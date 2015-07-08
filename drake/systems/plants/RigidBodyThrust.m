@@ -54,6 +54,10 @@ classdef RigidBodyThrust < RigidBodyForceElement
       B_mod(:,obj.input_num) = obj.scale_factor*J_geometric'*axis_world;
     end
     
+    function fr = constructFrame(obj,manip)
+      fr = CoordinateFrame(obj.name,1,'f',{'thrust'});
+    end
+    
   end
   
   methods (Static)
