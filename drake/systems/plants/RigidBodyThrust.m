@@ -10,6 +10,7 @@ classdef RigidBodyThrust < RigidBodyForceElement
     function obj = RigidBodyThrust(frame_id, axis, scale_factor, limits)
       
       obj.kinframe = frame_id;
+      axis = reshape(axis, [3,1]);
       obj.axis = axis/norm(axis);      
       
       obj.direct_feedthrough_flag = true;
