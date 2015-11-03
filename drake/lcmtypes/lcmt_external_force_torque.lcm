@@ -1,0 +1,13 @@
+package drake;
+
+struct lcmt_external_force_torque
+{
+    int64_t  timestamp;
+    string   body_name;
+    double   fx;
+    double   fy;
+    double   fz;
+    double   tx;
+    double   ty;
+    double   tz;
+}
