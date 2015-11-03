@@ -689,8 +689,15 @@ classdef RigidBodyManipulator < Manipulator
     end
     
     function model = addForceElement(model,force_element)
-      typecheck(force_element,'RigidBodyForceElement');
-      model.force{end+1} = force_element;
+      if (~iscell(force_element))
+        typecheck(force_element,'RigidBodyForceElement');
+      else
+        for i=1:length(force_element)
+          typecheck(force_element{i}, 'RigidBodyForceElement');
+        end
+      end
+
+      model.force = [model.force, force_element];
       model.dirty = true;
     end
 
