@@ -3,6 +3,7 @@ classdef RigidBodyCartesianForceTorque < RigidBodyForceElement
   properties
     body_id
     wrench_in_body_frame=true;
+    linkName
   end
 
   % allows for the application of an arbitrary force-moment on a body.
@@ -11,6 +12,7 @@ classdef RigidBodyCartesianForceTorque < RigidBodyForceElement
   methods
     function obj = RigidBodyCartesianForceTorque(name,frame_id,limits)
       obj.name = name;
+      obj.linkName = name;
       obj.body_id = frame_id;
       obj.direct_feedthrough_flag = true;
       obj.input_limits = repmat([-inf inf],6,1);
