@@ -3,11 +3,12 @@ package drake;
 struct lcmt_external_force_torque
 {
     int64_t  timestamp;
-    string   body_name;
-    double   fx;
-    double   fy;
-    double   fz;
-    double   tx;
-    double   ty;
-    double   tz;
+    int16_t  num_external_forces;
+    string   body_names[num_external_forces];
+    double  fx[num_external_forces];
+    double  fy[num_external_forces];
+    double  fz[num_external_forces];
+    double  tx[num_external_forces];
+    double  ty[num_external_forces];
+    double  tz[num_external_forces];
 }
