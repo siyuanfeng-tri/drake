@@ -30,7 +30,20 @@ const DrakeJoint& RigidBody::getJoint() const {
   }
 }
 
-bool RigidBody::hasParent() const { return parent != nullptr; }
+
+
+bool RigidBody::hasJoint() const
+{
+  if (joint){
+    return true;
+  }
+
+  return false;
+}
+
+bool RigidBody::hasParent() const {
+  return parent !=nullptr;
+}
 
 void RigidBody::addVisualElement(const DrakeShapes::VisualElement& element) {
   visual_elements.push_back(element);
