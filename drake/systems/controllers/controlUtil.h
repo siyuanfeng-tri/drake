@@ -126,6 +126,6 @@ struct JointNames {
 };
 
 DRAKECONTROLUTIL_EXPORT void getRobotJointIndexMap(
-    JointNames *joint_names, RobotJointIndexMap *joint_map);
+    const JointNames *joint_names, RobotJointIndexMap *joint_map);
 
 #endif
