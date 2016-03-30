@@ -543,6 +543,24 @@ void parseFrame(RigidBodyTree* model, XMLElement* node) {
   model->addFrame(frame);
 }
 
+void parseCollisionFilterGroup(RigidBodyTree *model, XMLElement *node, vector<string> &group_names, vector<vector<string>> &group_members, vector<vector<string>> &group_ignores)
+{
+  if (!node || !node->Attribute("name")) throw runtime_error("ERROR: collision filter group is missing a name element");
+  group_names.push_back(node->Attribute("name"));
+  group_members.resize(group_members.size() + 1);
+  group_ignores.resize(group_ignores.size() + 1);
+
+  for (XMLElement* member_node = node->FirstChildElement("member"); member_node; member_node = member_node->NextSiblingElement("member"))
+  {
+    group_members[group_names.size() - 1].push_back(member_node->Attribute("link"));
+  }
+
+  for (XMLElement* ignored_group_node = node->FirstChildElement("ignored_collision_filter_group"); ignored_group_node; ignored_group_node = ignored_group_node->NextSiblingElement("ignored_collision_filter_group"))
+  {
+    group_ignores[group_names.size() - 1].push_back(ignored_group_node->Attribute("collision_filter_group"));
+  }
+}
+
 void parseRobot(RigidBodyTree* model, XMLElement* node,
                 const PackageMap& package_map, const string& root_dir,
                 const DrakeJoint::FloatingBaseType floating_base_type,
@@ -609,6 +627,35 @@ void parseRobot(RigidBodyTree* model, XMLElement* node,
     floating_joint_name = "weld";
   }
 
+  // parse collision filter groups
+  vector<string> group_names;
+  vector<vector<string>> group_members, group_ignores;
+  for (XMLElement* collision_filter_group_node = node->FirstChildElement("collision_filter_group"); collision_filter_group_node; collision_filter_group_node = collision_filter_group_node->NextSiblingElement("collision_filter_group"))
+  parseCollisionFilterGroup(model, collision_filter_group_node, group_names, group_members, group_ignores);
+
+  // apply collision filter groups
+  DrakeCollision::bitmask belongs_to, ignores;
+  vector<string>::iterator ignored_group;
+  for (int group = 0; group < group_names.size(); group++)
+  {
+    belongs_to = DrakeCollision::NONE_MASK;
+    ignores = DrakeCollision::NONE_MASK;
+    belongs_to.set(group + 1);
+    for (auto ignored : group_ignores[group])
+    {
+    ignored_group = find(group_names.begin(), group_names.end(), ignored);
+      if (ignored_group != group_names.end())
+      {
+        ignores.set(ignored_group - group_names.begin() + 1);
+      }
+    }
+    for (auto link : group_members[group])
+    {
+      model->findLink(link)->addToCollisionFilterGroup(belongs_to);
+      model->findLink(link)->ignoreCollisionFilterGroup(ignores);
+    }
+  }
+
   for (unsigned int i = 1; i < model->bodies.size(); i++) {
     if (model->bodies[i]->parent == nullptr) {  // attach the root nodes to the
                                                 // world with a floating base
@@ -646,7 +693,6 @@ void parseURDF(RigidBodyTree* model, XMLDocument* xml_doc,
   if (!node) {
     throw std::runtime_error("ERROR: This urdf does not contain a robot tag");
   }
-
   parseRobot(model, node, package_map, root_dir, floating_base_type,
              weld_to_frame);
 
