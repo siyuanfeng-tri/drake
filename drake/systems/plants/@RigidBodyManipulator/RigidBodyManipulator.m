@@ -2253,7 +2253,7 @@ classdef RigidBodyManipulator < Manipulator
 
       end
       for i=1:length(model.name)
-        robot_inputs = [inputparents.robotnum]==i;
+        robot_inputs = [input_parents.robotnum]==i;
         coordinates = {inputnames{robot_inputs}}';
         fr{i}=CoordinateFrame([model.name{i},'Input'],sum(robot_inputs),'u',coordinates);
       end
