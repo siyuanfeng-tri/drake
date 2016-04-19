@@ -605,6 +605,11 @@ void InstantaneousQPController::resetControllerState(double t_new){
   this->controller_state.q_integrator_state = VectorXd::Zero(this->controller_state.q_integrator_state.size());
 }
 
+//access method for getting the controller state.
+QPControllerState InstantaneousQPController::getControllerState(){
+  return this->controller_state;
+}
+
 const QPControllerParams& InstantaneousQPController::getParamSet(std::string param_set_name){
   // look up the param set by name
   std::map<std::string, QPControllerParams>::iterator it;

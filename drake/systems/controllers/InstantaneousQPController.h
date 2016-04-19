@@ -55,6 +55,7 @@ class InstantaneousQPController {
       QPControllerOutput& qp_output, QPControllerDebugData* debug = NULL);
 
   void resetControllerState(double t_new);
+  QPControllerState getControllerState();
 
   const RigidBodyTree& getRobot() const { return *robot; }
   const RobotPropertyCache& getRPC() const { return rpc; }
