@@ -36,6 +36,14 @@ struct DrakeRobotState {
   Eigen::VectorXd qd;
 };
 
+struct DrakeRobotStateWithTorque{
+  double t;
+  Eigen::VectorXd q;
+  Eigen::VectorXd qd;
+  Eigen::VectorXd torque;
+};
+
+
 DRAKECONTROLUTIL_EXPORT bool isSupportElementActive(
     SupportStateElement *se, bool contact_force_detected,
     bool kinematic_contact_detected);
