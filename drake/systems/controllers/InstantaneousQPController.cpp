@@ -26,6 +26,7 @@ void InstantaneousQPController::initialize() {
 
   int nq = robot->num_positions;
   int nu = static_cast<int>(robot->actuators.size());
+  numFloatingBaseJoints = nq - nu;
 
   umin.resize(nu);
   umax.resize(nu);
@@ -627,6 +628,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
   int nu = robot->B.cols();
   int nq = robot->num_positions;
+  numFloatingBaseJoints = nq - nu;
 
   // zmp_data
   Map<const Matrix<double, 4, 4, RowMajor>> A_ls(&qp_input.zmp_data.A[0][0]);
@@ -691,11 +693,15 @@ int InstantaneousQPController::setupAndSolveQP(
     }
   }
 
-  const int dim = 3,  // 3D
-      nd = 2 *
-           m_surface_tangents;  // for friction cone approx, hard coded for now
+  const int dim = 3; // 3D
+  // for friction cone approx, hard coded for now
+  const int nd = 2 * m_surface_tangents;  // in practice nd = 4
 
-  assert(nu + 6 == nq);
+
+  // TODO:
+  // this is specific to floating base robot. maybe as simple as commenting out?
+  // if this is a fixed base robot, then assert nu==nq?
+//  assert(nu + 6 == nq);
 
   std::vector<DesiredBodyAcceleration> desired_body_accelerations;
   desired_body_accelerations.resize(qp_input.num_tracked_bodies);
@@ -703,6 +709,7 @@ int InstantaneousQPController::setupAndSolveQP(
   Vector6d body_vdot;
   Isometry3d body_pose_des;
 
+  // don't worry about supporting these for now with fixed base robot
   for (int i = 0; i < qp_input.num_tracked_bodies; i++) {
     int body_or_frame_id0 = body_or_frame_name_to_id.at(
         qp_input.body_motion_data[i].body_or_frame_name);
@@ -773,13 +780,16 @@ int InstantaneousQPController::setupAndSolveQP(
     if (desired_body_accelerations[i].weight < 0) n_body_accel_eq_constraints++;
   }
 
+
+  // This is all stuff to do with controlling the zmp. ZMP value function and stuff
+  // like that
   MatrixXd R_DQyD_ls = R_ls + D_ls.transpose() * Qy * D_ls;
 
   cache.initialize(robot_state.q, robot_state.qd);
   robot->doKinematics(cache, true);
 
   //---------------------------------------------------------------------
-
+  // will ignore this with a fixed base robot
   int num_active_contact_pts = 0;
   for (std::vector<SupportStateElement,
                    Eigen::aligned_allocator<SupportStateElement>>::iterator
@@ -800,12 +810,22 @@ int InstantaneousQPController::setupAndSolveQP(
     f_ext.insert({robot->bodies[body_id].get(), f_ext_i});
   }
 
+  // H is massMatrix
   H = robot->massMatrix(cache);
+
+  // C is coriolis term
   C = robot->dynamicsBiasTerm(cache, f_ext);
 
-  H_float = H.topRows(6);
+  // TODO: fixed base
+  // need to remove this for fixed base robot, just set 6 to 0
+  H_float = H.topRows(numFloatingBaseJoints);
+
+  // keep this for fixed base, will actually be whole robot in that case
   H_act = H.bottomRows(nu);
-  C_float = C.head<6>();
+
+  // TODO: fixed base
+  // same for these as for the H ones
+  C_float = C.head<numFloatingBaseJoints>();
   C_act = C.tail(nu);
 
   bool include_angular_momentum = (params.W_kdot.array().maxCoeff() > 1e-10);
@@ -819,6 +839,8 @@ int InstantaneousQPController::setupAndSolveQP(
   Vector3d xcom;
   // consider making all J's into row-major
 
+
+  //where are these going to be used?
   xcom = robot->centerOfMass(cache);
   J = robot->centerOfMassJacobian(cache);
   Jdotv = robot->centerOfMassJacobianDotTimesV(cache);
@@ -828,6 +850,8 @@ int InstantaneousQPController::setupAndSolveQP(
   MatrixXd Jcom;
   VectorXd Jcomdotv;
 
+
+  // whether we are using planar COM or full 3D com
   if (x0.size() == 6) {
     Jcom = J;
     Jcomdotv = Jdotv;
@@ -836,8 +860,10 @@ int InstantaneousQPController::setupAndSolveQP(
     Jcomdotv = Jdotv_xy;
   }
 
+  // J is the com jacobian
   Vector3d xcomdot = J * robot_state.qd;
 
+  // this is all for contact stuff?
   MatrixXd B, JB, Jp, normals;
   VectorXd Jpdotv;
   std::vector<double> adjusted_mus(active_supports.size());
@@ -853,11 +879,18 @@ int InstantaneousQPController::setupAndSolveQP(
     // std::cout << adjusted_mus[i] << " ";
   }
   // std::cout << std::endl;
+
+  // should be zero for fixed base robot, num_active_contact_pts = 0
+  // so we should have nc = 0
   int nc =
       contactConstraintsBV(*robot, cache, num_active_contact_pts, adjusted_mus,
                            active_supports, B, JB, Jp, Jpdotv, normals);
+
+  // Slack variables for velocity of contact points in world?
   int neps = nc * dim;
 
+
+  // don't worry about this for now
   if (params.use_center_of_mass_observer &&
       foot_force_torque_measurements.size() > 0) {
     estimateCoMBasedOnMeasuredZMP(params, active_supports, nc,
@@ -865,8 +898,13 @@ int InstantaneousQPController::setupAndSolveQP(
                                   xcomdot);
   }
 
+
+  // TODO: floating base, need to correct for fixed base. D_float shouldn't be there
+  // D is contact force jacobian
   VectorXd x_bar, xlimp;
-  MatrixXd D_float(6, JB.cols()), D_act(nu, JB.cols());
+  MatrixXd D_float(numFloatingBaseJoints, JB.cols()), D_act(nu, JB.cols());
+
+  // TODO: if have no contacts shouldn't need to worry about this
   if (nc > 0) {
     if (x0.size() == 6) {
       // x,y,z com
@@ -885,7 +923,7 @@ int InstantaneousQPController::setupAndSolveQP(
   }
 
   int nf = nc * nd;  // number of contact force variables
-  int nparams = nq + nf + neps;
+  int nparams = nq + nf + neps; // total number of variables in the QP
 
   Vector3d kdot_des;
   if (include_angular_momentum) {
@@ -921,38 +959,46 @@ int InstantaneousQPController::setupAndSolveQP(
       }
       f.head(nq) = fqp.transpose();
     } else {
-      f.head(nq) = -pid_out.qddot_des;
+      f.head(nq) = -pid_out.qddot_des; //TODO: I think this is missing w_qdd.array()
     }
   }
   f.tail(nf + neps) = VectorXd::Zero(nf + neps);
 
-  int neq = 6 + neps + 6 * n_body_accel_eq_constraints +
+  // TODO: Fixed base -> replace the 6.
+  // neq is the number of equality constraints.
+  // note that the order matters here
+  int neq = numFloatingBaseJoints + neps + 6 * n_body_accel_eq_constraints +
             qp_input.whole_body_data.num_constrained_dofs;
   MatrixXd Aeq = MatrixXd::Zero(neq, nparams);
   VectorXd beq = VectorXd::Zero(neq);
 
   // constrained floating base dynamics
   //  H_float*qdd - J_float'*lambda - Dbar_float*beta = -C_float
-  Aeq.topLeftCorner(6, nq) = H_float;
-  beq.topRows(6) = -C_float;
+  // TODO: what is beta?
+  Aeq.topLeftCorner(numFloatingBaseJoints, nq) = H_float;
+  beq.topRows(numFloatingBaseJoints) = -C_float;
 
   if (nc > 0) {
-    Aeq.block(0, nq, 6, nc * nd) = -D_float;
+    Aeq.block(0, nq, numFloatingBaseJoints, nc * nd) = -D_float;
   }
 
+
+  // TODO: neps are the slack variables on contact position velocity
   if (nc > 0) {
     // relative acceleration constraint
-    Aeq.block(6, 0, neps, nq) = Jp;
-    Aeq.block(6, nq, neps, nf) =
+    Aeq.block(numFloatingBaseJoints, 0, neps, nq) = Jp;
+    Aeq.block(numFloatingBaseJoints, nq, neps, nf) =
         MatrixXd::Zero(neps, nf);  // note: obvious sparsity here
-    Aeq.block(6, nq + nf, neps, neps) =
+    Aeq.block(numFloatingBaseJoints, nq + nf, neps, neps) =
         MatrixXd::Identity(neps, neps);  // note: obvious sparsity here
+
+    //TODO: Jpdotv is d/dt(Jp) * v, so Jp qdd + Jpdot v is velocity of contact point
     beq.segment(6, neps) = -Jpdotv - params.Kp_accel * Jp * robot_state.qd;
   }
 
   // add in body spatial equality constraints
   // VectorXd body_vdot;
-  int equality_ind = 6 + neps;
+  int equality_ind = numFloatingBaseJoints + neps;
   MatrixXd Jb(6, nq);
   Vector6d Jbdotv;
   for (int i = 0; i < desired_body_accelerations.size(); i++) {
@@ -987,6 +1033,8 @@ int InstantaneousQPController::setupAndSolveQP(
     }
   }
 
+
+  // add constraints for constrained dofs
   if (qp_input.whole_body_data.num_constrained_dofs > 0) {
     // add joint acceleration constraints
     for (int i = 0; i < qp_input.whole_body_data.num_constrained_dofs; i++) {
@@ -995,6 +1043,9 @@ int InstantaneousQPController::setupAndSolveQP(
     }
   }
 
+  // n_ineq is the number of inequality constraints. Doesn't have anything to do with
+  // fixed vs. floating base. The inequality constraints are torque limits and
+  // limits on some body accelerations
   int n_ineq = 2 * nu + 2 * 6 * desired_body_accelerations.size();
   MatrixXd Ain =
       MatrixXd::Zero(n_ineq, nparams);  // note: obvious sparsity here
@@ -1012,6 +1063,8 @@ int InstantaneousQPController::setupAndSolveQP(
   Ain.block(nu, 0, nu, nparams) = -1 * Ain.block(0, 0, nu, nparams);
   bin.segment(nu, nu) = B_act.transpose() * C_act - umin;
 
+
+  // constraints on body accelerations, using slack variables
   int constraint_start_index = 2 * nu;
   for (int i = 0; i < desired_body_accelerations.size(); i++) {
     Matrix<double, 6, Dynamic> Jb_compact = robot->geometricJacobian(
@@ -1057,12 +1110,18 @@ int InstantaneousQPController::setupAndSolveQP(
   lb.tail(neps) = -params.slack_limit * VectorXd::Ones(neps);
   ub.tail(neps) = params.slack_limit * VectorXd::Ones(neps);
 
+
+  // these will be the variables in the optimization
   VectorXd alpha(nparams);
 
+
+  // just cost matrices of form nf'*Qnfdiag*nf, cost on ground reaction forces
   MatrixXd Qnfdiag(nf, 1), Qneps(neps, 1);
   std::vector<MatrixXd*> QBlkDiag(
       nc > 0 ? 3 : 1);  // nq, nf, neps   // this one is for gurobi
 
+
+  // REG = 1e-8, here for numerical reasons
   VectorXd w = (w_qdd.array() + REG).matrix();
 
   if (nc != controller_state.num_active_contact_pts) {
@@ -1145,6 +1204,7 @@ int InstantaneousQPController::setupAndSolveQP(
   } else {
 #endif
 
+
     if (nc > 0) {
       Hqp = Jcom.transpose() * R_DQyD_ls * Jcom;
       if (include_angular_momentum) {
@@ -1153,7 +1213,7 @@ int InstantaneousQPController::setupAndSolveQP(
       Hqp += w_qdd.asDiagonal();
       Hqp += REG * MatrixXd::Identity(nq, nq);
     } else {
-      Hqp = (1 + REG) * MatrixXd::Identity(nq, nq);
+      Hqp = (1 + REG) * MatrixXd::Identity(nq, nq); // TODO: aren't we missing w_qdd here? maybe missing in both places?
     }
 
     // add in body spatial acceleration cost terms
@@ -1256,7 +1316,8 @@ int InstantaneousQPController::setupAndSolveQP(
     controller_state.last_com_ddot = Jdotv + J * qp_output.qdd;
   }
 
-  if (CHECK_CENTROIDAL_MOMENTUM_RATE_MATCHES_TOTAL_WRENCH) {
+  // only do this if we actually have a floating base
+  if (CHECK_CENTROIDAL_MOMENTUM_RATE_MATCHES_TOTAL_WRENCH && (numFloatingBaseJoints > 0)) {
     checkCentroidalMomentumMatchesTotalWrench(*robot, cache, qp_output.qdd,
                                               active_supports, B, beta);
   }
