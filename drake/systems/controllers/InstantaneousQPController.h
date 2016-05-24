@@ -5,9 +5,6 @@
 #include "QPCommon.h"
 #include "drake/solvers/gurobiQP.h"
 #include "lcmtypes/drake/lcmt_qp_controller_input.hpp"
-#include "lcmtypes/drake/lcmt_qp_controller_input_new.hpp"
-
-
 #define INSTQP_USE_FASTQP 1
 #define INSTQP_GUROBI_OUTPUTFLAG 0
 #define INSTQP_GUROBI_METHOD 2
@@ -49,7 +46,7 @@ class InstantaneousQPController {
   }
 
   int setupAndSolveQP(
-      const drake::lcmt_qp_controller_input_new& qp_input,
+      const drake::lcmt_qp_controller_input& qp_input,
       const DrakeRobotState& robot_state,
       const Eigen::Ref<const Eigen::Matrix<bool, Eigen::Dynamic, 1>>&
           contact_detected,
@@ -116,7 +113,7 @@ class InstantaneousQPController {
 
   std::vector<SupportStateElement,
               Eigen::aligned_allocator<SupportStateElement>>
-  loadAvailableSupports(const drake::lcmt_qp_controller_input_new& qp_input);
+  loadAvailableSupports(const drake::lcmt_qp_controller_input& qp_input);
 
   void estimateCoMBasedOnMeasuredZMP(
       const QPControllerParams& params,
