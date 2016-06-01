@@ -305,13 +305,13 @@ classdef QPLocomotionPlanSettings
         obj.D_control = -obj.robot.default_walking_params.nominal_LIP_COM_height / obj.g * eye(2);
       end
 
-      for j = 1:num_bodies_to_track
-        if options.bodies_to_track(j) == biped.findLinkId('r_hand')
-          obj.constrained_dofs = setdiff(obj.constrained_dofs, findPositionIndices(obj.robot,'r_arm'));
-        elseif options.bodies_to_track(j) == biped.findLinkId('l_hand')
-          obj.constrained_dofs = setdiff(obj.constrained_dofs, findPositionIndices(obj.robot,'l_arm'));
-        end
-      end
+      % for j = 1:num_bodies_to_track
+      %   if options.bodies_to_track(j) == biped.findLinkId('r_hand')
+      %     obj.constrained_dofs = setdiff(obj.constrained_dofs, findPositionIndices(obj.robot,'r_arm'));
+      %   elseif options.bodies_to_track(j) == biped.findLinkId('l_hand')
+      %     obj.constrained_dofs = setdiff(obj.constrained_dofs, findPositionIndices(obj.robot,'l_arm'));
+      %   end
+      % end
       
       body_poses = zeros([7, length(ts), num_bodies_to_track]);
       body_velocity = zeros([7,length(ts), num_bodies_to_track]);
