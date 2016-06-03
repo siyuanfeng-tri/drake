@@ -1313,6 +1313,8 @@ int InstantaneousQPController::setupAndSolveQP(
     if (use_fast_qp > 0) {  // set up and call fastqp
       info = fastQP(QBlkDiag, f, Aeq, beq, Ain_lb_ub, bin_lb_ub,
                     controller_state.active, alpha);
+      qp_output.fastQPFailed = false;
+
       // if (info<0)    mexPrintf("fastQP info=%d... calling Gurobi.\n", info);
     } else {
       // use gurobi active set
@@ -1328,6 +1330,7 @@ int InstantaneousQPController::setupAndSolveQP(
     }
 
     if (info < 0) {
+      qp_output.fastQPFailed = true;
       model = gurobiQP(env, QBlkDiag, f, Aeq, beq, Ain, bin, lb, ub,
                        controller_state.active, alpha);
       int status;
@@ -1335,6 +1338,9 @@ int InstantaneousQPController::setupAndSolveQP(
       // if (status!=2) mexPrintf("Gurobi reports non-optimal status = %d\n",
       // status);
     }
+
+    // record the info from the QP
+    qp_output.qpInfo = info;
 #ifdef USE_MATRIX_INVERSION_LEMMA
   }
 #endif
