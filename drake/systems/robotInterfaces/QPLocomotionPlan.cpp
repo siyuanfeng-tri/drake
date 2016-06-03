@@ -136,11 +136,12 @@ drake::lcmt_qp_controller_input QPLocomotionPlan::createQPControllerInput(
   // change this to use the new qtraj format in the qp_input msg which is splines
   auto q_des = settings.q_traj.value(t_plan);
 
-  // extract the slice of the polynomial that we want. Now encode it into the appropriate message
+  // extract the slice of the polynomial that we want and shift it to the global time
   PiecewisePolynomial<double>& qtrajSpline = settings.q_traj;
   int qtrajSegmentIdx = qtrajSpline.getSegmentIndex(t_plan);
   int endSegmentIdx = std::min(2, qtrajSpline.getNumberOfSegments() - qtrajSegmentIdx);
   PiecewisePolynomial<double> qtrajSlice = qtrajSpline.slice(qtrajSegmentIdx, endSegmentIdx);
+  qtrajSlice.shiftRight(start_time);
 
   // apply plan shift if necessary.
   // note that the plan shift is only for position of floating base, namely, x,y,z
