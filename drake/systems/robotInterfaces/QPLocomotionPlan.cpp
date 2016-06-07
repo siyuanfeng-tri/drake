@@ -134,7 +134,13 @@ drake::lcmt_qp_controller_input QPLocomotionPlan::createQPControllerInput(
 
   // whole body data
   // change this to use the new qtraj format in the qp_input msg which is splines
+  // convert this q_des to a std::vector which we can use in the whole_body_data msg
   auto q_des = settings.q_traj.value(t_plan);
+  std::vector<float> q_des_std_vector;
+  q_des_std_vector.resize(q_des.size());
+  for(int i = 0; i < q_des.size(); i++){
+    q_des_std_vector[i] = static_cast<float>(q_des(i));
+  }
 
   // extract the slice of the polynomial that we want and shift it to the global time
   PiecewisePolynomial<double>& qtrajSpline = settings.q_traj;
@@ -160,7 +166,7 @@ drake::lcmt_qp_controller_input QPLocomotionPlan::createQPControllerInput(
   drake::lcmt_piecewise_polynomial qtrajSplineMsg;
   encodePiecewisePolynomial(qtrajSlice, qtrajSplineMsg);
   qp_input.whole_body_data.spline = qtrajSplineMsg;
-
+  qp_input.whole_body_data.q_des = q_des_std_vector;
   qp_input.whole_body_data.timestamp = 0;
   qp_input.whole_body_data.num_positions = robot.num_positions;
   qp_input.whole_body_data.constrained_dofs =
