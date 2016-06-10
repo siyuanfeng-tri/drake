@@ -96,6 +96,62 @@ int contactPhi(const RigidBodyTree &r, const KinematicsCache<double> &cache,
   return nc;
 }
 
+void reconstructContactWrench(
+    const RigidBodyTree& robot, KinematicsCache<double>& cache,
+    const std::vector<SupportStateElement,
+                      Eigen::aligned_allocator<SupportStateElement>>&
+        active_supports,
+    const MatrixXd& B, const VectorXd& beta,
+    std::vector<Vector6d> &contact_wrenches,
+    std::vector<Vector3d> &ref_pts,
+    std::vector<Vector3d> &all_contacts,
+    std::vector<Vector3d> &all_forces)
+{
+  const int n_basis_vectors_per_contact = 2 * m_surface_tangents;
+
+  int beta_start = 0;
+ 
+  // resize outputs
+  contact_wrenches.resize(active_supports.size(), Vector6d::Zero());
+  ref_pts.resize(active_supports.size());
+  all_contacts.clear();
+  all_forces.clear();
+
+  for (size_t j = 0; j < active_supports.size(); j++) {
+    const auto& active_support = active_supports[j];
+    const auto& contact_pts = active_support.contact_pts; // this is relative in body frame
+    int ncj = static_cast<int>(contact_pts.size());
+    int active_support_length = n_basis_vectors_per_contact * ncj;
+    const auto& Bj = B.middleCols(beta_start, active_support_length);
+    const auto& betaj = beta.segment(beta_start, active_support_length);
+
+    // find which body is this contact on
+    int body_id = active_support.body_idx;
+
+    // compute wrench wrt to body position
+    contact_wrenches[j].setZero();
+    ref_pts[j] = robot.transformPoints(cache, Vector3d::Zero(), body_id, 0);
+    
+    for (size_t k = 0; k < contact_pts.size(); k++) {
+      const auto& Bblock = Bj.middleCols(k * n_basis_vectors_per_contact,
+          n_basis_vectors_per_contact);
+      const auto& betablock = betaj.segment(k * n_basis_vectors_per_contact,
+          n_basis_vectors_per_contact);
+      Vector3d point_force = Bblock * betablock;
+      Vector3d contact_pt = robot.transformPoints(cache, contact_pts[k], body_id, 0);
+
+      // trq first
+      contact_wrenches[j].head<3>() += (contact_pt - ref_pts[j]).cross(point_force);
+      contact_wrenches[j].tail<3>() += point_force;
+
+      all_contacts.push_back(contact_pt);
+      all_forces.push_back(point_force);
+    } 
+
+    beta_start += active_support_length;
+  }
+}
+
 int contactConstraintsBV(
     const RigidBodyTree &r, const KinematicsCache<double> &cache, int nc,
     std::vector<double> support_mus,

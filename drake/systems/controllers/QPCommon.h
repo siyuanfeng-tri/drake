@@ -291,12 +291,18 @@ struct DesiredBodyAcceleration {
 };
 
 struct QPControllerOutput {
+  std::vector<Eigen::Matrix<double,6,1>> contact_wrenches; // 1 wrench per link in contact. 
+  std::vector<Eigen::Vector3d> contact_ref_points; // 1 ref point per link in contact.
+  std::vector<Eigen::Vector3d> all_contact_points; // all the contact points (many per link)
+  std::vector<Eigen::Vector3d> all_contact_forces; // all the contact forces (many per link)
+  
   Eigen::VectorXd q_ref;
   Eigen::VectorXd qd_ref;
   Eigen::VectorXd qdd;
   Eigen::VectorXd u;
   Eigen::VectorXd q_des; // just what we evaluate fromt the spline
   Eigen::VectorXd qdot_des; //desired velocity coming from spline
+
   bool fastQPFailed;
   int qpInfo;
 };

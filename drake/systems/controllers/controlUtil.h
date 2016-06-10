@@ -87,6 +87,16 @@ DRAKECONTROLUTIL_EXPORT int contactPhi(const RigidBodyTree &r,
                                        const KinematicsCache<double> &cache,
                                        SupportStateElement &supp,
                                        Eigen::VectorXd &phi);
+DRAKECONTROLUTIL_EXPORT void reconstructContactWrench(
+    const RigidBodyTree& robot, KinematicsCache<double>& cache,
+    const std::vector<SupportStateElement,
+                      Eigen::aligned_allocator<SupportStateElement>>&
+        active_supports,
+    const Eigen::MatrixXd& B, const Eigen::VectorXd& beta,
+    std::vector<Vector6d> &contact_wrenches,
+    std::vector<Eigen::Vector3d> &ref_pts,
+    std::vector<Eigen::Vector3d> &all_contacts,
+    std::vector<Eigen::Vector3d> &all_forces);
 DRAKECONTROLUTIL_EXPORT int contactConstraintsBV(
     const RigidBodyTree &r, const KinematicsCache<double> &cache, int nc,
     std::vector<double> support_mus,

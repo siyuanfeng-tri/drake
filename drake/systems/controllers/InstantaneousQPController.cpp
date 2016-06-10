@@ -1376,6 +1376,9 @@ int InstantaneousQPController::setupAndSolveQP(
       velocityReference(robot_state.t, robot_state.q, robot_state.qd,
                         qp_output.qdd, foot_contact, params.vref_integrator);
 
+  // reconstruct grf.
+  reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_wrenches, qp_output.contact_ref_points, qp_output.all_contact_points, qp_output.all_contact_forces);
+
   // Remember t for next time around
   controller_state.t_prev = robot_state.t;
 
