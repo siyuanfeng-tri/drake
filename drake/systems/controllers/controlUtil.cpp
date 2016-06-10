@@ -1,5 +1,6 @@
 #include "drake/systems/controllers/controlUtil.h"
 #include "drake/util/drakeUtil.h"
+#include <list>
 
 using namespace Eigen;
 
@@ -104,8 +105,8 @@ void reconstructContactWrench(
     const MatrixXd& B, const VectorXd& beta,
     std::vector<Vector6d> &contact_wrenches,
     std::vector<Vector3d> &ref_pts,
-    std::vector<Vector3d> &all_contacts,
-    std::vector<Vector3d> &all_forces)
+    std::vector<Vector3d> &All_contacts,
+    std::vector<Vector3d> &All_forces)
 {
   const int n_basis_vectors_per_contact = 2 * m_surface_tangents;
 
@@ -114,8 +115,7 @@ void reconstructContactWrench(
   // resize outputs
   contact_wrenches.resize(active_supports.size(), Vector6d::Zero());
   ref_pts.resize(active_supports.size());
-  all_contacts.clear();
-  all_forces.clear();
+  std::list<Vector3d> all_contacts, all_forces; 
 
   for (size_t j = 0; j < active_supports.size(); j++) {
     const auto& active_support = active_supports[j];
@@ -150,6 +150,15 @@ void reconstructContactWrench(
 
     beta_start += active_support_length;
   }
+
+  All_contacts.resize(all_contacts.size());
+  All_forces.resize(all_forces.size());
+  int ctr = 0;
+  for (auto it = all_contacts.begin(); it != all_contacts.end(); it++)
+    All_contacts[ctr++] = *it;
+  ctr = 0;
+  for (auto it = all_forces.begin(); it != all_forces.end(); it++)
+    All_forces[ctr++] = *it;
 }
 
 int contactConstraintsBV(
