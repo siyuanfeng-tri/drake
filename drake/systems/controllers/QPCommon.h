@@ -302,6 +302,10 @@ struct QPControllerOutput {
   Eigen::VectorXd u;
   Eigen::VectorXd q_des; // just what we evaluate fromt the spline
   Eigen::VectorXd qdot_des; //desired velocity coming from spline
+  
+  Eigen::VectorXd comdd;
+  Eigen::VectorXd footdd[2];
+  Eigen::VectorXd pelvdd;
 
   bool fastQPFailed;
   int qpInfo;

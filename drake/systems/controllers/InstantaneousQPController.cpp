@@ -1378,7 +1378,24 @@ int InstantaneousQPController::setupAndSolveQP(
 
   // reconstruct grf.
   reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_wrenches, qp_output.contact_ref_points, qp_output.all_contact_points, qp_output.all_contact_forces);
-
+  qp_output.comdd = Jcom * qp_output.qdd + Jcomdotv;
+  int sf_idx[3];
+  sf_idx[0] = body_or_frame_name_to_id.at("leftFoot");
+  sf_idx[1] = body_or_frame_name_to_id.at("rightFoot");
+  sf_idx[2] = body_or_frame_name_to_id.at("pelvis");
+  VectorXd cartdd[3];
+  for (int i = 0; i < 3; i++) {
+    KinematicPath body_path;
+    MatrixXd Jcompact, Jfull;
+    body_path = robot->findKinematicPath(0, sf_idx[i]);
+    Jcompact = robot->geometricJacobian(cache, 0, sf_idx[i], sf_idx[i], true);
+    Jfull = robot->geometricJacobian(cache, 0, sf_idx[i], sf_idx[i], true);
+    cartdd[i] = Jfull * qp_output.qdd + robot->geometricJacobianDotTimesV(cache, 0, sf_idx[i], sf_idx[i]);
+  }
+  qp_output.pelvdd = cartdd[2];
+  qp_output.footdd[0] = cartdd[0];
+  qp_output.footdd[1] = cartdd[1];
+  
   // Remember t for next time around
   controller_state.t_prev = robot_state.t;
 
