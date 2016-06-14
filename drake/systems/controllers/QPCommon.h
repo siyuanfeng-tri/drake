@@ -231,6 +231,8 @@ struct QPControllerParams {
         w_grf(0.0),
         Kp_accel(0.0),
         contact_threshold(0.0),
+        mu(0.7),
+        w_zmp(1.0),
         min_knee_angle(0.0),
         use_center_of_mass_observer(false),
         center_of_mass_observer_gain(Eigen::Matrix4d::Zero()) {}
@@ -247,6 +249,8 @@ struct QPControllerParams {
   double w_grf;
   double Kp_accel;
   double contact_threshold;
+  double w_zmp;
+  double mu;
   double min_knee_angle;
   bool use_center_of_mass_observer;
   Eigen::Matrix4d center_of_mass_observer_gain;
@@ -306,6 +310,7 @@ struct QPControllerOutput {
   Eigen::VectorXd comdd;
   Eigen::VectorXd footdd[2];
   Eigen::VectorXd pelvdd;
+  Eigen::VectorXd slack;
 
   bool fastQPFailed;
   int qpInfo;

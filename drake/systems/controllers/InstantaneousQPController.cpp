@@ -529,8 +529,8 @@ void checkCentroidalMomentumMatchesTotalWrench(
         active_supports,
     const MatrixXd& B, const VectorXd& beta) {
   std::map<int, Side> foot_body_index_to_side;
-  foot_body_index_to_side[robot.findLinkId("l_foot")] = Side::LEFT;
-  foot_body_index_to_side[robot.findLinkId("r_foot")] = Side::RIGHT;
+  foot_body_index_to_side[robot.findLinkId("leftFoot")] = Side::LEFT;
+  foot_body_index_to_side[robot.findLinkId("rightFoot")] = Side::RIGHT;
   // compute sum of wrenches, compare to rate of change of momentum from vd
   Vector6d total_wrench_in_world = Vector6d::Zero();
   const int n_basis_vectors_per_contact = 2 * m_surface_tangents;
@@ -580,7 +580,9 @@ void checkCentroidalMomentumMatchesTotalWrench(
       robot.worldMomentumMatrixDotTimesV(cache);
   Vector6d momentum_rate_of_change =
       world_momentum_matrix * qdd + world_momentum_matrix_dot_times_v;
+  Vector6d momentum_rate_of_change_centroidal = transformSpatialForce(com_to_world.inverse(), momentum_rate_of_change);
 
+      std::cout << momentum_rate_of_change_centroidal.transpose() << std::endl << std::endl;
   valuecheckMatrix(total_wrench_in_world, momentum_rate_of_change, 1e-6);
 }
 
@@ -908,10 +910,22 @@ int InstantaneousQPController::setupAndSolveQP(
     } else {
       adjusted_mus[i] = mu;
     }
+
+    /////////////////////////////
+    /////////////////////////////
+    /////////////////////////////
+    /////////////////////////////
+    adjusted_mus[i] = params.mu;
+    /////////////////////////////
+    /////////////////////////////
+    /////////////////////////////
+    /////////////////////////////
+
+
+
     // std::cout << adjusted_mus[i] << " ";
   }
-  // std::cout << std::endl;
-
+  
   // should be zero for fixed base robot, num_active_contact_pts = 0
   // so we should have nc = 0
   int nc =
@@ -969,6 +983,9 @@ int InstantaneousQPController::setupAndSolveQP(
   //  min: ybar*Qy*ybar + ubar*R*ubar + (2*S*xbar + s1)*(A*x + B*u) +
   //    w_qdd*quad(qddot_ref - qdd) + w_eps*quad(epsilon) +
   //    w_grf*quad(beta) + quad(kdot_des - (A*qdd + Adot*qd))
+
+  double w_zmp = params.w_zmp;
+
   VectorXd f(nparams);
   {
     if (nc > 0) {
@@ -984,6 +1001,7 @@ int InstantaneousQPController::setupAndSolveQP(
       fqp += (S * x_bar + 0.5 * s1).transpose() * B_ls * Jcom;
       fqp -= u0.transpose() * tmp2;
       fqp -= y0.transpose() * Qy * D_ls * Jcom;
+      fqp *= w_zmp;
       fqp -= (w_qdd.array() * pid_out.qddot_des.array()).matrix().transpose();
       if (include_angular_momentum) {
         fqp += Akdot_times_v.transpose() * params.W_kdot * Ak;
@@ -1238,7 +1256,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
 
     if (nc > 0) {
-      Hqp = Jcom.transpose() * R_DQyD_ls * Jcom;
+      Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
       if (include_angular_momentum) {
         Hqp += Ak.transpose() * params.W_kdot * Ak;
       }
@@ -1389,13 +1407,14 @@ int InstantaneousQPController::setupAndSolveQP(
     MatrixXd Jcompact, Jfull;
     body_path = robot->findKinematicPath(0, sf_idx[i]);
     Jcompact = robot->geometricJacobian(cache, 0, sf_idx[i], sf_idx[i], true);
-    Jfull = robot->geometricJacobian(cache, 0, sf_idx[i], sf_idx[i], true);
+    Jfull = robot->compactToFull(Jcompact, body_path.joint_path, true);
     cartdd[i] = Jfull * qp_output.qdd + robot->geometricJacobianDotTimesV(cache, 0, sf_idx[i], sf_idx[i]);
   }
   qp_output.pelvdd = cartdd[2];
   qp_output.footdd[0] = cartdd[0];
   qp_output.footdd[1] = cartdd[1];
-  
+  qp_output.slack = alpha.tail(neps);
+
   // Remember t for next time around
   controller_state.t_prev = robot_state.t;
 
