@@ -318,7 +318,9 @@ QPControllerParams loadSingleParamSet(const YAML::Node& config,
   params.slack_limit = get(config, "slack_limit").as<double>();
   params.w_grf = get(config, "w_grf").as<double>();
   params.w_zmp = get(config, "w_zmp").as<double>();
+  params.w_qdd_delta = get(config, "w_qdd_delta").as<double>();
   params.mu = get(config, "mu").as<double>();
+  params.Jpdotv_multiplier = get(config, "Jpdotv_multiplier").as<double>();
   params.Kp_accel = get(config, "Kp_accel").as<double>();
   params.contact_threshold = get(config, "contact_threshold").as<double>();
   params.min_knee_angle = get(config, "min_knee_angle").as<double>();

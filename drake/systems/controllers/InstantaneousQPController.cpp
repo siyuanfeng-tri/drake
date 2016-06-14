@@ -985,6 +985,8 @@ int InstantaneousQPController::setupAndSolveQP(
   //    w_grf*quad(beta) + quad(kdot_des - (A*qdd + Adot*qd))
 
   double w_zmp = params.w_zmp;
+  auto w_qdd_delta = params.w_qdd_delta;
+
 
   VectorXd f(nparams);
   {
@@ -1003,6 +1005,12 @@ int InstantaneousQPController::setupAndSolveQP(
       fqp -= y0.transpose() * Qy * D_ls * Jcom;
       fqp *= w_zmp;
       fqp -= (w_qdd.array() * pid_out.qddot_des.array()).matrix().transpose();
+      if(qp_output.qdd.size() == nq){
+        fqp -= (w_qdd_delta * qp_output.qdd.array()).matrix().transpose();
+      } else{
+        std::cout << "skipping w_qdd_delta 1" << std::endl;
+      }
+      
       if (include_angular_momentum) {
         fqp += Akdot_times_v.transpose() * params.W_kdot * Ak;
         fqp -= kdot_des.transpose() * params.W_kdot * Ak;
@@ -1013,6 +1021,7 @@ int InstantaneousQPController::setupAndSolveQP(
     }
   }
   f.tail(nf + neps) = VectorXd::Zero(nf + neps);
+
 
   // TODO: Fixed base -> replace the 6.
   // neq is the number of equality constraints.
@@ -1043,7 +1052,7 @@ int InstantaneousQPController::setupAndSolveQP(
         MatrixXd::Identity(neps, neps);  // note: obvious sparsity here
 
     //TODO: Jpdotv is d/dt(Jp) * v, so Jp qdd + Jpdot v is velocity of contact point
-    beq.segment(6, neps) = -Jpdotv - params.Kp_accel * Jp * robot_state.qd;
+    beq.segment(6, neps) = -1.0*params.Jpdotv_multiplier*Jpdotv - params.Kp_accel * Jp * robot_state.qd;
   }
 
   // add in body spatial equality constraints
@@ -1261,6 +1270,13 @@ int InstantaneousQPController::setupAndSolveQP(
         Hqp += Ak.transpose() * params.W_kdot * Ak;
       }
       Hqp += w_qdd.asDiagonal();
+
+      if(qp_output.qdd.size() == nq){
+        Hqp += w_qdd_delta*MatrixXd::Identity(nq, nq);
+      } else{
+        std::cout << "skipping w_qdd_delta" << std::endl;
+      }
+      
       Hqp += REG * MatrixXd::Identity(nq, nq);
     } else {
       Hqp = (1 + REG) * MatrixXd::Identity(nq, nq); // TODO: aren't we missing w_qdd here? maybe missing in both places?

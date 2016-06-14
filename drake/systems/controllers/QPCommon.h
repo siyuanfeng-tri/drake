@@ -229,9 +229,11 @@ struct QPControllerParams {
         w_slack(0.0),
         slack_limit(0.0),
         w_grf(0.0),
+        w_qdd_delta(0.0),
         Kp_accel(0.0),
         contact_threshold(0.0),
         mu(0.7),
+        Jpdotv_multiplier(1.0),
         w_zmp(1.0),
         min_knee_angle(0.0),
         use_center_of_mass_observer(false),
@@ -247,9 +249,11 @@ struct QPControllerParams {
   double w_slack;
   double slack_limit;
   double w_grf;
+  double Jpdotv_multiplier;
   double Kp_accel;
   double contact_threshold;
   double w_zmp;
+  double w_qdd_delta;
   double mu;
   double min_knee_angle;
   bool use_center_of_mass_observer;
