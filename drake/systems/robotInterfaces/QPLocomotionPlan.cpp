@@ -417,6 +417,12 @@ drake::lcmt_qp_controller_input QPLocomotionPlan::createQPControllerInput(
     }
   }
 
+  // set the qp output torque low pass filter alpha value based on plan time
+  if (t_plan < 0.5)
+    qp_input.torque_alpha_filter = 0.9;
+  else
+    qp_input.torque_alpha_filter = 0;
+  
   last_qp_input = qp_input;
   verifySubtypeSizes(qp_input);
   return qp_input;

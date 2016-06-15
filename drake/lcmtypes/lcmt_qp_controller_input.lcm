@@ -23,4 +23,6 @@ struct lcmt_qp_controller_input
 	lcmt_joint_pd_override joint_pd_override[num_joint_pd_overrides];
 
 	string param_set_name;
+
+	double torque_alpha_filter;
 }

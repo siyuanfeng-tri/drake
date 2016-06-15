@@ -1410,6 +1410,18 @@ int InstantaneousQPController::setupAndSolveQP(
   for (int i = 0; i < qp_output.u.size(); i++) {
     if (std::isnan(qp_output.u(i))) qp_output.u(i) = 0;
   }
+
+  // low pass filter the output trq
+  trq_alpha = qp_input.torque_alpha_filter;
+  trq_alpha = std::min(1., trq_alpha);
+  trq_alpha = std::max(0., trq_alpha);
+  if (trq_prev.size() != qp_output.u.size()) {
+    trq_prev.resize(qp_output.u.size());
+    trq_prev = qp_output.u;
+  }
+  trq_prev = trq_alpha * trq_prev + (1-trq_alpha) * qp_output.u;
+  qp_output.u = trq_prev;
+
   // y = B_act.jacobiSvd(ComputeThinU|ComputeThinV).solve(H_act*qdd + C_act -
   // Jz_act.transpose()*lambda - D_act*beta);
 

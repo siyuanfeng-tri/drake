@@ -99,6 +99,10 @@ class InstantaneousQPController {
   // and which must persist to the next iteration
   QPControllerState controller_state;
 
+  // low pass filter output torque;
+  Eigen::VectorXd trq_prev;
+  double trq_alpha;  
+
   PIDOutput wholeBodyPID(double t, const Eigen::Ref<const Eigen::VectorXd>& q,
                          const Eigen::Ref<const Eigen::VectorXd>& qd,
                          const Eigen::Ref<const Eigen::VectorXd>& q_des,
