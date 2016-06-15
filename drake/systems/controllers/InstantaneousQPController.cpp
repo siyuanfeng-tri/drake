@@ -743,6 +743,8 @@ int InstantaneousQPController::setupAndSolveQP(
   Vector6d body_vdot;
   Isometry3d body_pose_des;
 
+  qp_output.body_vdots.resize(qp_input.num_tracked_bodies);
+
   // don't worry about supporting these for now with fixed base robot
   for (int i = 0; i < qp_input.num_tracked_bodies; i++) {
     int body_or_frame_id0 = body_or_frame_name_to_id.at(
@@ -807,6 +809,14 @@ int InstantaneousQPController::setupAndSolveQP(
         params.body_motion[true_body_id0].accel_bounds;
     desired_body_accelerations[i].control_pose_when_in_contact =
         qp_input.body_motion_data[i].control_pose_when_in_contact;
+
+
+    // for debugging purposes
+    int body_id0 = robot->parseBodyOrFrameID(
+        desired_body_accelerations[i].body_or_frame_id0);
+
+    qp_output.body_vdots[i].name = robot->getBodyOrFrameName(body_id0);
+    qp_output.body_vdots[i].body_vdot = desired_body_accelerations[i].body_vdot;
   }
 
   int n_body_accel_eq_constraints = 0;

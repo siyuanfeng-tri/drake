@@ -298,12 +298,19 @@ struct DesiredBodyAcceleration {
   Vector6d weight_multiplier;
 };
 
+struct QPBodyMotionInput {
+  std::string name;
+  Eigen::Matrix<double, 6, 1> body_vdot;
+};
+
 struct QPControllerOutput {
   std::vector<Eigen::Matrix<double,6,1>> contact_wrenches; // 1 wrench per link in contact. 
   std::vector<Eigen::Vector3d> contact_ref_points; // 1 ref point per link in contact.
   std::vector<Eigen::Vector3d> all_contact_points; // all the contact points (many per link)
   std::vector<Eigen::Vector3d> all_contact_forces; // all the contact forces (many per link)
-  
+
+  std::vector<QPBodyMotionInput> body_vdots;
+
   Eigen::VectorXd q_ref;
   Eigen::VectorXd qd_ref;
   Eigen::VectorXd qdd;
