@@ -995,8 +995,14 @@ int InstantaneousQPController::setupAndSolveQP(
   //    w_grf*quad(beta) + quad(kdot_des - (A*qdd + Adot*qd))
 
   double w_zmp = params.w_zmp;
-  auto w_qdd_delta = params.w_qdd_delta;
+  double w_qdd_delta = params.w_qdd_delta;
 
+  // compute u without constraints
+  VectorXd lin = -(C_ls*xlimp-y0).transpose() * Qy * D_ls
+                 + u0.transpose() * R_ls
+                 - (S*x_bar+0.5*s1).transpose() * B_ls;
+  VectorXd u_d = R_DQyD_ls.inverse() * lin.transpose();
+  qp_output.comdd_d = u_d;
 
   VectorXd f(nparams);
   {
@@ -1297,6 +1303,9 @@ int InstantaneousQPController::setupAndSolveQP(
       if (desired_body_accelerations[i].weight > 0) {
         int body_id0 = robot->parseBodyOrFrameID(
             desired_body_accelerations[i].body_or_frame_id0);
+        
+        std::cout << robot->getBodyOrFrameName(body_id0) << std::endl;
+        
         if (desired_body_accelerations[i].control_pose_when_in_contact ||
             !inSupport(active_supports, body_id0)) {
           Matrix<double, 6, Dynamic> Jb_compact = robot->geometricJacobian(
