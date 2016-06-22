@@ -10,6 +10,9 @@
 #include "drake/util/testUtil.h"
 #include "gtest/gtest.h"
 
+#include "drake/systems/plants/RigidBodyTree.h"
+#include "drake/systems/plants/KinematicsCache.h"
+
 using Eigen::Dynamic;
 using Eigen::Ref;
 using Eigen::Matrix;
@@ -20,6 +23,7 @@ using Eigen::Vector2d;
 using Eigen::Vector3d;
 using Eigen::Vector4d;
 using Eigen::VectorXd;
+using Eigen::Isometry3d;
 
 using Drake::TaylorVecXd;
 using Drake::VecIn;
@@ -236,6 +240,263 @@ GTEST_TEST(testOptimizationProblem, testProblem1AsQP) {
 });
 }
 
+////////////////////// SFENG
+//
+typedef Eigen::Matrix<double,6,1> Vector6d;
+MatrixXd getTaskSpaceJacobian(const RigidBodyTree &r, KinematicsCache<double> &cache, int body, const Vector3d &local_offset)
+{
+  std::vector<int> v_or_q_indices;
+  KinematicPath body_path = r.findKinematicPath(0, body);
+  MatrixXd Jg = r.geometricJacobian(cache, 0, body, 0, true, &v_or_q_indices);
+  MatrixXd J(6, r.number_of_velocities());
+  J.setZero();
+
+  Vector3d points = r.transformPoints(cache, local_offset, body, 0);
+
+  int col = 0;
+  for (std::vector<int>::iterator it = v_or_q_indices.begin(); it != v_or_q_indices.end(); ++it) {
+    // angular
+    J.template block<SPACE_DIMENSION, 1>(0,*it) = Jg.block<3,1>(0,col);
+    // linear, just like the linear velocity, assume qd = 1, the column is the linear velocity.
+    J.template block<SPACE_DIMENSION, 1>(3,*it) = Jg.block<3,1>(3,col);
+    J.template block<SPACE_DIMENSION, 1>(3,*it).noalias() += Jg.block<3,1>(0,col).cross(points);
+    col++;
+  }
+
+  return J;
+}
+
+Vector6d getTaskSpaceJacobianDotTimesV(const RigidBodyTree &r, KinematicsCache<double> &cache, int body_or_frame_id, const Vector3d &local_offset)
+{
+  // position of point in world
+  Vector3d p = r.transformPoints(cache, local_offset, body_or_frame_id, 0);
+  Vector6d twist = r.relativeTwist(cache, 0, body_or_frame_id, 0);
+  Vector6d J_geometric_dot_times_v = r.geometricJacobianDotTimesV(cache, 0, body_or_frame_id, 0);
+
+  // linear vel of r
+  Vector3d pdot = twist.head<3>().cross(p) + twist.tail<3>();
+
+  // each column of J_task Jt = [Jg_omega; Jg_v + Jg_omega.cross(p)]
+  // Jt * v, angular part stays the same, 
+  // linear part = [\dot{Jg_v}v + \dot{Jg_omega}.cross(p) + Jg_omega.cross(rdot)] * v 
+  //             = [lin of JgdotV + ang of JgdotV.cross(p) + omega.cross(rdot)]
+  Vector6d Jdv = J_geometric_dot_times_v;
+  Jdv.tail<3>() += twist.head<3>().cross(pdot) + J_geometric_dot_times_v.head<3>().cross(p);
+
+  return Jdv;
+}
+
+GTEST_TEST(testOptimizationProblem, testValGravComp) {
+  std::string home_dir = getenv("HOME");
+  std::string urdf = std::string(home_dir) + std::string("/code/oh-distro-private/software/models/val_description/urdf/valkyrie_sim_drake.urdf");
+  
+  RigidBodyTree robot(urdf, DrakeJoint::ROLLPITCHYAW);
+  KinematicsCache<double> cache(robot.bodies);
+  
+  std::unordered_map<std::string, int> body_or_frame_name_to_id;
+  body_or_frame_name_to_id = std::unordered_map<std::string, int>();
+  for (auto it = robot.bodies.begin(); it != robot.bodies.end(); ++it) {
+    body_or_frame_name_to_id[(*it)->name()] = it - robot.bodies.begin();
+  }
+
+  for (auto it = robot.frames.begin(); it != robot.frames.end(); ++it) {
+    body_or_frame_name_to_id[(*it)->name] = -(it - robot.frames.begin()) - 2;
+  }
+  
+  std::unordered_map<std::string, int> joint_name_to_id; 
+  for (int i = 0; i < robot.number_of_positions(); i++) {
+    joint_name_to_id[robot.getPositionName(i)] = i;
+  }
+
+  // set state and do kinematics
+  VectorXd q(robot.number_of_positions());
+  VectorXd qd(robot.number_of_velocities());
+
+  q.setZero();
+  qd.setZero();
+
+  q[joint_name_to_id.at("rightHipRoll")] = 0.01;
+  q[joint_name_to_id.at("rightHipPitch")] = -0.5432;
+  q[joint_name_to_id.at("rightKneePitch")] = 1.2195;
+  q[joint_name_to_id.at("rightAnklePitch")] = -0.7070;
+  q[joint_name_to_id.at("rightAnkleRoll")] = -0.0069;
+
+  q[joint_name_to_id.at("leftHipRoll")] = -0.01;
+  q[joint_name_to_id.at("leftHipPitch")] = -0.5432;
+  q[joint_name_to_id.at("leftKneePitch")] = 1.2195;
+  q[joint_name_to_id.at("leftAnklePitch")] = -0.7070;
+  q[joint_name_to_id.at("leftAnkleRoll")] = 0.0069;
+
+  q[joint_name_to_id.at("rightShoulderRoll")] = 1;
+  q[joint_name_to_id.at("rightShoulderYaw")] = 0.5;
+  q[joint_name_to_id.at("rightElbowPitch")] = M_PI/2.;
+  
+  q[joint_name_to_id.at("leftShoulderRoll")] = -1;
+  q[joint_name_to_id.at("leftShoulderYaw")] = 0.5;
+  q[joint_name_to_id.at("leftElbowPitch")] = -M_PI/2.;
+  
+  cache.initialize(q, qd);
+  robot.doKinematics(cache, true);
+
+  // inverse dynamics looks like:
+  // M(q) * qdd + h(q,qd) = S * tau + J^T * lambda,
+  // assume we have 2 contacts at the foot, we want to solve for qdd, and lambda, 
+  // and tau = M_l * qdd + h_l - J^T_l * lamda, _l means the lower rows of those matrices,
+  //
+  // the unknown is X = [qdd, lambda]
+  // equality constraints: M_u * qdd + h_u = J^T_u * lambda
+  // inequality: a bunch, etc for now
+  // min: (J*qdd + Jdqd)^2 + (Jcom*qdd + Jcomdqd - comdd_d)^2 + (qdd)^2 + (lambda)^2
+
+  MatrixXd M = robot.massMatrix(cache);
+  eigen_aligned_unordered_map<RigidBody const*, Matrix<double, TWIST_SIZE, 1>> f_ext;
+  VectorXd h = robot.dynamicsBiasTerm(cache, f_ext);
+
+  int nContacts = 2;
+  int nQdd = robot.number_of_velocities();
+  int nWrench = 6 * nContacts;
+  int nTrq = nQdd - 6;
+  
+  int nVar = nQdd + nWrench;
+  int neq = 6 + nQdd;
+  int nineq = 1 * nContacts; // Fz >= 0
+
+  // get contact related stuff
+  int foot_id[nContacts]; 
+  std::string foot_name[nContacts] = {std::string("leftFoot"), std::string("rightFoot")};
+  Isometry3d foot_pose[nContacts];
+  MatrixXd foot_J[nContacts];
+  VectorXd foot_Jdv[nContacts];
+  // contact is 9cm below ankle
+  Isometry3d foot_to_contact = Isometry3d::Identity();
+  foot_to_contact.translation() = Vector3d(0,0,-0.09);
+
+  for (int i = 0; i < nContacts; i++) {
+    foot_id[i] = body_or_frame_name_to_id.at(foot_name[i]);
+    foot_pose[i] = robot.relativeTransform(cache, 0, foot_id[i]) * foot_to_contact;
+    foot_J[i] = getTaskSpaceJacobian(robot, cache, foot_id[i], foot_to_contact.translation());
+    foot_Jdv[i] = getTaskSpaceJacobianDotTimesV(robot, cache, foot_id[i], foot_to_contact.translation());
+    
+    std::cout << foot_pose[i].translation().transpose() << std::endl;
+  }
+
+  MatrixXd CE(neq, nVar);
+  VectorXd ce0(neq);
+  MatrixXd CI(nineq, nVar);
+  VectorXd ci0(nineq);
+
+  MatrixXd H(nVar, nVar);
+  VectorXd h0(nVar);
+
+  VectorXd X(nVar);
+
+  CE.setZero();
+  ce0.setZero();
+  CI.setZero();
+  ci0.setZero();
+  H.setZero();
+  h0.setZero();
+
+  // equality: EOM
+  CE.block(0,0,6,nQdd) = M.topRows(6);
+  for (int i = 0; i < nContacts; i++) {
+    CE.block(0,nQdd+i*6,6,6) = -foot_J[i].block<6,6>(0,0).transpose();
+  }
+  ce0.head(6) = h.head(6);
+  CE.block(6,0,nQdd,nQdd).setIdentity();
+
+  // inequality: Fz >= 0; no friction limit, no cop limit for now 
+  for (int i = 0; i < nContacts; i++) {
+    CI(i, nQdd+5+i*6) = 1;
+  }
+  ci0.setZero();
+
+  // cost function
+  // CoM term
+  Vector3d comdd_d = Vector3d::Zero();
+  double w_com = 100;
+  MatrixXd Jcom = robot.centerOfMassJacobian(cache);
+  VectorXd Jcomdv = robot.centerOfMassJacobianDotTimesV(cache);
+  H.block(0,0,nQdd,nQdd) += w_com * Jcom.transpose() * Jcom;
+  h0.head(nQdd) += w_com * 1 * (Jcomdv - comdd_d).transpose() * Jcom;
+
+  // contact not moving term
+  Vector6d footdd_d[nContacts];
+  double w_foot = 1000;
+  for (int i = 0; i < nContacts; i++) {
+    footdd_d[i].setZero();
+    H.block(0,0,nQdd,nQdd) += w_foot * foot_J[i].transpose() * foot_J[i];
+    h0.head(nQdd) += w_foot * 1 * (foot_Jdv[i] - footdd_d[i]).transpose() * foot_J[i];
+  }
+
+  // reg qdd
+  double w_qdd_reg = 1000000;
+  H.block(0,0,nQdd,nQdd) += w_qdd_reg * MatrixXd::Identity(nQdd,nQdd);
+  //for (int i = 0; i < nQdd; i++)
+  //  H(i,i) += w_qdd_reg;
+
+  // reg wrench
+  double w_wrench_reg = 0.01;
+  //for (int i = 0; i < nWrench; i++)
+  //  H(nQdd+i,nQdd+i) += w_wrench_reg;
+  H.block(nQdd,nQdd,nWrench,nWrench) += w_wrench_reg * MatrixXd::Identity(nWrench,nWrench);
+
+  //////////////////////////////////////////////////////////
+  // SOLVE
+  OptimizationProblem prog;
+  auto x = prog.AddContinuousVariables(nVar);
+  prog.AddQuadraticProgramCost(H, h0);
+  prog.AddLinearEqualityConstraint(CE, -ce0);
+  VectorXd init = VectorXd::Zero(nVar);
+  init(nQdd + 5) = 700;
+  init(nQdd + 11) = 700;
+  prog.SetInitialGuess({x}, init);
+  SolutionResult result;
+  SnoptSolver snopt_solver;
+  result = snopt_solver.Solve(prog);
+  assert(result == SolutionResult::kSolutionFound);
+  X = x.value();
+
+  //////////////////////////////////////////////////////////
+
+  // get qdd, lambda, and tau
+  VectorXd qdd = X.head(nQdd);
+  VectorXd lambda = X.tail(nWrench); 
+  VectorXd tau = M.bottomRows(nTrq) * qdd + h.tail(nTrq);
+  for (int i = 0; i < nContacts; i++) {
+    tau -= foot_J[i].block(0,6,6,nTrq).transpose() * lambda.segment<6>(i*6);
+  }
+
+  std::cout << "QDD:\n";
+  for (int i = 0; i < nQdd; i++)
+    std::cout << robot.getPositionName(i) << ": " << qdd[i] << std::endl;
+ 
+  std::cout << "COMDD:\n";
+  std::cout << (Jcom * qdd + Jcomdv).transpose() << std::endl;
+
+  std::cout << "LFdd:\n";
+  std::cout << (foot_J[0] * qdd + foot_Jdv[0]).transpose() << std::endl;
+  std::cout << "RFdd:\n";
+  std::cout << (foot_J[1] * qdd + foot_Jdv[1]).transpose() << std::endl;
+
+  std::cout << "LF:\n";
+  std::cout << lambda.head(6) << std::endl;
+  std::cout << "RF:\n";
+  std::cout << lambda.tail(6) << std::endl;
+
+  std::cout << "TAU:\n";
+  for (int i = 0; i < nTrq; i++)
+    std::cout << robot.getPositionName(i+6) << ": " << tau[i] << std::endl;
+
+  // check dynamics
+  VectorXd residual = M * qdd + h;
+  for (int i = 0; i < nContacts; i++)
+    residual -= foot_J[i].transpose() * lambda.segment<6>(i*6);
+  residual.tail(nTrq) -= tau;
+
+  std::cout << residual << std::endl;
+}
+
 // This test comes from Section 2.3 of "Handbook of Test Problems in
 // Local and Global Optimization."
 class TestProblem2Objective {
@@ -278,7 +539,7 @@ GTEST_TEST(testOptimizationProblem, testProblem2) {
   expected << 0, 1, 0, 1, 1, 20;
   prog.SetInitialGuess({x}, expected + .01 * VectorXd::Random(6));
   RunNonlinearProgram(prog, [&]() {
-    EXPECT_TRUE(CompareMatrices(x.value(), expected, 1e-9,
+    EXPECT_TRUE(CompareMatrices(x.value(), expected, 1e-4,
                                 MatrixCompareType::absolute));
   });
 }
@@ -316,7 +577,7 @@ GTEST_TEST(testOptimizationProblem, testProblem2AsQP) {
   prog.SetInitialGuess({x}, expected + .01 * VectorXd::Random(6));
 
   RunNonlinearProgram(prog, [&]() {
-    EXPECT_TRUE(CompareMatrices(x.value(), expected, 1e-9,
+    EXPECT_TRUE(CompareMatrices(x.value(), expected, 1e-4,
                               MatrixCompareType::absolute));
   });
 }
