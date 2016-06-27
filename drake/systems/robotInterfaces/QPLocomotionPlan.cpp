@@ -100,11 +100,13 @@ drake::lcmt_qp_controller_input QPLocomotionPlan::createQPControllerInput(
   if (std::isnan(start_time)) start_time = t_global;
 
   double t_plan = t_global - start_time;
+  double t_plan_no_clip = t_plan;
   if (t_plan < 0)
     throw std::runtime_error("t_plan is negative!");  // TODO: decide how to
                                                       // handle this case; fail
                                                       // fast for now
   t_plan = std::min(t_plan, settings.duration);
+
 
   // find index into supports vector
   size_t support_index = 0;
@@ -418,10 +420,12 @@ drake::lcmt_qp_controller_input QPLocomotionPlan::createQPControllerInput(
   }
 
   // set the qp output torque low pass filter alpha value based on plan time
-  if (t_plan < 0.5)
+  std::cout << "t_plan_no_clip " << t_plan_no_clip << std::endl;
+  std::cout << "t_plan " << t_plan << std::endl;
+  if (t_plan_no_clip < 0.5)
     qp_input.torque_alpha_filter = 0.9;
   else
-    qp_input.torque_alpha_filter = 0;
+    qp_input.torque_alpha_filter = 0.0;
   
   last_qp_input = qp_input;
   verifySubtypeSizes(qp_input);
