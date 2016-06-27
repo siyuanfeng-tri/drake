@@ -32,19 +32,22 @@ classdef PlanEval < handle
     end
 
     function current_plan = getCurrentPlan(obj, t, x)
-      while true
-        current_plan = obj.plan_queue{1};
-        if ~current_plan.isFinished(t, x);
-          break
-        end
-        disp('current plan is finished')
-        if length(obj.plan_queue) == 1
-          obj.plan_queue{1} = current_plan.getSuccessor(t, x);
-        else
-          obj.plan_queue(1) = [];
-        end
-        obj.plan_queue{1}.setStartTime(t);
-      end
+      current_plan = obj.plan_queue{1};
+      % while true
+      %   current_plan = obj.plan_queue{1};
+      %   if ~current_plan.isFinished(t, x);
+      %     break
+      %   end
+      %   disp('current plan is finished')
+      %   if length(obj.plan_queue) == 1
+      %     % don't do this, keep calling getQPControllerInput, have time dependent stuff in there . . .
+      %     % like the alpha filter
+      %     % obj.plan_queue{1} = current_plan.getSuccessor(t, x);
+      %   else
+      %     obj.plan_queue(1) = [];
+      %   end
+      %   % obj.plan_queue{1}.setStartTime(t);
+      % end
     end
 
     function qp_input = getQPControllerInput(obj, t, x)
