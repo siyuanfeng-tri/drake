@@ -528,9 +528,9 @@ void checkCentroidalMomentumMatchesTotalWrench(
                       Eigen::aligned_allocator<SupportStateElement>>&
         active_supports,
     const MatrixXd& B, const VectorXd& beta) {
-  std::map<int, Side> foot_body_index_to_side;
-  foot_body_index_to_side[robot.findLinkId("leftFoot")] = Side::LEFT;
-  foot_body_index_to_side[robot.findLinkId("rightFoot")] = Side::RIGHT;
+  // std::map<int, Side> foot_body_index_to_side;
+  // foot_body_index_to_side[robot.findLinkId("leftFoot")] = Side::LEFT;
+  // foot_body_index_to_side[robot.findLinkId("rightFoot")] = Side::RIGHT;
   // compute sum of wrenches, compare to rate of change of momentum from vd
   Vector6d total_wrench_in_world = Vector6d::Zero();
   const int n_basis_vectors_per_contact = 2 * m_surface_tangents;
@@ -1422,9 +1422,16 @@ int InstantaneousQPController::setupAndSolveQP(
   }
 
   // low pass filter the output trq
-  trq_alpha = qp_input.torque_alpha_filter;
-  trq_alpha = std::min(1., trq_alpha);
-  trq_alpha = std::max(0., trq_alpha);
+  // only if enabled in the params
+  if(params.useTorqueAlphaFilter){
+    trq_alpha = qp_input.torque_alpha_filter;
+    trq_alpha = std::min(1., trq_alpha);
+    trq_alpha = std::max(0., trq_alpha);
+  } else{
+    trq_alpha = 0.0;
+  }
+
+  
   if (trq_prev.size() != qp_output.u.size()) {
     trq_prev.resize(qp_output.u.size());
     trq_prev = qp_output.u;
@@ -1446,8 +1453,8 @@ int InstantaneousQPController::setupAndSolveQP(
   reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_wrenches, qp_output.contact_ref_points, qp_output.all_contact_points, qp_output.all_contact_forces);
   qp_output.comdd = Jcom * qp_output.qdd + Jcomdotv;
   int sf_idx[3];
-  sf_idx[0] = body_or_frame_name_to_id.at("leftFoot");
-  sf_idx[1] = body_or_frame_name_to_id.at("rightFoot");
+  sf_idx[0] = rpc.foot_ids[Side::LEFT];
+  sf_idx[1] = rpc.foot_ids[Side::RIGHT];
   sf_idx[2] = body_or_frame_name_to_id.at("pelvis");
   VectorXd cartdd[3];
   for (int i = 0; i < 3; i++) {

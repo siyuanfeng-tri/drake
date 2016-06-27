@@ -323,6 +323,7 @@ QPControllerParams loadSingleParamSet(const YAML::Node& config,
   params.Jpdotv_multiplier = get(config, "Jpdotv_multiplier").as<double>();
   params.Kp_accel = get(config, "Kp_accel").as<double>();
   params.contact_threshold = get(config, "contact_threshold").as<double>();
+  params.useTorqueAlphaFilter = get(config, "useTorqueAlphaFilter").as<bool>();
   params.min_knee_angle = get(config, "min_knee_angle").as<double>();
   YAML::Node com_observer_config = get(config, "center_of_mass_observer");
   params.use_center_of_mass_observer =

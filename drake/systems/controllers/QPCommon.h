@@ -252,6 +252,7 @@ struct QPControllerParams {
   double Jpdotv_multiplier;
   double Kp_accel;
   double contact_threshold;
+  bool useTorqueAlphaFilter;
   double w_zmp;
   double w_qdd_delta;
   double mu;
