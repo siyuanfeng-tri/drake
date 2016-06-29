@@ -9,12 +9,11 @@ using systems::OutputPort;
 using systems::StateVector;
 using systems::SystemOutput;
 using systems::VectorInterface;
-using systems::VectorX;
 
 namespace examples {
 
 namespace {
-const ptrdiff_t kStateSize = 2;
+constexpr int64_t kStateSize = 2;
 }  // namespace
 
 SpringMassStateVector::SpringMassStateVector(double initial_position,
@@ -52,6 +51,12 @@ void SpringMassOutputVector::set_velocity(double v) {
   get_mutable_value()[1] = v;
 }
 
+SpringMassOutputVector* SpringMassOutputVector::DoClone() const {
+  SpringMassOutputVector* clone(new SpringMassOutputVector());
+  clone->get_mutable_value() = get_value();
+  return clone;
+}
+
 SpringMassSystem::SpringMassSystem(const std::string& name,
                                    double spring_constant_N_per_m,
                                    double mass_kg)
@@ -77,8 +82,9 @@ std::unique_ptr<Context<double>> SpringMassSystem::CreateDefaultContext()
 std::unique_ptr<SystemOutput<double>> SpringMassSystem::AllocateOutput() const {
   std::unique_ptr<SystemOutput<double>> output(new SystemOutput<double>);
   {
-    OutputPort<double> port;
-    port.vector_output.reset(new SpringMassOutputVector());
+    std::unique_ptr<VectorInterface<double>> data(new SpringMassOutputVector());
+    std::unique_ptr<OutputPort<double>> port(
+        new OutputPort<double>(std::move(data)));
     output->ports.push_back(std::move(port));
   }
   return output;
@@ -99,7 +105,7 @@ void SpringMassSystem::Output(const Context<double>& context,
       dynamic_cast<const SpringMassStateVector&>(
           context.get_state().continuous_state->get_state());
   SpringMassOutputVector* output_vector = dynamic_cast<SpringMassOutputVector*>(
-      output->ports[0].vector_output.get());
+      output->ports[0]->GetMutableVectorData());
   output_vector->set_position(state.get_position());
   output_vector->set_velocity(state.get_velocity());
 }

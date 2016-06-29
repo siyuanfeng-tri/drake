@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 
+#include "drake/common/eigen_types.h"
 #include "drake/drakeRBM_export.h"
 #include "drake/systems/plants/collision/DrakeCollision.h"
 #include "drake/systems/plants/joints/DrakeJoint.h"
@@ -42,7 +43,7 @@ class DRAKERBM_EXPORT RigidBody {
   /**
    * Returns the ID of the model to which this rigid body belongs.
    */
-  const int get_model_id() const;
+  int get_model_id() const;
 
   /**
    * Sets the ID of the model to which this rigid body belongs.
@@ -110,11 +111,7 @@ class DRAKERBM_EXPORT RigidBody {
   }
 
   // TODO(amcastro-tri): Change to is_adjacent_to().
-  bool adjacentTo(const RigidBody& other) const {
-    return ((has_as_parent(other) && !(joint && joint->isFloating())) ||
-            (other.has_as_parent(*this) &&
-             !(other.joint && other.joint->isFloating())));
-  }
+  bool adjacentTo(const RigidBody& other) const;
 
   bool CollidesWith(const RigidBody& other) const {
     bool ignored =
@@ -180,7 +177,7 @@ class DRAKERBM_EXPORT RigidBody {
 
   double mass;
   Eigen::Vector3d com;
-  Eigen::Matrix<double, TWIST_SIZE, TWIST_SIZE> I;
+  drake::SquareTwistMatrix<double> I;
 
   friend std::ostream& operator<<(std::ostream& out, const RigidBody& b);
 
@@ -200,21 +197,11 @@ class DRAKERBM_EXPORT RigidBody {
 
     CollisionElement* clone() const override;
 
-    /**
-     * @brief Returns a const reference to the body to which this
-     * CollisionElement is attached.
-     */
-    // TODO(amcastro-tri): getBody() -> get_body()
-    const RigidBody& getBody() const;
-
     bool CollidesWith(const DrakeCollision::Element* other) const override;
 
 #ifndef SWIG
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 #endif
-
-   private:
-    const RigidBody* const body;
   };
 
  public:
