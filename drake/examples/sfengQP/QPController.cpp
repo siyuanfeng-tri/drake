@@ -349,8 +349,8 @@ int QPController2::control(
   //int nInEq = 11 * nContacts + nTrq;
   
   OptimizationProblem prog;
-  const DecisionVariableView qdd = prog.AddContinuousVariables(nQdd, "qdd");
   const DecisionVariableView lambda = prog.AddContinuousVariables(nWrench, "lambda");
+  const DecisionVariableView qdd = prog.AddContinuousVariables(nQdd, "qdd");
   
   int lambda_start = lambda.index();
   int qdd_start = qdd.index();
@@ -584,16 +584,8 @@ int QPController2::control(
   VectorXd val;
   for (auto cost_b : costs) {
     std::shared_ptr<Constraint> cost = cost_b.constraint();
-    /*
-    try {
-      cost->eval(output.qdd, val);
-      std::cout << "cost on qdd: " << val.transpose() << std::endl;
-    }
-    catch (std::exception &e) {
-      cost->eval(lambda.value(), val);
-      std::cout << "cost on wrench: " << val.transpose() << std::endl;
-    }
-    */
+    cost->eval(cost_b.variable_list().begin()->value(), val);
+    std::cout << "cost on qdd: " << val.transpose() << std::endl;
   }
   
   VectorXd residual = rs.M * output.qdd + rs.h;
