@@ -28,6 +28,7 @@ template <typename CoefficientType>
 typename ExponentialPlusPiecewisePolynomial<CoefficientType>::ValueType
 ExponentialPlusPiecewisePolynomial<CoefficientType>::value(double t) const {
   int segment_index = getSegmentIndex(t);
+  t = std::min(std::max(t, getStartTime()), getEndTime());
 
   Eigen::Matrix<double, Eigen::Dynamic, 1> ret =
       piecewise_polynomial_part.value(t);
