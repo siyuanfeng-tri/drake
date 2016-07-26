@@ -744,7 +744,7 @@ int InstantaneousQPController::setupAndSolveQP(
   Vector6d body_vdot;
   Isometry3d body_pose_des;
 
-  qp_output.body_vdots.resize(qp_input.num_tracked_bodies);
+  qp_output.desired_body_motions.resize(qp_input.num_tracked_bodies);
 
   // don't worry about supporting these for now with fixed base robot
   for (int i = 0; i < qp_input.num_tracked_bodies; i++) {
@@ -816,8 +816,13 @@ int InstantaneousQPController::setupAndSolveQP(
     int body_id0 = robot->parseBodyOrFrameID(
         desired_body_accelerations[i].body_or_frame_id0);
 
-    qp_output.body_vdots[i].name = robot->getBodyOrFrameName(body_id0);
-    qp_output.body_vdots[i].body_vdot = desired_body_accelerations[i].body_vdot;
+    qp_output.desired_body_motions[i].name = robot->getBodyOrFrameName(body_id0);
+    //qp_output.body_vdots[i].body_vdot = desired_body_accelerations[i].body_vdot;
+    // these are in world frame, and the first 3 are pos, because the trajs are specified that way
+    qp_output.desired_body_motions[i].body_q_d.segment<3>(0) = body_pose_des.translation();
+    qp_output.desired_body_motions[i].body_q_d.segment<3>(3) = rotmat2rpy(body_pose_des.linear());
+    qp_output.desired_body_motions[i].body_v_d = body_v_des;
+    qp_output.desired_body_motions[i].body_vdot_d = body_vdot_des;
   }
 
   int n_body_accel_eq_constraints = 0;
@@ -936,7 +941,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
     // std::cout << adjusted_mus[i] << " ";
   }
-  
+
   // should be zero for fixed base robot, num_active_contact_pts = 0
   // so we should have nc = 0
   int nc =
@@ -1027,7 +1032,7 @@ int InstantaneousQPController::setupAndSolveQP(
       } else{
         std::cout << "skipping w_qdd_delta 1" << std::endl;
       }
-      
+
       if (include_angular_momentum) {
         fqp += Akdot_times_v.transpose() * params.W_kdot * Ak;
         fqp -= kdot_des.transpose() * params.W_kdot * Ak;
@@ -1293,7 +1298,7 @@ int InstantaneousQPController::setupAndSolveQP(
       } else{
         std::cout << "skipping w_qdd_delta" << std::endl;
       }
-      
+
       Hqp += REG * MatrixXd::Identity(nq, nq);
     } else {
       Hqp = (1 + REG) * MatrixXd::Identity(nq, nq); // TODO: aren't we missing w_qdd here? maybe missing in both places?
@@ -1304,9 +1309,7 @@ int InstantaneousQPController::setupAndSolveQP(
       if (desired_body_accelerations[i].weight > 0) {
         int body_id0 = robot->parseBodyOrFrameID(
             desired_body_accelerations[i].body_or_frame_id0);
-        
-        std::cout << robot->getBodyOrFrameName(body_id0) << std::endl;
-        
+
         if (desired_body_accelerations[i].control_pose_when_in_contact ||
             !inSupport(active_supports, body_id0)) {
           Matrix<double, 6, Dynamic> Jb_compact = robot->geometricJacobian(
@@ -1431,7 +1434,7 @@ int InstantaneousQPController::setupAndSolveQP(
     trq_alpha = 0.0;
   }
 
-  
+
   if (trq_prev.size() != qp_output.u.size()) {
     trq_prev.resize(qp_output.u.size());
     trq_prev = qp_output.u;

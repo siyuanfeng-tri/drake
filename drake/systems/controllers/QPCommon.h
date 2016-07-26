@@ -301,20 +301,22 @@ struct DesiredBodyAcceleration {
   Vector6d weight_multiplier;
 };
 
-struct QPBodyMotionInput {
+struct QPDesiredBodyMotion {
   std::string name;
-  Eigen::Matrix<double, 6, 1> body_vdot;
+  Eigen::Matrix<double, 6, 1> body_q_d;
+  Eigen::Matrix<double, 6, 1> body_v_d;
+  Eigen::Matrix<double, 6, 1> body_vdot_d;
 };
 
 struct QPControllerOutput {
-  std::vector<Eigen::Matrix<double,6,1>> contact_wrenches; // 1 wrench per link in contact. 
+  std::vector<Eigen::Matrix<double,6,1>> contact_wrenches; // 1 wrench per link in contact.
   std::vector<Eigen::Vector3d> contact_ref_points; // 1 ref point per link in contact.
   std::vector<Eigen::Vector3d> all_contact_points; // all the contact points (many per link)
   std::vector<Eigen::Vector3d> all_contact_forces; // all the contact forces (many per link)
 
-  // input 
-  std::vector<QPBodyMotionInput> body_vdots; // specified in body frame
-  Eigen::VectorXd comdd_d; // computed with the unconstrained cost function 
+  // input
+  std::vector<QPDesiredBodyMotion> desired_body_motions; // specified in world frame
+  Eigen::VectorXd comdd_d; // computed with the unconstrained cost function
 
   Eigen::VectorXd q_ref;
   Eigen::VectorXd qd_ref;
@@ -322,7 +324,7 @@ struct QPControllerOutput {
   Eigen::VectorXd u;
   Eigen::VectorXd q_des; // just what we evaluate fromt the spline
   Eigen::VectorXd qdot_des; //desired velocity coming from spline
-  
+
   // output
   Eigen::VectorXd comdd;
   Eigen::VectorXd footdd[2];
