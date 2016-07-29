@@ -21,6 +21,60 @@ using namespace Eigen;
 
 #define MU_VERY_SMALL 0.001
 
+static void reconstructContactWrench(
+    const RigidBodyTree& robot, KinematicsCache<double>& cache,
+    const std::vector<SupportStateElement,
+                      Eigen::aligned_allocator<SupportStateElement>>&
+        active_supports,
+    const MatrixXd& B, const VectorXd& beta,
+    std::vector<QPControllerContactOutput> &contact_output)
+{
+  const int n_basis_vectors_per_contact = 2 * m_surface_tangents;
+
+  int beta_start = 0;
+
+  // resize outputs
+  contact_output.resize(active_supports.size());
+
+  for (size_t j = 0; j < active_supports.size(); j++) {
+    const auto& active_support = active_supports[j];
+    const auto& contact_pts = active_support.contact_pts; // this is relative in body frame
+    int ncj = static_cast<int>(contact_pts.size());
+    int active_support_length = n_basis_vectors_per_contact * ncj;
+    const auto& Bj = B.middleCols(beta_start, active_support_length);
+    const auto& betaj = beta.segment(beta_start, active_support_length);
+
+    // find which body is this contact on
+    int body_id = active_support.body_idx;
+    contact_output[j].body_name = robot.getBodyOrFrameName(body_id);
+    contact_output[j].contact_points.resize(contact_pts.size());
+    contact_output[j].contact_forces.resize(contact_pts.size());
+    contact_output[j].wrench.setZero();
+
+    // compute wrench wrt to body position
+    contact_output[j].wrench.setZero();
+    contact_output[j].ref_point = robot.transformPoints(cache, Vector3d::Zero(), body_id, 0);
+
+    for (size_t k = 0; k < contact_pts.size(); k++) {
+      const auto& Bblock = Bj.middleCols(k * n_basis_vectors_per_contact,
+          n_basis_vectors_per_contact);
+      const auto& betablock = betaj.segment(k * n_basis_vectors_per_contact,
+          n_basis_vectors_per_contact);
+      Vector3d point_force = Bblock * betablock;
+      Vector3d contact_pt = robot.transformPoints(cache, contact_pts[k], body_id, 0);
+
+      // trq first
+      contact_output[j].wrench.head<3>() += (contact_pt - contact_output[j].ref_point).cross(point_force);
+      contact_output[j].wrench.tail<3>() += point_force;
+
+      contact_output[j].contact_points[k] = contact_pt;
+      contact_output[j].contact_forces[k] = point_force;
+    }
+
+    beta_start += active_support_length;
+  }
+}
+
 void InstantaneousQPController::initialize() {
   body_or_frame_name_to_id = computeBodyOrFrameNameToIdMap(*(this->robot));
 
@@ -1453,7 +1507,9 @@ int InstantaneousQPController::setupAndSolveQP(
                         qp_output.qdd, foot_contact, params.vref_integrator);
 
   // reconstruct grf.
-  reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_wrenches, qp_output.contact_ref_points, qp_output.all_contact_points, qp_output.all_contact_forces);
+  reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_output);
+
+  // reconstruct cartdd
   qp_output.comdd = Jcom * qp_output.qdd + Jcomdotv;
   int sf_idx[3];
   sf_idx[0] = rpc.foot_ids[Side::LEFT];

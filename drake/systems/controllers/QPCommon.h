@@ -308,12 +308,16 @@ struct QPDesiredBodyMotion {
   Eigen::Matrix<double, 6, 1> body_vdot_d;
 };
 
-struct QPControllerOutput {
-  std::vector<Eigen::Matrix<double,6,1>> contact_wrenches; // 1 wrench per link in contact.
-  std::vector<Eigen::Vector3d> contact_ref_points; // 1 ref point per link in contact.
-  std::vector<Eigen::Vector3d> all_contact_points; // all the contact points (many per link)
-  std::vector<Eigen::Vector3d> all_contact_forces; // all the contact forces (many per link)
+// everything expressed in the world frame
+struct QPControllerContactOutput {
+  std::string body_name;
+  Eigen::Matrix<double, 6, 1> wrench;
+  Eigen::Matrix<double, 3, 1> ref_point;
+  std::vector<Eigen::Vector3d> contact_points;
+  std::vector<Eigen::Vector3d> contact_forces;
+};
 
+struct QPControllerOutput {
   // input
   std::vector<QPDesiredBodyMotion> desired_body_motions; // specified in world frame
   Eigen::VectorXd comdd_d; // computed with the unconstrained cost function
@@ -330,6 +334,7 @@ struct QPControllerOutput {
   Eigen::VectorXd footdd[2];
   Eigen::VectorXd pelvdd;
   Eigen::VectorXd slack;
+  std::vector<QPControllerContactOutput> contact_output;
 
   bool fastQPFailed;
   int qpInfo;
