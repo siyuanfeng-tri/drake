@@ -1,5 +1,6 @@
 #include "drake/solvers/Optimization.h"
 #include "drake/solvers/SnoptSolver.h"
+#include "drake/solvers/gurobi_solver.h"
 
 #include "qp_controller.h"
 
@@ -279,12 +280,13 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   VectorXd lambda0 = VectorXd::Zero(num_wrench);
   prog.SetInitialGuess(lambda, lambda0);
   SolutionResult result;
-  SnoptSolver snopt;
-  if (!snopt.available()) {
-    std::cerr << "Solver (SNOPT) not available.\n";
+  SnoptSolver solver;
+  // GurobiSolver solver;
+  if (!solver.available()) {
+    std::cerr << "Solver not available.\n";
     return -1;
   }
-  result = snopt.Solve(prog);
+  result = solver.Solve(prog);
   if (result != drake::solvers::SolutionResult::kSolutionFound) {
     std::cerr << "solution not found\n";
     return -1;

@@ -55,7 +55,8 @@ int main() {
   std::string urdf =
       drake::GetDrakePath() +
       std::string(
-          "/examples/QPInverseDynamicsForHumanoids/valkyrie_sim_drake.urdf");
+          "/examples/Valkyrie/urdf/urdf/"
+          "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf");
   HumanoidStatus robot_status(
       std::make_unique<RigidBodyTree>(urdf, DrakeJoint::ROLLPITCHYAW));
 
