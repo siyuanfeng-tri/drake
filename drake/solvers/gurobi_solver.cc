@@ -70,8 +70,14 @@ int AddCosts(GRBmodel* model, OptimizationProblem& prog,
     const auto& constraint = binding.constraint();
     const int constraint_variable_dimension = binding.GetNumElements();
 
+    // TODO: NEEDS TO HANDLE MULTI varibles in this case.
+    start_row = binding.variable_list().front().index();
+
     Eigen::MatrixXd Q = 0.5 * (constraint->Q());
     Eigen::VectorXd b = constraint->b();
+
+    std::cout << "GRB Q: " << constraint->Q() << std::endl;
+    std::cout << "GRB b: " << constraint->b() << std::endl << std::endl;
 
     // Check for square matrices.
     DRAKE_ASSERT(Q.rows() == Q.cols());
@@ -96,6 +102,7 @@ int AddCosts(GRBmodel* model, OptimizationProblem& prog,
           const int error = GRBaddqpterms(model, 1, &row_ind, &col_ind,
                                           &individual_quadratic_cost_value);
           if (error) {
+            std::cout << "err in add qp Qij term " << error << std::endl;
             return (error);
           }
         }
@@ -104,9 +111,10 @@ int AddCosts(GRBmodel* model, OptimizationProblem& prog,
     const int error = GRBsetdblattrarray(
         model, "Obj", start_row, constraint_variable_dimension, b.data());
     if (error) {
+      std::cout << "err in add qp b term " << error << std::endl;
       return error;
     }
-    start_row += Q.rows();
+    //start_row += Q.rows();
     // Verify that the start_row does not exceed the total possible
     // dimension of the decision variable.
     DRAKE_ASSERT(start_row <= static_cast<int>(prog.num_vars()));

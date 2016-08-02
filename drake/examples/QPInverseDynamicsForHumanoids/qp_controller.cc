@@ -280,8 +280,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   VectorXd lambda0 = VectorXd::Zero(num_wrench);
   prog.SetInitialGuess(lambda, lambda0);
   SolutionResult result;
-  SnoptSolver solver;
-  // GurobiSolver solver;
+  //SnoptSolver solver;
+  GurobiSolver solver;
   if (!solver.available()) {
     std::cerr << "Solver not available.\n";
     return -1;
