@@ -794,7 +794,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
   std::vector<DesiredBodyAcceleration> desired_body_accelerations;
   desired_body_accelerations.resize(qp_input.num_tracked_bodies);
-  Vector6d body_v_des, body_vdot_des;
+  Vector6d body_v_des, body_vdot_des, body_vdot_in_task_frame;
   Vector6d body_vdot;
   Isometry3d body_pose_des;
 
@@ -857,7 +857,8 @@ int InstantaneousQPController::setupAndSolveQP(
     desired_body_accelerations[i].body_vdot = bodySpatialMotionPD(
         *robot, robot_state, body_or_frame_id0, body_pose_des, body_v_des,
         body_vdot_des, body_Kp, body_Kd,
-        desired_body_accelerations[i].T_task_to_world);
+        desired_body_accelerations[i].T_task_to_world,
+        body_vdot_in_task_frame);
 
     desired_body_accelerations[i].weight = weight;
     desired_body_accelerations[i].accel_bounds =
@@ -871,12 +872,12 @@ int InstantaneousQPController::setupAndSolveQP(
         desired_body_accelerations[i].body_or_frame_id0);
 
     qp_output.desired_body_motions[i].name = robot->getBodyOrFrameName(body_id0);
-    //qp_output.body_vdots[i].body_vdot = desired_body_accelerations[i].body_vdot;
-    // these are in world frame, and the first 3 are pos, because the trajs are specified that way
+    // these are in task frame. the first 3 are pos, because the trajs are specified that way
     qp_output.desired_body_motions[i].body_q_d.segment<3>(0) = body_pose_des.translation();
     qp_output.desired_body_motions[i].body_q_d.segment<3>(3) = rotmat2rpy(body_pose_des.linear());
     qp_output.desired_body_motions[i].body_v_d = body_v_des;
     qp_output.desired_body_motions[i].body_vdot_d = body_vdot_des;
+    qp_output.desired_body_motions[i].body_vdot_with_pd = body_vdot_in_task_frame;
   }
 
   int n_body_accel_eq_constraints = 0;

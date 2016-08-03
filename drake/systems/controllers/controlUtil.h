@@ -115,7 +115,8 @@ DRAKECONTROLUTIL_EXPORT Vector6d bodySpatialMotionPD(
     const Eigen::Ref<const Vector6d> &body_v_des,
     const Eigen::Ref<const Vector6d> &body_vdot_des,
     const Eigen::Ref<const Vector6d> &Kp, const Eigen::Ref<const Vector6d> &Kd,
-    const Eigen::Isometry3d &T_task_to_world = Eigen::Isometry3d::Identity());
+    const Eigen::Isometry3d &T_task_to_world,
+    Vector6d &body_vdot_with_pd);
 
 DRAKECONTROLUTIL_EXPORT void evaluateXYZExpmapCubicSpline(
     double t, const PiecewisePolynomial<double> &spline,

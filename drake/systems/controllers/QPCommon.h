@@ -303,9 +303,14 @@ struct DesiredBodyAcceleration {
 
 struct QPDesiredBodyMotion {
   std::string name;
+  // these are all in task frame, first 3 are position, second 3 are angular.
+  // interpolated from the nominal trajectory. 
   Eigen::Matrix<double, 6, 1> body_q_d;
   Eigen::Matrix<double, 6, 1> body_v_d;
   Eigen::Matrix<double, 6, 1> body_vdot_d;
+
+  // these are in task frame, computed with PD + ff acc with the above setpoints.
+  Eigen::Matrix<double, 6, 1> body_vdot_with_pd;
 };
 
 // everything expressed in the world frame

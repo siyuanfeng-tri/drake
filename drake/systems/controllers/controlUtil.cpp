@@ -323,7 +323,8 @@ Vector6d bodySpatialMotionPD(
     const int body_index, const Isometry3d &body_pose_des,
     const Ref<const Vector6d> &body_v_des,
     const Ref<const Vector6d> &body_vdot_des, const Ref<const Vector6d> &Kp,
-    const Ref<const Vector6d> &Kd, const Isometry3d &T_task_to_world) {
+    const Ref<const Vector6d> &Kd, const Isometry3d &T_task_to_world,
+    Vector6d &body_vdot_with_pd) {
   // @param body_pose_des  desired pose in the task frame, this is the
   // homogeneous transformation from desired body frame to task frame
   // @param body_v_des    desired [xyzdot;angular_velocity] in task frame
@@ -387,6 +388,9 @@ Vector6d bodySpatialMotionPD(
       (Kp_angular.array() * angular_err_task.array()).matrix() +
       (Kd_angular.array() * angular_vel_err_task.array()).matrix() +
       body_angular_vel_dot_des;
+
+  body_vdot_with_pd.head<3>() = body_xyzddot_task;
+  body_vdot_with_pd.tail<3>() = body_angular_vel_dot_task;
 
   Vector6d twist_dot = Vector6d::Zero();
   Vector3d body_xyzddot = T_task_to_world.linear() * body_xyzddot_task;
