@@ -291,8 +291,8 @@ struct DesiredBodyAcceleration {
       : accel_bounds(Eigen::VectorXd(6), Eigen::VectorXd(6)) {}
 
   int body_or_frame_id0;
-  Vector6d body_vdot; // this is the TWIST
-  Vector6d body_vdot_in_task_frame; // acceleration (not TWIST) in task frame
+  Eigen::Vector6d body_vdot; // this is the TWIST
+  Eigen::Vector6d body_vdot_in_task_frame; // acceleration (not TWIST) in task frame
   double weight;
   Bounds accel_bounds;
   bool control_pose_when_in_contact;
