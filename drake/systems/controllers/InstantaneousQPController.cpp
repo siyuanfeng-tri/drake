@@ -362,6 +362,10 @@ InstantaneousQPController::loadAvailableSupports(
   for (int i = 0; i < qp_input.num_support_data; i++) {
     available_supports[i].body_idx =
         body_or_frame_name_to_id.at(qp_input.support_data[i].body_name);
+
+    available_supports[i].total_normal_force_upper_bound = qp_input.support_data[i].total_normal_force_upper_bound;
+    available_supports[i].total_normal_force_lower_bound = qp_input.support_data[i].total_normal_force_lower_bound;
+
     for (int j = 0; j < 4; j++) {
       available_supports[i].support_logic_map[j] =
           qp_input.support_data[i].support_logic_map[j];
@@ -1183,6 +1187,8 @@ int InstantaneousQPController::setupAndSolveQP(
   // fixed vs. floating base. The inequality constraints are torque limits and
   // limits on some body accelerations
   int n_ineq = 2 * nu + 2 * 6 * desired_body_accelerations.size();
+  // add a max and min bound on the normal force per contact
+  // n_ineq += 2 * active_supports.size();
   MatrixXd Ain =
       MatrixXd::Zero(n_ineq, nparams);  // note: obvious sparsity here
   VectorXd bin = VectorXd::Zero(n_ineq);
@@ -1225,6 +1231,37 @@ int InstantaneousQPController::setupAndSolveQP(
         Jbdotv - desired_body_accelerations[i].accel_bounds.min;
     constraint_start_index += 6;
   }
+
+  /*
+  // contact normal force component stuff
+  int beta_start = 0;
+  for (size_t c = 0; c < active_supports.size(); c++) {
+    const auto& active_support = active_supports[c];
+    int active_support_length = nd * active_support.contact_pts.size();
+    const auto& B_per_foot = B.middleCols(beta_start, active_support_length);
+    MatrixXd B_rotate = B_per_foot;
+
+    double upper = active_support.total_normal_force_upper_bound;
+    double lower = active_support.total_normal_force_lower_bound;
+
+    if (upper >= 1.5 * robot->getMass())
+      upper = 1.5 * robot->getMass();
+
+    if (lower <= 0)
+      lower = 0;
+
+    // max
+    Ain.block(constraint_start_index, nq + beta_start, 1, active_support_length) = B_rotate.row(2);
+    bin(constraint_start_index++) = upper;
+
+    // min
+    Ain.block(constraint_start_index, nq + beta_start, 1, active_support_length) = -B_rotate.row(2);
+    bin(constraint_start_index++) = lower;
+
+    std::cout << "foot " << c << " beta start " << beta_start << " active_support_length " << active_support_length << " [u,l] " << active_support.total_normal_force_upper_bound << " " << active_support.total_normal_force_lower_bound << std::endl;
+    beta_start += active_support_length;
+  }
+  */
 
   for (int i = 0; i < n_ineq; i++) {
     // remove inf constraints---needed by gurobi

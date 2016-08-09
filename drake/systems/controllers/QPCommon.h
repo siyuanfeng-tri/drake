@@ -151,13 +151,13 @@ struct WholeBodyParams {
 
 struct BodyMotionParams {
   BodyMotionParams()
-      : Kp(Vector6d::Zero()),
-        Kd(Vector6d::Zero()),
+      : Kp(Eigen::Vector6d::Zero()),
+        Kd(Eigen::Vector6d::Zero()),
         accel_bounds(Eigen::VectorXd::Zero(6), Eigen::VectorXd::Zero(6)),
         weight(0.0) {}
 
-  Vector6d Kp;
-  Vector6d Kd;
+  Eigen::Vector6d Kp;
+  Eigen::Vector6d Kd;
   Bounds accel_bounds;
   double weight;
 
@@ -291,20 +291,20 @@ struct DesiredBodyAcceleration {
       : accel_bounds(Eigen::VectorXd(6), Eigen::VectorXd(6)) {}
 
   int body_or_frame_id0;
-  Vector6d body_vdot;
+  Eigen::Vector6d body_vdot;
   double weight;
   Bounds accel_bounds;
   bool control_pose_when_in_contact;
   bool use_spatial_velocity;
   KinematicPath body_path;
   Eigen::Isometry3d T_task_to_world;
-  Vector6d weight_multiplier;
+  Eigen::Vector6d weight_multiplier;
 };
 
 struct QPDesiredBodyMotion {
   std::string name;
   // these are all in task frame, first 3 are position, second 3 are angular.
-  // interpolated from the nominal trajectory. 
+  // interpolated from the nominal trajectory.
   Eigen::Matrix<double, 6, 1> body_q_d;
   Eigen::Matrix<double, 6, 1> body_v_d;
   Eigen::Matrix<double, 6, 1> body_vdot_d;

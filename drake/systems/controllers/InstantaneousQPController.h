@@ -88,7 +88,7 @@ class InstantaneousQPController {
 
   // momentum controller-specific
   Eigen::MatrixXd Ag;      // centroidal momentum matrix
-  Vector6d Agdot_times_v;  // centroidal momentum velocity-dependent bias
+  Eigen::Vector6d Agdot_times_v;  // centroidal momentum velocity-dependent bias
   Eigen::MatrixXd Ak;      // centroidal angular momentum matrix
   Eigen::Vector3d
       Akdot_times_v;  // centroidal angular momentum velocity-dependent bias
@@ -100,7 +100,7 @@ class InstantaneousQPController {
 
   // low pass filter output torque;
   Eigen::VectorXd trq_prev;
-  double trq_alpha;  
+  double trq_alpha;
 
   PIDOutput wholeBodyPID(double t, const Eigen::Ref<const Eigen::VectorXd>& q,
                          const Eigen::Ref<const Eigen::VectorXd>& qd,

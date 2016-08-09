@@ -16,11 +16,15 @@ const int m_surface_tangents =
 
 #define EPSILON 10e-8
 
-typedef Eigen::Matrix<double, 6, 1> Vector6d;
-typedef Eigen::Matrix<double, 7, 1> Vector7d;
+namespace Eigen {
+  typedef Matrix<double, 6, 1> Vector6d;
+  typedef Matrix<double, 7, 1> Vector7d;
+}
 
 typedef struct _support_state_element {
   int body_idx;
+  double total_normal_force_upper_bound;
+  double total_normal_force_lower_bound;
   std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>>
       contact_pts;
   bool support_logic_map[4];
@@ -43,6 +47,18 @@ struct DrakeRobotStateWithTorque{
   Eigen::VectorXd torque;
 };
 
+DRAKECONTROLUTIL_EXPORT Eigen::Vector6d GetTaskSpaceVel(
+    const RigidBodyTree &r, const KinematicsCache<double> &cache,
+    const RigidBody& body,
+    const Eigen::Vector3d &local_offset = Eigen::Vector3d::Zero());
+DRAKECONTROLUTIL_EXPORT Eigen::Vector6d GetTaskSpaceJacobianDotTimesV(
+    const RigidBodyTree &r, const KinematicsCache<double> &cache,
+    const RigidBody& body,
+    const Eigen::Vector3d &local_offset = Eigen::Vector3d::Zero());
+DRAKECONTROLUTIL_EXPORT Eigen::MatrixXd GetTaskSpaceJacobian(
+    const RigidBodyTree &r, const KinematicsCache<double> &cache,
+    const RigidBody& body,
+    const Eigen::Vector3d &local_offset = Eigen::Vector3d::Zero());
 
 DRAKECONTROLUTIL_EXPORT bool isSupportElementActive(
     SupportStateElement *se, bool contact_force_detected,
@@ -109,19 +125,19 @@ DRAKECONTROLUTIL_EXPORT Eigen::MatrixXd individualSupportCOPs(
         active_supports,
     const Eigen::MatrixXd &normals, const Eigen::MatrixXd &B,
     const Eigen::VectorXd &beta);
-DRAKECONTROLUTIL_EXPORT Vector6d bodySpatialMotionPD(
+DRAKECONTROLUTIL_EXPORT Eigen::Vector6d bodySpatialMotionPD(
     const RigidBodyTree &r, const DrakeRobotState &robot_state,
     const int body_index, const Eigen::Isometry3d &body_pose_des,
-    const Eigen::Ref<const Vector6d> &body_v_des,
-    const Eigen::Ref<const Vector6d> &body_vdot_des,
-    const Eigen::Ref<const Vector6d> &Kp, const Eigen::Ref<const Vector6d> &Kd,
+    const Eigen::Ref<const Eigen::Vector6d> &body_v_des,
+    const Eigen::Ref<const Eigen::Vector6d> &body_vdot_des,
+    const Eigen::Ref<const Eigen::Vector6d> &Kp, const Eigen::Ref<const Eigen::Vector6d> &Kd,
     const Eigen::Isometry3d &T_task_to_world,
-    Vector6d &body_vdot_with_pd);
+    Eigen::Vector6d &body_vdot_with_pd);
 
 DRAKECONTROLUTIL_EXPORT void evaluateXYZExpmapCubicSpline(
     double t, const PiecewisePolynomial<double> &spline,
-    Eigen::Isometry3d &body_pose_des, Vector6d &xyzdot_angular_vel,
-    Vector6d &xyzddot_angular_accel);
+    Eigen::Isometry3d &body_pose_des, Eigen::Vector6d &xyzdot_angular_vel,
+    Eigen::Vector6d &xyzddot_angular_accel);
 
 struct RobotJointIndexMap {
   Eigen::VectorXi drake_to_robot;
