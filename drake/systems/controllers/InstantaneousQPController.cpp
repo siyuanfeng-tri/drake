@@ -870,6 +870,8 @@ int InstantaneousQPController::setupAndSolveQP(
     desired_body_accelerations[i].control_pose_when_in_contact =
         qp_input.body_motion_data[i].control_pose_when_in_contact;
 
+    desired_body_accelerations[i].body_vdot_in_task_frame = body_vdot_in_task_frame;
+
 
     // for debugging purposes
     int body_id0 = robot->parseBodyOrFrameID(
@@ -1410,9 +1412,21 @@ int InstantaneousQPController::setupAndSolveQP(
           Jb = robot->compactToFull<Matrix<double, 6, Dynamic>>(
               Jb_compact, desired_body_accelerations[i].body_path.joint_path,
               true);
+
+
           Jbdotv = robot->geometricJacobianDotTimesV(
               cache, 0, desired_body_accelerations[i].body_or_frame_id0,
               desired_body_accelerations[i].body_or_frame_id0);
+
+//          Vector3d local_offset; // will just be zero for now
+//          Jb = getTaskSpaceJacobian(*robot, cache, desired_body_accelerations[i].body_or_frame_id0, local_offset);
+//          Jbdotv = getTaskSpaceJacobianDotTimesV(*robot, cache, desired_body_accelerations[i].body_or_frame_id0, local_offset);
+
+
+          // if using TaskSpaceJacobians then use body_vdot_in_task_frame here
+//          Vector6d & des_body_vdot = desired_body_accelerations[i].body_vdot_in_task_frame;
+
+          Vector6d & des_body_vdot = desired_body_accelerations[i].body_vdot;
 
           if (qp_input.body_motion_data[i].in_floating_base_nullspace) {
             Jb.block(0, 0, 6, 6) = MatrixXd::Zero(6, 6);
@@ -1426,7 +1440,7 @@ int InstantaneousQPController::setupAndSolveQP(
               f.head(nq).noalias() +=
                   desired_body_accelerations[i].weight *
                   desired_body_accelerations[i].weight_multiplier(j) *
-                  (Jbdotv(j) - desired_body_accelerations[i].body_vdot[j]) *
+                  (Jbdotv(j) - des_body_vdot[j]) *
                   Jb.row(j).transpose();
             }
           }
