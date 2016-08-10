@@ -1440,7 +1440,7 @@ int InstantaneousQPController::setupAndSolveQP(
           Jb = R_stack*Jb; // rotate it to task space
 
           Vector6d & des_body_vdot = desired_body_accelerations[i].body_vdot_in_task_frame;
-          
+
 
           if (qp_input.body_motion_data[i].in_floating_base_nullspace) {
             Jb.block(0, 0, 6, 6) = MatrixXd::Zero(6, 6);
@@ -1594,6 +1594,8 @@ int InstantaneousQPController::setupAndSolveQP(
   qp_output.footdd[0] = cartdd[0];
   qp_output.footdd[1] = cartdd[1];
   qp_output.slack = alpha.tail(neps);
+
+  qp_output.qdd_des_w_pd = pid_out.qddot_des;
 
   // Remember t for next time around
   controller_state.t_prev = robot_state.t;
