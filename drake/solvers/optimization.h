@@ -159,6 +159,14 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
 
     return variable_views_.back();
   }
+  
+  const DecisionVariableView get_variable(const std::string &name) const {
+    for (auto it = variable_views_.begin(); it != variable_views_.end(); it++) {
+      if (name.compare(it->name()) == 0)
+        return *it;
+    }
+    throw std::runtime_error("unable to find variable: " + name);
+  }
 
   //    const DecisionVariable& AddIntegerVariables(size_t num_new_vars,
   //    std::string name);
@@ -684,6 +692,10 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
   // TODO(naveenoid) : getter for quadratic_constraints
   const std::list<Binding<LinearConstraint>>& linear_constraints() const {
     return linear_constraints_;
+  }
+
+  const VariableList &variable_views() const { 
+    return variable_views_;
   }
 
   /** GetAllCosts

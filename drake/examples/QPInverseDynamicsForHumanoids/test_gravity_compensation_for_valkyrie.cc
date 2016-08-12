@@ -1,9 +1,9 @@
 #include "drake/common/drake_path.h"
 #include "qp_controller.h"
 
-QPOutput TestGravityCompensation(const HumanoidStatus& robot_status) {
+QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   // Make controller.
-  QPController con;
+  QPController con(robot_status);
   QPInput input;
   QPOutput output;
   InitQPOutput(robot_status.robot(), &output);
@@ -41,8 +41,33 @@ QPOutput TestGravityCompensation(const HumanoidStatus& robot_status) {
   input.w_vd = 1e3;
   input.w_wrench_reg = 1e-5;
 
+  // for sim
+  Eigen::VectorXd tmp_q, tmp_qd;
+  double dt = 0.002;
+  double T = 0;
+
   // Call QP controller.
-  con.Control(robot_status, input, &output);
+  Vector3d com0 = robot_status.com();
+  Vector3d com_d = com0 + Vector3d(0.04, 0, 0);
+  std::cout << "INITIAL COM " << com0.transpose() << std::endl;
+  for (int i = 0; i < 1000; i++) {
+
+    input.comdd_d = 20 * (com_d - com0) + 3 * (-robot_status.comd());
+
+    con.Control(robot_status, input, &output);
+    
+    // fwd simulate
+    tmp_q = robot_status.position();
+    tmp_qd = robot_status.velocity();
+
+    tmp_q += tmp_qd * dt;
+    tmp_qd += output.vd * dt;
+    T += dt;
+
+    robot_status.Update(T, tmp_q, tmp_qd, output.joint_torque, output.foot_wrench_in_sensor_frame[0], output.foot_wrench_in_sensor_frame[1]); 
+  }
+  
+  std::cout << "FINAL COM " << robot_status.com().transpose() << std::endl;
 
   // Print quadratic costs for all the terms.
   ComputeQPCost(robot_status, input, output);
