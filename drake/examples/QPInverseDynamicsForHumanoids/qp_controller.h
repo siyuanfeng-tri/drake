@@ -4,6 +4,10 @@
 #include <iostream>
 #include <fstream>
 
+#include "drake/solvers/optimization.h"
+#include "drake/solvers/snopt_solver.h"
+#include "drake/solvers/gurobi_solver.h"
+
 /**
  * Input to the QP inverse dynamics controller
  */
@@ -98,6 +102,13 @@ class QPController {
    */
   int Control(const HumanoidStatus& rs, const QPInput& input, QPOutput* output);
 
+  void SetupDoubleSupport(const HumanoidStatus& rs);
+  void SetupSingleSupport(const HumanoidStatus& rs);
+
+  QPController(const HumanoidStatus& rs) {
+    SetupDoubleSupport(rs);
+  }
+
  private:
   // These are temporary matrices used by the controller.
   Eigen::MatrixXd torque_linear_;
@@ -108,4 +119,27 @@ class QPController {
   Eigen::MatrixXd inequality_linear_;
   Eigen::VectorXd inequality_upper_bound_;
   Eigen::VectorXd inequality_lower_bound_;
+
+  // update the problem
+  drake::solvers::OptimizationProblem prog_;
+  drake::solvers::SnoptSolver solver_;
+  //GurobiSolver solver_;
+
+  int num_contacts_;
+  int num_vd_;
+  int num_wrench_;
+  int num_torque_;
+  int num_variable_;
+
+  void ResizeQP();
+
+  std::shared_ptr<drake::solvers::LinearEqualityConstraint> eq_dynamics_;
+  std::vector<std::shared_ptr<drake::solvers::LinearEqualityConstraint>> eq_contacts_;
+  std::shared_ptr<drake::solvers::LinearConstraint> ineq_contact_wrench_;
+  std::shared_ptr<drake::solvers::LinearConstraint> ineq_torque_limit_;
+  std::shared_ptr<drake::solvers::QuadraticConstraint> cost_comdd_;
+  std::shared_ptr<drake::solvers::QuadraticConstraint> cost_pelvdd_;
+  std::shared_ptr<drake::solvers::QuadraticConstraint> cost_torsodd_;
+  std::shared_ptr<drake::solvers::QuadraticConstraint> cost_vd_reg_;
+  std::shared_ptr<drake::solvers::QuadraticConstraint> cost_lambda_reg_;
 };

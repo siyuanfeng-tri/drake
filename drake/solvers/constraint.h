@@ -64,6 +64,16 @@ class Constraint {
   Eigen::VectorXd const& upper_bound() const { return upper_bound_; }
   size_t num_constraints() const { return lower_bound_.size(); }
 
+  void UpdateLowerBound(const Eigen::VectorXd& new_lb) {
+    if (new_lb.size() == lower_bound_.size())
+      lower_bound_ = new_lb;
+  }
+  
+  void UpdateUpperBound(const Eigen::VectorXd& new_ub) {
+    if (new_ub.size() == upper_bound_.size())
+      upper_bound_ = new_ub;
+  }
+
  protected:
   void set_bounds(const Eigen::VectorXd& lower_bound,
                   const Eigen::VectorXd& upper_bound) {
@@ -110,6 +120,13 @@ class QuadraticConstraint : public Constraint {
   virtual const Eigen::MatrixXd& Q() const { return Q_; }
 
   virtual const Eigen::VectorXd& b() const { return b_; }
+
+  void UpdateConstraint(const Eigen::MatrixXd& new_Q, const Eigen::VectorXd& new_b) {
+    if (new_Q.cols() == Q_.cols() && new_Q.rows() == Q_.rows() && new_b.size() == b_.size()) {
+      Q_ = new_Q;
+      b_ = new_b;
+    }
+  }
 
  private:
   Eigen::MatrixXd Q_;
@@ -209,6 +226,14 @@ class LinearConstraint : public Constraint {
   virtual const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>& A()
       const {
     return A_;
+  }
+
+  void UpdateConstraint(const Eigen::MatrixXd& new_A, const Eigen::VectorXd& new_lb, const Eigen::VectorXd& new_ub) {
+    if (new_A.rows() == A_.rows() && new_A.cols() == A_.cols() && new_lb.size() == lower_bound().size() && new_ub.size() == upper_bound().size()) {
+      A_ = new_A;
+      UpdateLowerBound(new_lb);
+      UpdateUpperBound(new_ub);
+    }
   }
 
  protected:
