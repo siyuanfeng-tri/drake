@@ -1,5 +1,6 @@
 #include "drake/common/drake_path.h"
 #include "qp_controller.h"
+#include <chrono>
 
 QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   // Make controller.
@@ -49,6 +50,9 @@ QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   // Call QP controller.
   Vector3d com0 = robot_status.com();
   Vector3d com_d = com0 + Vector3d(0.04, 0, 0);
+  
+  auto begin = std::chrono::high_resolution_clock::now();
+
   std::cout << "INITIAL COM " << com0.transpose() << std::endl;
   for (int i = 0; i < 1000; i++) {
 
@@ -68,6 +72,11 @@ QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   }
   
   std::cout << "FINAL COM " << robot_status.com().transpose() << std::endl;
+
+  auto end = std::chrono::high_resolution_clock::now();
+  size_t nano_sec = std::chrono::duration_cast<std::chrono::nanoseconds>(end-begin).count();
+  std::cout << (double)nano_sec / 1e6 << " sec." << std::endl;
+
 
   // Print quadratic costs for all the terms.
   ComputeQPCost(robot_status, input, output);
