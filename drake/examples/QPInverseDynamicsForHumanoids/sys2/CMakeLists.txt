@@ -1,0 +1,2 @@
+add_executable(sys2_qp_test sys2_qp_test.cc sys2_qp.cc)
+target_link_libraries(sys2_qp_test drakeRBSystem drakeOptimization drakeSide drakeLCMSystem2)
