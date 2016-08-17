@@ -9,7 +9,7 @@ void HumanoidStatus::FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
                                     const RigidBody& body, Isometry3d* pose,
                                     Vector6d* vel, MatrixXd* J,
                                     Vector6d* Jdot_times_v,
-                                    const Vector3d& local_offset) const {
+                                    const Ref<const Vector3d>& local_offset) const {
   *pose = Isometry3d::Identity();
   pose->translation() = local_offset;
   *pose = robot->relativeTransform(cache_, 0, body.get_body_index()) * (*pose);
@@ -20,9 +20,9 @@ void HumanoidStatus::FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
       GetTaskSpaceJacobianDotTimesV(*(robot), cache_, body, local_offset);
 }
 
-void HumanoidStatus::Update(double t, const VectorXd& q, const VectorXd& v,
-                            const VectorXd& trq, const Vector6d& l_ft, const Vector6d& r_ft,
-                            const Matrix3d& rot) {
+void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<const VectorXd>& v,
+                            const Ref<const VectorXd>& trq, const Ref<const Vector6d>& l_ft, const Ref<const Vector6d>& r_ft,
+                            const Ref<const Matrix3d>& rot) {
   if (q.size() != position_.size() || v.size() != velocity_.size() ||
       trq.size() != joint_torque_.size()) {
     throw std::runtime_error("robot state update dimension mismatch");

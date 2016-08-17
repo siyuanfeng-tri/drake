@@ -173,30 +173,7 @@ int main() {
   Eigen::VectorXd STATE = Eigen::VectorXd::Zero(qp_con.number_of_robot_states());
   Eigen::VectorXd QP_INPUT = Eigen::VectorXd::Zero(qp_con.number_of_qp_inputs());
   Eigen::VectorXd QP_OUTPUT = Eigen::VectorXd::Zero(qp_con.number_of_qp_outputs());
-  
-  VectorXd2HumanoidStatus(STATE, &rs);
-  Eigen::Vector3d com_d(rs.com());
-  com_d[0] += 0.1;
-
-  qp_input.pelvdd_d.setZero();
-  qp_input.torsodd_d.setZero();
-  qp_input.footdd_d[Side::LEFT].setZero();
-  qp_input.footdd_d[Side::RIGHT].setZero();
-  qp_input.wrench_d[Side::LEFT].setZero();
-  qp_input.wrench_d[Side::RIGHT].setZero();
-  qp_input.vd_d.setZero();
-  // [5] is Fz, 660N * 2 is about robot weight.
-  qp_input.wrench_d[Side::LEFT][5] = 660;
-  qp_input.wrench_d[Side::RIGHT][5] = 660;
-  qp_input.w_com = 1e2;
-  qp_input.w_pelv = 1e1;
-  qp_input.w_torso = 1e1;
-  qp_input.w_foot = 1e1;
-  qp_input.w_vd = 1e3;
-  qp_input.w_wrench_reg = 1e-5; 
-
-  double dt = 0.002;
-  
+ 
   int time_idx = 0;
   int q_idx = time_idx + 1;
   int v_idx = q_idx + rs.robot().number_of_positions();
@@ -210,8 +187,52 @@ int main() {
   Eigen::Map<Eigen::VectorXd> l_ft(STATE.data()+l_ft_idx, 6);
   Eigen::Map<Eigen::VectorXd> r_ft(STATE.data()+r_ft_idx, 6);
 
-  std::cout << "ahsdf " << qp_con.number_of_qp_inputs() << " " << get_qp_input_size(qp_input) << std::endl;
+  q[rs.joint_name_to_position_index().at("rightHipRoll")] = 0.01;
+  q[rs.joint_name_to_position_index().at("rightHipPitch")] = -0.5432;
+  q[rs.joint_name_to_position_index().at("rightKneePitch")] = 1.2195;
+  q[rs.joint_name_to_position_index().at("rightAnklePitch")] =
+      -0.7070;
+  q[rs.joint_name_to_position_index().at("rightAnkleRoll")] = -0.0069;
 
+  q[rs.joint_name_to_position_index().at("leftHipRoll")] = -0.01;
+  q[rs.joint_name_to_position_index().at("leftHipPitch")] = -0.5432;
+  q[rs.joint_name_to_position_index().at("leftKneePitch")] = 1.2195;
+  q[rs.joint_name_to_position_index().at("leftAnklePitch")] = -0.7070;
+  q[rs.joint_name_to_position_index().at("leftAnkleRoll")] = 0.0069;
+
+  q[rs.joint_name_to_position_index().at("rightShoulderRoll")] = 1;
+  q[rs.joint_name_to_position_index().at("rightShoulderYaw")] = 0.5;
+  q[rs.joint_name_to_position_index().at("rightElbowPitch")] =
+      M_PI / 2.;
+
+  q[rs.joint_name_to_position_index().at("leftShoulderRoll")] = -1;
+  q[rs.joint_name_to_position_index().at("leftShoulderYaw")] = 0.5;
+  q[rs.joint_name_to_position_index().at("leftElbowPitch")] =
+      -M_PI / 2.; 
+
+  VectorXd2HumanoidStatus(STATE, &rs);
+  Eigen::Vector3d com_d(rs.com());
+  com_d[0] += 0.05;
+
+  qp_input.pelvdd_d.setZero();
+  qp_input.torsodd_d.setZero();
+  qp_input.footdd_d[Side::LEFT].setZero();
+  qp_input.footdd_d[Side::RIGHT].setZero();
+  qp_input.wrench_d[Side::LEFT].setZero();
+  qp_input.wrench_d[Side::RIGHT].setZero();
+  qp_input.vd_d.setZero();
+  // [5] is Fz, 660N * 2 is about robot weight.
+  qp_input.wrench_d[Side::LEFT][5] = 660;
+  qp_input.wrench_d[Side::RIGHT][5] = 660;
+  qp_input.w_com = 1e2;
+  qp_input.w_pelv = 1e-1;
+  qp_input.w_torso = 1e-1;
+  qp_input.w_foot = 1e2;
+  qp_input.w_vd = 1e-3;
+  qp_input.w_wrench_reg = 1e-5; 
+
+  double dt = 0.01;
+  
   while (true) {
     // make qp input
     qp_input.comdd_d = 40 * (com_d - rs.com()) - 4*(rs.comd());
@@ -228,6 +249,10 @@ int main() {
 
     // parse output / fwd sim, qp_output will be sent through LCM as well.
     VectorXd2QPOutput(output->get_mutable_port(0)->GetMutableVectorData()->get_mutable_value(), &qp_output);
+
+    std::cout << "comdd_d " << qp_input.comdd_d.transpose() << std::endl;
+    std::cout << "comdd " << qp_output.comdd.transpose() << std::endl;
+
     STATE[time_idx] += dt;
     q += qd * dt;
     qd += qp_output.vd * dt;

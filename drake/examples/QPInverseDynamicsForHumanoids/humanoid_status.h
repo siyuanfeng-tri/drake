@@ -99,9 +99,9 @@ class HumanoidStatus {
    * the foot frame. This is useful if the foot ft sensor has a different
    * orientation than the foot.
    */
-  void Update(double t, const VectorXd& q, const VectorXd& v,
-              const VectorXd& trq, const Vector6d& l_ft, const Vector6d& r_ft,
-              const Matrix3d& rot = Matrix3d::Identity());
+  void Update(double t, const Ref<const VectorXd>& q, const Ref<const VectorXd>& v,
+              const Ref<const VectorXd>& trq, const Ref<const Vector6d>& l_ft, const Ref<const Vector6d>& r_ft,
+              const Ref<const Matrix3d>& rot = Matrix3d::Identity());
 
   inline const RigidBodyTree& robot() const { return *robot_; }
   inline const KinematicsCache<double>& cache() const { return cache_; }
@@ -218,5 +218,5 @@ class HumanoidStatus {
   void FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
                       const RigidBody& body, Isometry3d* pose, Vector6d* vel,
                       MatrixXd* J, Vector6d* Jdot_times_v,
-                      const Vector3d& local_offset = Vector3d::Zero()) const;
+                      const Ref<const Vector3d>& local_offset = Vector3d::Zero()) const;
 };

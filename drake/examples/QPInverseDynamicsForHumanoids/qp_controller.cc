@@ -363,7 +363,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   for (auto eq_b : eqs) {
     std::shared_ptr<LinearEqualityConstraint> eq = eq_b.constraint();
     VectorXd X = VariableList2VectorXd(eq_b.variable_list());
-    assert((eq->A() * X - eq->lower_bound()).isZero(1e-8));
+    assert((eq->A() * X - eq->lower_bound()).isZero(EPSILON));
   }
 
   for (auto ineq_b : ineqs) {
@@ -371,7 +371,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     VectorXd X = VariableList2VectorXd(ineq_b.variable_list());
     X = ineq->A() * X;
     for (int i = 0; i < X.size(); i++) {
-      assert(X[i] >= ineq->lower_bound()[i] && X[i] <= ineq->upper_bound()[i]);
+      assert(X[i] >= ineq->lower_bound()[i] - EPSILON && X[i] <= ineq->upper_bound()[i] + EPSILON);
     }
   }
 
@@ -419,10 +419,10 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     residual -=
         rs.foot(i).J.transpose() * output->foot_wrench_in_world_frame[i];
   residual.tail(num_torque) -= output->joint_torque;
-  assert(residual.isZero(1e-8));
+  assert(residual.isZero(EPSILON));
 
   for (int i = 0; i < num_contacts; i++) {
-    assert(output->footdd[i].isZero(1e-8));
+    assert(output->footdd[i].isZero(EPSILON));
   }
 
   if (!is_qp_output_sane(*output)) {

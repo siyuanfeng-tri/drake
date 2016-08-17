@@ -56,13 +56,6 @@ class System2QP : public LeafSystem<double> {
   int num_joints_;
   std::string urdf_name_;
   const std::shared_ptr<RigidBodyTree> robot_;
-
-  /*
-  QPController qp_controller_;
-  HumanoidStatus robot_status_;
-  QPInput qp_input_;
-  QPOutput qp_output_;
-  */
 };
 
 
