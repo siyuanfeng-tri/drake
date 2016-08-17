@@ -42,8 +42,8 @@ class HumanoidStatus {
   /// Offset from the foot frame to force torque sensor in the foot frame.
   static const Vector3d kFootToSensorOffset;
 
-  explicit HumanoidStatus(std::unique_ptr<RigidBodyTree> robot_in)
-      : robot_(std::move(robot_in)), cache_(robot_->bodies) {
+  explicit HumanoidStatus(const std::shared_ptr<RigidBodyTree> robot_in)
+      : robot_(robot_in), cache_(robot_->bodies) {
     pelv_.name = std::string("pelvis");
     pelv_.body = robot_->FindBody("pelvis");
 
@@ -163,7 +163,7 @@ class HumanoidStatus {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
-  std::unique_ptr<RigidBodyTree> robot_;
+  const std::shared_ptr<RigidBodyTree> robot_;
   KinematicsCache<double> cache_;
   /// Maps body name to its index
   std::unordered_map<std::string, int> body_name_to_id_;
@@ -215,7 +215,8 @@ class HumanoidStatus {
    * @param local_offset offset between point of interest to body origin in
    * body frame
    */
-  void FillKinematics(const RigidBody& body, Isometry3d* pose, Vector6d* vel,
+  void FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
+                      const RigidBody& body, Isometry3d* pose, Vector6d* vel,
                       MatrixXd* J, Vector6d* Jdot_times_v,
                       const Vector3d& local_offset = Vector3d::Zero()) const;
 };

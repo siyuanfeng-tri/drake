@@ -35,7 +35,9 @@ struct QPInput {
   double w_wrench_reg;
 };
 
+// temporary stuff
 void InitQPInput(const RigidBodyTree& r, QPInput* input);
+void PrintQPInput(const QPInput &input);
 inline bool is_qp_input_sane(const QPInput& input) {
   return ((int)input.coord_names.size() == input.vd_d.size()) &&
          (input.coord_names.size() != 0);
@@ -91,7 +93,15 @@ struct QPParam {
 class QPController {
  public:
   QPParam param;
-
+  
+  explicit QPController() {
+    param.mu = 1;
+    param.mu_Mz = 0.1;
+    param.x_max = 0.2;
+    param.x_min = -0.05;
+    param.y_max = 0.05;
+    param.y_min = -0.05; 
+  }
   /**
    * The current version explicitly uses SNOPT, but it is really solving a
    * quadratic program. It also instantiates
