@@ -5,26 +5,27 @@ const Vector3d HumanoidStatus::kFootToContactOffset = Vector3d(0, 0, -0.09);
 const Vector3d HumanoidStatus::kFootToSensorOffset =
     Vector3d(0.0215646, 0.0, -0.051054);
 
-void HumanoidStatus::FillKinematics(const RigidBody& body, Isometry3d* pose,
+void HumanoidStatus::FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
+                                    const RigidBody& body, Isometry3d* pose,
                                     Vector6d* vel, MatrixXd* J,
                                     Vector6d* Jdot_times_v,
                                     const Vector3d& local_offset) const {
   *pose = Isometry3d::Identity();
   pose->translation() = local_offset;
-  *pose = robot_->relativeTransform(cache_, 0, body.get_body_index()) * (*pose);
+  *pose = robot->relativeTransform(cache_, 0, body.get_body_index()) * (*pose);
 
-  *vel = GetTaskSpaceVel(*(robot_), cache_, body, local_offset);
-  *J = GetTaskSpaceJacobian(*(robot_), cache_, body, local_offset);
+  *vel = GetTaskSpaceVel(*(robot), cache_, body, local_offset);
+  *J = GetTaskSpaceJacobian(*(robot), cache_, body, local_offset);
   *Jdot_times_v =
-      GetTaskSpaceJacobianDotTimesV(*(robot_), cache_, body, local_offset);
+      GetTaskSpaceJacobianDotTimesV(*(robot), cache_, body, local_offset);
 }
 
 void HumanoidStatus::Update(double t, const VectorXd& q, const VectorXd& v,
-                            const VectorXd& trq, const Vector6d& l_ft,
-                            const Vector6d& r_ft, const Matrix3d& rot) {
+                            const VectorXd& trq, const Vector6d& l_ft, const Vector6d& r_ft,
+                            const Matrix3d& rot) {
   if (q.size() != position_.size() || v.size() != velocity_.size() ||
       trq.size() != joint_torque_.size()) {
-    throw std::runtime_error("robot_ state update dimension mismatch");
+    throw std::runtime_error("robot state update dimension mismatch");
   }
 
   time_ = t;
@@ -47,14 +48,14 @@ void HumanoidStatus::Update(double t, const VectorXd& q, const VectorXd& v,
   comd_ = J_com_ * v;
 
   // body parts
-  FillKinematics(*pelv_.body, &pelv_.pose, &pelv_.vel, &pelv_.J,
+  FillKinematics(robot_, *pelv_.body, &pelv_.pose, &pelv_.vel, &pelv_.J,
                  &pelv_.Jdot_times_v);
-  FillKinematics(*torso_.body, &torso_.pose, &torso_.vel, &torso_.J,
+  FillKinematics(robot_, *torso_.body, &torso_.pose, &torso_.vel, &torso_.J,
                  &torso_.Jdot_times_v);
   for (int s = 0; s < 2; s++) {
-    FillKinematics(*foot_[s].body, &foot_[s].pose, &foot_[s].vel, &foot_[s].J,
+    FillKinematics(robot_, *foot_[s].body, &foot_[s].pose, &foot_[s].vel, &foot_[s].J,
                    &foot_[s].Jdot_times_v, kFootToContactOffset);
-    FillKinematics(*foot_sensor_[s].body, &foot_sensor_[s].pose,
+    FillKinematics(robot_, *foot_sensor_[s].body, &foot_sensor_[s].pose,
                    &foot_sensor_[s].vel, &foot_sensor_[s].J,
                    &foot_sensor_[s].Jdot_times_v, kFootToSensorOffset);
   }
