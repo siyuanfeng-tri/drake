@@ -65,17 +65,15 @@ class Constraint {
   size_t num_constraints() const { return lower_bound_.size(); }
 
   void UpdateLowerBound(const Eigen::VectorXd& new_lb) {
-    if (new_lb.size() == lower_bound_.size())
-      lower_bound_ = new_lb;
-  }
-  
-  void UpdateUpperBound(const Eigen::VectorXd& new_ub) {
-    if (new_ub.size() == upper_bound_.size())
-      upper_bound_ = new_ub;
+    if (new_lb.size() == lower_bound_.size()) lower_bound_ = new_lb;
   }
 
-  inline void set_description(const std::string &des) { description_ = des; }
-  inline const std::string &get_description() const { return description_; }
+  void UpdateUpperBound(const Eigen::VectorXd& new_ub) {
+    if (new_ub.size() == upper_bound_.size()) upper_bound_ = new_ub;
+  }
+
+  inline void set_description(const std::string& des) { description_ = des; }
+  inline const std::string& get_description() const { return description_; }
 
  protected:
   std::string description_;
@@ -126,8 +124,10 @@ class QuadraticConstraint : public Constraint {
 
   virtual const Eigen::VectorXd& b() const { return b_; }
 
-  void UpdateConstraint(const Eigen::MatrixXd& new_Q, const Eigen::VectorXd& new_b) {
-    if (new_Q.cols() == Q_.cols() && new_Q.rows() == Q_.rows() && new_b.size() == b_.size()) {
+  void UpdateConstraint(const Eigen::MatrixXd& new_Q,
+                        const Eigen::VectorXd& new_b) {
+    if (new_Q.cols() == Q_.cols() && new_Q.rows() == Q_.rows() &&
+        new_b.size() == b_.size()) {
       Q_ = new_Q;
       b_ = new_b;
     }
@@ -170,7 +170,6 @@ class SemidefiniteConstraint : public Constraint {
     throw std::runtime_error(
         "Eval is not implemented in SemidefiniteConstraint.");
   };
-
 
   virtual const Eigen::MatrixXd& G() const { return G_; }
 
@@ -233,8 +232,7 @@ class PolynomialConstraint : public Constraint {
 
   /// To avoid repeated allocation, reuse a map for the evaluation point.
   mutable std::map<Polynomiald::VarType, double> double_evaluation_point_;
-  mutable std::map<Polynomiald::VarType, TaylorVarXd>
-      taylor_evaluation_point_;
+  mutable std::map<Polynomiald::VarType, TaylorVarXd> taylor_evaluation_point_;
 };
 
 // todo: consider implementing DifferentiableConstraint,
@@ -276,8 +274,12 @@ class LinearConstraint : public Constraint {
     return A_;
   }
 
-  void UpdateConstraint(const Eigen::MatrixXd& new_A, const Eigen::VectorXd& new_lb, const Eigen::VectorXd& new_ub) {
-    if (new_A.rows() == A_.rows() && new_A.cols() == A_.cols() && new_lb.size() == lower_bound().size() && new_ub.size() == upper_bound().size()) {
+  void UpdateConstraint(const Eigen::MatrixXd& new_A,
+                        const Eigen::VectorXd& new_lb,
+                        const Eigen::VectorXd& new_ub) {
+    if (new_A.rows() == A_.rows() && new_A.cols() == A_.cols() &&
+        new_lb.size() == lower_bound().size() &&
+        new_ub.size() == upper_bound().size()) {
       A_ = new_A;
       UpdateLowerBound(new_lb);
       UpdateUpperBound(new_ub);
