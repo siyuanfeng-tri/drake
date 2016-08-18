@@ -10,24 +10,49 @@ using namespace Eigen;
  * For all the velocity / acceleration / wrench, the first 3 are always angular,
  * and the last 3 are linear.
  */
-struct BodyOfInterest {
+class BodyOfInterest {
+ private:
   /// Name of the BodyOfInterest
-  std::string name;
+  std::string name_;
   /// The link which this BOI is attached to
-  const RigidBody* body;
+  const RigidBody& body_;
 
-  Eigen::Isometry3d pose;
+  Isometry3d pose_;
+  Vector3d offset_;
+
   /// This is the task space velocity, or twist of a frame that has the same
   /// orientation as the world frame, but located at the origin of the body
   /// frame.
-  Vector6d vel;
+  Vector6d vel_;
 
   /// task space Jacobian, xdot = J * v
-  MatrixXd J;
+  MatrixXd J_;
   /// task space Jd * v
-  Vector6d Jdot_times_v;
+  Vector6d Jdot_times_v_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+ public:
+  explicit BodyOfInterest(const std::string &name, const RigidBody& body, const Vector3d &off)
+    : name_(name), body_(body), offset_(off) {}
+
+  void Update(const RigidBodyTree &robot, const KinematicsCache<double> &cache) {
+    pose_.translation() = offset_;
+    pose_.linear().setIdentity();
+    pose_ = robot.relativeTransform(cache, 0, body_.get_body_index()) * pose_;
+
+    vel_ = GetTaskSpaceVel(robot, cache, body_, offset_);
+    J_ = GetTaskSpaceJacobian(robot, cache, body_, offset_);
+    Jdot_times_v_ =
+      GetTaskSpaceJacobianDotTimesV(robot, cache, body_, offset_);
+  }
+
+  inline const std::string &name() const { return name_; }
+  inline const RigidBody& body() const { return body_; }
+  inline const Isometry3d &pose() const { return pose_; }
+  inline const Vector6d &velocity() const { return vel_; }
+  inline const MatrixXd &J() const { return J_; }
+  inline const Vector6d &Jdot_times_v() const { return Jdot_times_v_; }
 };
 
 /**
@@ -43,25 +68,15 @@ class HumanoidStatus {
   static const Vector3d kFootToSensorOffset;
 
   explicit HumanoidStatus(const std::shared_ptr<RigidBodyTree> robot_in)
-      : robot_(robot_in), cache_(robot_->bodies) {
-    pelv_.name = std::string("pelvis");
-    pelv_.body = robot_->FindBody("pelvis");
-
-    torso_.name = std::string("torso");
-    torso_.body = robot_->FindBody("torso");
-
-    foot_[Side::LEFT].name = std::string("leftFoot");
-    foot_[Side::LEFT].body = robot_->FindBody("leftFoot");
-
-    foot_[Side::RIGHT].name = std::string("rightFoot");
-    foot_[Side::RIGHT].body = robot_->FindBody("rightFoot");
-
-    foot_sensor_[Side::LEFT].name = std::string("leftFootSensor");
-    foot_sensor_[Side::LEFT].body = robot_->FindBody("leftFoot");
-
-    foot_sensor_[Side::RIGHT].name = std::string("rightFootSensor");
-    foot_sensor_[Side::RIGHT].body = robot_->FindBody("rightFoot");
-
+      : robot_(robot_in), cache_(robot_->bodies),
+        bodies_of_interest_ {
+          BodyOfInterest("pelvis", *robot_->FindBody("pelvis"), Vector3d::Zero()),
+          BodyOfInterest("torso", *robot_->FindBody("torso"), Vector3d::Zero()),
+          BodyOfInterest("leftFoot", *robot_->FindBody("leftFoot"), Vector3d::Zero()),
+          BodyOfInterest("rightFoot", *robot_->FindBody("rightFoot"), Vector3d::Zero()),
+          BodyOfInterest("leftFootSensor", *robot_->FindBody("leftFoot"), kFootToSensorOffset),
+          BodyOfInterest("rightFootSensor", *robot_->FindBody("rightFoot"), kFootToSensorOffset),
+        } {
     // build map
     body_name_to_id_ = std::unordered_map<std::string, int>();
     for (auto it = robot_->bodies.begin(); it != robot_->bodies.end(); ++it) {
@@ -129,14 +144,18 @@ class HumanoidStatus {
   inline const Vector3d& comd() const { return comd_; }
   inline const MatrixXd& J_com() const { return J_com_; }
   inline const Vector3d& Jdot_times_v_com() const { return Jdot_times_v_com_; }
-  inline const BodyOfInterest& pelv() const { return pelv_; }
-  inline const BodyOfInterest& torso() const { return torso_; }
-  inline const BodyOfInterest& foot(Side::SideEnum s) const { return foot_[s]; }
+  inline const BodyOfInterest& pelv() const { return bodies_of_interest_[0]; }
+  inline const BodyOfInterest& torso() const { return bodies_of_interest_[1]; }
+  inline const BodyOfInterest& foot(Side::SideEnum s) const {
+    if (s == Side::LEFT) return bodies_of_interest_[2];
+    else return bodies_of_interest_[3];
+  }
   inline const BodyOfInterest& foot(int s) const {
     return foot(Side::values.at(s));
   }
   inline const BodyOfInterest& foot_sensor(Side::SideEnum s) const {
-    return foot_sensor_[s];
+    if (s == Side::LEFT) return bodies_of_interest_[4];
+    else return bodies_of_interest_[5];
   }
   inline const Vector2d& cop() const { return cop_; }
   inline const Vector2d& cop_in_sensor_frame(Side::SideEnum s) const {
@@ -167,6 +186,7 @@ class HumanoidStatus {
  private:
   const std::shared_ptr<RigidBodyTree> robot_;
   KinematicsCache<double> cache_;
+
   /// Maps body name to its index
   std::unordered_map<std::string, int> body_name_to_id_;
   /// Maps joint name to its index
@@ -192,12 +212,7 @@ class HumanoidStatus {
   MatrixXd J_com_;             ///< Com Jacobian: comd = J_com * v
   Vector3d Jdot_times_v_com_;  ///< J_com_dot * v
 
-  // These are at the origin of the each body (defined by the urdf) unless
-  // specified otherwise.
-  BodyOfInterest pelv_;     ///< Pelvis link
-  BodyOfInterest torso_;    ///< Torso
-  BodyOfInterest foot_[2];  ///< At the bottom of foot, right below the ankle.
-  BodyOfInterest foot_sensor_[2];  ///< At the foot sensor, inside foot
+  std::vector<BodyOfInterest> bodies_of_interest_;
 
   Vector2d cop_;  ///< Center of pressure
   Vector2d
@@ -217,8 +232,10 @@ class HumanoidStatus {
    * @param local_offset offset between point of interest to body origin in
    * body frame
    */
+  /*
   void FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
                       const RigidBody& body, Isometry3d* pose, Vector6d* vel,
                       MatrixXd* J, Vector6d* Jdot_times_v,
                       const Ref<const Vector3d>& local_offset = Vector3d::Zero()) const;
+  */
 };

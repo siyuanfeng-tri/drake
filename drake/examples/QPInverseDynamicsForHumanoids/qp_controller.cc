@@ -156,7 +156,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
       rs.M().bottomRows(num_torque_);
   for (int i = 0; i < num_contacts_; i++) {
     torque_linear_.block(0, lambda_start + i * 6, num_torque_, 6) =
-        -rs.foot(i).J.block(0, 6, 6, num_torque_).transpose();
+        -rs.foot(i).J().block(0, 6, 6, num_torque_).transpose();
   }
   torque_constant_ = rs.bias_term().tail(num_torque_);
 
@@ -167,7 +167,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   dynamics_linear_.block(0, vd_start, 6, num_vd_) = rs.M().topRows(6);
   for (int i = 0; i < num_contacts_; i++) {
     dynamics_linear_.block(0, lambda_start + i * 6, 6, 6) =
-        -rs.foot(i).J.block<6, 6>(0, 0).transpose();
+        -rs.foot(i).J().block<6, 6>(0, 0).transpose();
   }
   dynamics_constant_ = -rs.bias_term().head(6);
   eq_dynamics_->UpdateConstraint(dynamics_linear_, dynamics_constant_);
@@ -175,7 +175,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   // contact constraints, 6 rows per contact
   for (int i = 0; i < num_contacts_; i++) {
     eq_contacts_[i]->UpdateConstraint(
-        rs.foot(i).J, -(rs.foot(i).Jdot_times_v - input.footdd_d[i]));
+        rs.foot(i).J(), -(rs.foot(i).Jdot_times_v() - input.footdd_d[i]));
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -283,7 +283,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   MatrixXd world_to_foot(MatrixXd::Zero(num_wrench_, num_wrench_));
   for (int i = 0; i < num_contacts_; i++) {
     world_to_foot.block<3, 3>(i * 6, i * 6) =
-        rs.foot(i).pose.linear().transpose();
+        rs.foot(i).pose().linear().transpose();
     world_to_foot.block<3, 3>(i * 6 + 3, i * 6 + 3) =
         world_to_foot.block<3, 3>(i * 6, i * 6);
   }
@@ -320,14 +320,14 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
           rs.J_com());
 
   cost_pelvdd_->UpdateConstraint(
-      input.w_pelv * rs.pelv().J.transpose() * rs.pelv().J,
-      input.w_pelv * (rs.pelv().Jdot_times_v - input.pelvdd_d).transpose() *
-          rs.pelv().J);
+      input.w_pelv * rs.pelv().J().transpose() * rs.pelv().J(),
+      input.w_pelv * (rs.pelv().Jdot_times_v() - input.pelvdd_d).transpose() *
+          rs.pelv().J());
 
   cost_torsodd_->UpdateConstraint(
-      input.w_torso * rs.torso().J.transpose() * rs.torso().J,
-      input.w_torso * (rs.torso().Jdot_times_v - input.torsodd_d).transpose() *
-          rs.torso().J);
+      input.w_torso * rs.torso().J().transpose() * rs.torso().J(),
+      input.w_torso * (rs.torso().Jdot_times_v() - input.torsodd_d).transpose() *
+          rs.torso().J());
 
   // regularize vd to vd_d
   cost_vd_reg_->UpdateConstraint(input.w_vd * MatrixXd::Identity(num_vd_, num_vd_),
@@ -390,11 +390,11 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   // parse result
   output->vd = vd_.value();
   output->comdd = rs.J_com() * output->vd + rs.Jdot_times_v_com();
-  output->pelvdd = rs.pelv().J * output->vd + rs.pelv().Jdot_times_v;
-  output->torsodd = rs.torso().J * output->vd + rs.torso().Jdot_times_v;
+  output->pelvdd = rs.pelv().J() * output->vd + rs.pelv().Jdot_times_v();
+  output->torsodd = rs.torso().J() * output->vd + rs.torso().Jdot_times_v();
 
   for (int i = 0; i < num_contacts_; i++) {
-    output->footdd[i] = (rs.foot(i).J * output->vd + rs.foot(i).Jdot_times_v);
+    output->footdd[i] = (rs.foot(i).J() * output->vd + rs.foot(i).Jdot_times_v());
     output->foot_wrench_in_world_frame[i] = lambda_.value().segment<6>(i * 6);
   }
 
@@ -402,23 +402,23 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
                          rs.bias_term().tail(num_torque_);
   for (int i = 0; i < num_contacts_; i++) {
     output->joint_torque -=
-        rs.foot(i).J.block(0, 6, 6, num_torque_).transpose() *
+        rs.foot(i).J().block(0, 6, 6, num_torque_).transpose() *
         output->foot_wrench_in_world_frame[i];
   }
 
   for (int i = 0; i < num_contacts_; i++) {
     Isometry3d T(Isometry3d::Identity());
     T.translation() =
-        rs.foot(i).pose.translation() - rs.foot_sensor(i).pose.translation();
+        rs.foot(i).pose().translation() - rs.foot_sensor(i).pose().translation();
 
     output->foot_wrench_in_sensor_frame[i] =
         transformSpatialForce(T, output->foot_wrench_in_world_frame[i]);
 
     output->foot_wrench_in_sensor_frame[i].head<3>() =
-        rs.foot_sensor(i).pose.linear().transpose() *
+        rs.foot_sensor(i).pose().linear().transpose() *
         output->foot_wrench_in_sensor_frame[i].head<3>();
     output->foot_wrench_in_sensor_frame[i].tail<3>() =
-        rs.foot_sensor(i).pose.linear().transpose() *
+        rs.foot_sensor(i).pose().linear().transpose() *
         output->foot_wrench_in_sensor_frame[i].tail<3>();
   }
 
@@ -461,17 +461,17 @@ double ComputeQPCost(const HumanoidStatus& rs, const QPInput& input,
   tot = c;
   std::cout << "com cost: " << c << std::endl;
 
-  c = 0.5 * output.vd.transpose() * input.w_pelv * rs.pelv().J.transpose() *
-          rs.pelv().J * output.vd +
-      input.w_pelv * (rs.pelv().Jdot_times_v - input.pelvdd_d).transpose() *
-          rs.pelv().J * output.vd;
+  c = 0.5 * output.vd.transpose() * input.w_pelv * rs.pelv().J().transpose() *
+          rs.pelv().J() * output.vd +
+      input.w_pelv * (rs.pelv().Jdot_times_v() - input.pelvdd_d).transpose() *
+          rs.pelv().J() * output.vd;
   tot += c;
   std::cout << "pelv cost: " << c << std::endl;
 
-  c = 0.5 * output.vd.transpose() * input.w_torso * rs.torso().J.transpose() *
-          rs.torso().J * output.vd +
-      input.w_torso * (rs.torso().Jdot_times_v - input.torsodd_d).transpose() *
-          rs.torso().J * output.vd;
+  c = 0.5 * output.vd.transpose() * input.w_torso * rs.torso().J().transpose() *
+          rs.torso().J() * output.vd +
+      input.w_torso * (rs.torso().Jdot_times_v() - input.torsodd_d).transpose() *
+          rs.torso().J() * output.vd;
   tot += c;
   std::cout << "torso cost: " << c << std::endl;
 

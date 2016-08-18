@@ -5,21 +5,6 @@ const Vector3d HumanoidStatus::kFootToContactOffset = Vector3d(0, 0, -0.09);
 const Vector3d HumanoidStatus::kFootToSensorOffset =
     Vector3d(0.0215646, 0.0, -0.051054);
 
-void HumanoidStatus::FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
-                                    const RigidBody& body, Isometry3d* pose,
-                                    Vector6d* vel, MatrixXd* J,
-                                    Vector6d* Jdot_times_v,
-                                    const Ref<const Vector3d>& local_offset) const {
-  *pose = Isometry3d::Identity();
-  pose->translation() = local_offset;
-  *pose = robot->relativeTransform(cache_, 0, body.get_body_index()) * (*pose);
-
-  *vel = GetTaskSpaceVel(*(robot), cache_, body, local_offset);
-  *J = GetTaskSpaceJacobian(*(robot), cache_, body, local_offset);
-  *Jdot_times_v =
-      GetTaskSpaceJacobianDotTimesV(*(robot), cache_, body, local_offset);
-}
-
 Eigen::VectorXd HumanoidStatus::GetNominalPosition() const {
   Eigen::VectorXd q = Eigen::VectorXd::Zero(position_.size());
 
@@ -78,17 +63,8 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<co
   comd_ = J_com_ * v;
 
   // body parts
-  FillKinematics(robot_, *pelv_.body, &pelv_.pose, &pelv_.vel, &pelv_.J,
-                 &pelv_.Jdot_times_v);
-  FillKinematics(robot_, *torso_.body, &torso_.pose, &torso_.vel, &torso_.J,
-                 &torso_.Jdot_times_v);
-  for (int s = 0; s < 2; s++) {
-    FillKinematics(robot_, *foot_[s].body, &foot_[s].pose, &foot_[s].vel, &foot_[s].J,
-                   &foot_[s].Jdot_times_v, kFootToContactOffset);
-    FillKinematics(robot_, *foot_sensor_[s].body, &foot_sensor_[s].pose,
-                   &foot_sensor_[s].vel, &foot_sensor_[s].J,
-                   &foot_sensor_[s].Jdot_times_v, kFootToSensorOffset);
-  }
+  for (size_t i = 0; i < bodies_of_interest_.size(); i++)
+    bodies_of_interest_[i].Update(*robot_, cache_);
 
   // ft sensor
   foot_wrench_in_sensor_frame_[Side::LEFT] = l_ft;
@@ -99,9 +75,9 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<co
     foot_wrench_in_sensor_frame_[i].tail(3) =
         rot * foot_wrench_in_sensor_frame_[i].tail(3);
     foot_wrench_in_world_frame_[i].head(3) =
-        foot_sensor_[i].pose.linear() * foot_wrench_in_sensor_frame_[i].head(3);
+        foot_sensor(i).pose().linear() * foot_wrench_in_sensor_frame_[i].head(3);
     foot_wrench_in_world_frame_[i].tail(3) =
-        foot_sensor_[i].pose.linear() * foot_wrench_in_sensor_frame_[i].tail(3);
+        foot_sensor(i).pose().linear() * foot_wrench_in_sensor_frame_[i].tail(3);
   }
 
   // cop
@@ -112,8 +88,8 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<co
     if (fabs(Fz[i]) < 1e-3) {
       cop_in_sensor_frame_[i][0] = 0;
       cop_in_sensor_frame_[i][1] = 0;
-      cop_w[i][0] = foot_sensor_[i].pose.translation()[0];
-      cop_w[i][1] = foot_sensor_[i].pose.translation()[1];
+      cop_w[i][0] = foot_sensor(i).pose().translation()[0];
+      cop_w[i][1] = foot_sensor(i).pose().translation()[1];
     } else {
       // cop relative to the ft sensor
       cop_in_sensor_frame_[i][0] =
@@ -122,9 +98,9 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<co
           foot_wrench_in_sensor_frame_[i][0] / foot_wrench_in_sensor_frame_[i][5];
 
       cop_w[i][0] = -foot_wrench_in_world_frame_[i][1] / Fz[i] +
-                    foot_sensor_[i].pose.translation()[0];
+                    foot_sensor(i).pose().translation()[0];
       cop_w[i][1] = foot_wrench_in_world_frame_[i][0] / Fz[i] +
-                    foot_sensor_[i].pose.translation()[1];
+                    foot_sensor(i).pose().translation()[1];
     }
   }
 
