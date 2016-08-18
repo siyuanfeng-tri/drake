@@ -51,16 +51,21 @@ void QPController::ResizeQP() {
   // allocate equality constraints
   // dyanmics
   eq_dynamics_ = prog_.AddLinearEqualityConstraint(MatrixXd::Zero(6, num_variable_), Matrix<double, 6, 1>::Zero(), {vd_, lambda_});
+  eq_dynamics_->set_description("dynamics eq");
   eq_contacts_.resize(num_contacts_);
   // contact constraints, 6 rows per contact
-  for (int i = 0; i < num_contacts_; i++)
+  for (int i = 0; i < num_contacts_; i++) {
     eq_contacts_[i] = prog_.AddLinearEqualityConstraint(MatrixXd::Zero(6, num_vd_), Matrix<double, 6, 1>::Zero(), {vd_});
+    eq_contacts_[i]->set_description("contact eq");
+  }
 
   // allocate inequality constraints
   // contact ft
   ineq_contact_wrench_ = prog_.AddLinearConstraint(MatrixXd::Zero(11 * num_contacts_, num_wrench_), VectorXd::Zero(11 * num_contacts_), VectorXd::Zero(11 * num_contacts_), {lambda_});
+  ineq_contact_wrench_->set_description("contact wrench ineq");
   // trq lim
-  ineq_torque_limit_ = prog_.AddLinearConstraint(MatrixXd::Zero(num_torque_, num_variable_), VectorXd::Zero(num_torque_), VectorXd::Zero(11 * num_contacts_), {vd_, lambda_});
+  ineq_torque_limit_ = prog_.AddLinearConstraint(MatrixXd::Zero(num_torque_, num_variable_), VectorXd::Zero(num_torque_), VectorXd::Zero(num_torque_), {vd_, lambda_});
+  ineq_torque_limit_->set_description("torque limit ineq");
 
   // allocate cost func:
   Eigen::MatrixXd tmp_matrix_vd(num_vd_, num_vd_);
@@ -68,18 +73,23 @@ void QPController::ResizeQP() {
 
   // com
   cost_comdd_ = prog_.AddQuadraticCost(tmp_matrix_vd, tmp_vector_vd, {vd_});
+  cost_comdd_->set_description("com cost");
   // pelv
   cost_pelvdd_ = prog_.AddQuadraticCost(tmp_matrix_vd, tmp_vector_vd, {vd_});
+  cost_pelvdd_->set_description("pelv cost");
   // torso
   cost_torsodd_ = prog_.AddQuadraticCost(tmp_matrix_vd, tmp_vector_vd, {vd_});
+  cost_torsodd_->set_description("torso cost");
   // l foot
   //prog_.AddQuadraticCost(tmp_matrix_vd, tmp_vector_vd, {vd_});
   // r foot
   //prog_.AddQuadraticCost(tmp_matrix_vd, tmp_vector_vd, {vd_});
   // reg vd
   cost_vd_reg_ = prog_.AddQuadraticCost(tmp_matrix_vd, tmp_vector_vd, {vd_});
+  cost_vd_reg_->set_description("vd cost");
   // reg lambda
   cost_lambda_reg_ = prog_.AddQuadraticCost(MatrixXd::Identity(num_wrench_, num_wrench_), VectorXd::Zero(num_wrench_), {lambda_});
+  cost_lambda_reg_->set_description("lambda cost");
 
 }
 
@@ -348,7 +358,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   ////////////////////////////////////////////////////////////////////
   // example of inspecting each cost / eq, ineq term
   // These will not be called in a real controller
-  auto costs = prog_.generic_costs();
+  auto costs = prog_.quadratic_costs();
   auto eqs = prog_.linear_equality_constraints();
   auto ineqs = prog_.linear_constraints();
 
@@ -356,14 +366,15 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     VectorXd val;
     std::shared_ptr<Constraint> cost = cost_b.constraint();
     cost->Eval(VariableList2VectorXd(cost_b.variable_list()), val);
-    std::cout << "cost term 0.5 x^T * H * x + h0 * x: " << val.transpose()
+    std::cout << cost->get_description() << ": " << val.transpose()
               << std::endl;
   }
 
   for (auto eq_b : eqs) {
     std::shared_ptr<LinearEqualityConstraint> eq = eq_b.constraint();
     VectorXd X = VariableList2VectorXd(eq_b.variable_list());
-    assert((eq->A() * X - eq->lower_bound()).isZero(EPSILON));
+    DRAKE_ASSERT((eq->A() * X - eq->lower_bound()).isZero(EPSILON));
+    //std::cout << eq->get_description() << ": " << (eq->A() * X - eq->lower_bound()).transpose() << std::endl;
   }
 
   for (auto ineq_b : ineqs) {
@@ -371,7 +382,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     VectorXd X = VariableList2VectorXd(ineq_b.variable_list());
     X = ineq->A() * X;
     for (int i = 0; i < X.size(); i++) {
-      assert(X[i] >= ineq->lower_bound()[i] - EPSILON && X[i] <= ineq->upper_bound()[i] + EPSILON);
+      DRAKE_ASSERT(X[i] >= ineq->lower_bound()[i] - EPSILON && X[i] <= ineq->upper_bound()[i] + EPSILON);
     }
   }
 
@@ -409,20 +420,6 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     output->foot_wrench_in_sensor_frame[i].tail<3>() =
         rs.foot_sensor(i).pose.linear().transpose() *
         output->foot_wrench_in_sensor_frame[i].tail<3>();
-  }
-
-  // Check equality constraints:
-  // Dynamics: M(q) * vd + h(q,v) = S * tau + J^T * lambda_
-  // Foot not moving: J * vd + Jd * v = 0
-  VectorXd residual = rs.M() * output->vd + rs.bias_term();
-  for (int i = 0; i < num_contacts_; i++)
-    residual -=
-        rs.foot(i).J.transpose() * output->foot_wrench_in_world_frame[i];
-  residual.tail(num_torque) -= output->joint_torque;
-  assert(residual.isZero(EPSILON));
-
-  for (int i = 0; i < num_contacts; i++) {
-    assert(output->footdd[i].isZero(EPSILON));
   }
 
   if (!is_qp_output_sane(*output)) {

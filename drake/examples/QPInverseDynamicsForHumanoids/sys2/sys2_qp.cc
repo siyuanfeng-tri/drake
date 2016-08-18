@@ -25,25 +25,26 @@ void System2QP::EvalOutput(const ContextBase<double> &context, SystemOutput<doub
     return;
   }
 
-  /*
-  std::cout << "state: " << context.get_vector_input(0)->get_value() << std::endl;
-  std::cout << "pos:\n" << rs.position() << std::endl;
-  std::cout << "vel:\n" << rs.velocity() << std::endl;
+  QPController qp_controller(rs);
 
-  std::cout << "input: " << context.get_vector_input(1)->get_value() << std::endl;
-  PrintQPInput(qp_input);
-  */
-  
-  QPController qp_controller;
   if (qp_controller.Control(rs, qp_input, &qp_output) < 0) {
     std::cout << "System2QP: QP canot solve\n";
     return;
   }
+ 
+  /*
+  std::cout << "===================================\n";
+  for (int i = 0; i < rs.position().size(); i++) {
+    std::cout << rs.robot().getPositionName(i) << ": " << rs.position()[i] << ", " << rs.velocity()[i] << std::endl;
+  }
+  std::cout << "===================================\n";
+  */
+ 
+  PrintQPInput(qp_input);
+  PrintQPOutput(qp_output);
 
   QPOutput2VectorXd(qp_output, &tmp);
   output->get_mutable_port(0)->GetMutableVectorData()->get_mutable_value() = tmp;
-
-  //getchar();
 }
 
 
