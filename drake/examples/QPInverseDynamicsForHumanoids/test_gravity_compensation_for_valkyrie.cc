@@ -44,7 +44,7 @@ QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
     con.Control(robot_status, input, &output);
   }
   printf("%g\n", (get_time() - t0) / 100.);
-  
+
   // Print quadratic costs for all the terms.
   ComputeQPCost(robot_status, input, output);
 
