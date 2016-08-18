@@ -159,11 +159,10 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
 
     return variable_views_.back();
   }
-  
-  const DecisionVariableView get_variable(const std::string &name) const {
+
+  const DecisionVariableView get_variable(const std::string& name) const {
     for (auto it = variable_views_.begin(); it != variable_views_.end(); it++) {
-      if (name.compare(it->name()) == 0)
-        return *it;
+      if (name.compare(it->name()) == 0) return *it;
     }
     throw std::runtime_error("unable to find variable: " + name);
   }
@@ -354,8 +353,8 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
    * @brief Adds linear equality constraints referencing potentially a
    * subset of the decision variables (defined in the vars parameter).
    */
-  void AddConstraint(
-      std::shared_ptr<LinearEqualityConstraint> con, VariableList const& vars) {
+  void AddConstraint(std::shared_ptr<LinearEqualityConstraint> con,
+                     VariableList const& vars) {
     problem_type_.AddLinearEqualityConstraint();
     linear_equality_constraints_.push_back(
         Binding<LinearEqualityConstraint>(con, vars));
@@ -503,9 +502,9 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
             linear_constraint_ub[poly_num] -= monomial.coefficient;
           } else if (monomial.terms.size() == 1) {
             const Polynomiald::VarType term_var = monomial.terms[0].var;
-            int var_num = (std::find(poly_vars.begin(), poly_vars.end(),
-                                     term_var) -
-                           poly_vars.begin());
+            int var_num =
+                (std::find(poly_vars.begin(), poly_vars.end(), term_var) -
+                 poly_vars.begin());
             DRAKE_ASSERT(var_num < static_cast<int>(poly_vars.size()));
             linear_constraint_matrix(poly_num, var_num) = monomial.coefficient;
           } else {
@@ -521,8 +520,7 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
         return constraint;
       } else {
         std::shared_ptr<LinearConstraint> constraint(
-            new LinearConstraint(linear_constraint_matrix,
-                                 linear_constraint_lb,
+            new LinearConstraint(linear_constraint_matrix, linear_constraint_lb,
                                  linear_constraint_ub));
         AddConstraint(constraint, vars);
         return constraint;
@@ -620,7 +618,8 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
    * - "conesubscript"
    *   + Denotes which variable x_i satisfies the cone relation:
    *   + x_i >= (sqrt(sum(x_j^2))), i!=j
-   * TODO(alexdunyak): Calling OptimizationProblem::Solve will not invoke mosek at this
+   * TODO(alexdunyak): Calling OptimizationProblem::Solve will not invoke mosek
+   *at this
    * time.
    */
   void SetSolverOption(const std::string& solver_name,
@@ -694,9 +693,7 @@ class DRAKEOPTIMIZATION_EXPORT OptimizationProblem {
     return linear_constraints_;
   }
 
-  const VariableList &variable_views() const { 
-    return variable_views_;
-  }
+  const VariableList& variable_views() const { return variable_views_; }
 
   /** GetAllCosts
    *
