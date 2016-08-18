@@ -195,10 +195,10 @@ int main() {
 
   Vector6d Kp_default = (Vector6d() << 30, 30, 30, 30, 30, 30).finished();
   Vector6d Kd_default = (Vector6d() << 4, 4, 4, 4, 4, 4).finished();
-  CartesianSetPoint pelv_fb(0, rs.pelv().pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default);
-  CartesianSetPoint torso_fb(0, rs.torso().pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default);
-  CartesianSetPoint foot_fb[2] = {CartesianSetPoint(0, rs.foot(Side::LEFT).pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default),
-                                  CartesianSetPoint(0, rs.foot(Side::RIGHT).pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default)};
+  CartesianSetPoint pelv_fb(0, rs.pelv().pose(), Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default);
+  CartesianSetPoint torso_fb(0, rs.torso().pose(), Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default);
+  CartesianSetPoint foot_fb[2] = {CartesianSetPoint(0, rs.foot(Side::LEFT).pose(), Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default),
+                                  CartesianSetPoint(0, rs.foot(Side::RIGHT).pose(), Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default)};
 
   Eigen::Vector3d com_d(rs.com());
   com_d[0] += 0.05;
@@ -227,10 +227,10 @@ int main() {
   while (true) {
     // make qp input
     qp_input.comdd_d = 40 * (com_d - rs.com()) - 4*rs.comd();
-    qp_input.pelvdd_d = pelv_fb.ComputeAccelerationTarget(rs.pelv().pose, rs.pelv().vel);
-    qp_input.torsodd_d = torso_fb.ComputeAccelerationTarget(rs.torso().pose, rs.torso().vel);
-    qp_input.footdd_d[Side::LEFT] = foot_fb[Side::LEFT].ComputeAccelerationTarget(rs.foot(Side::LEFT).pose, rs.foot(Side::LEFT).vel);
-    qp_input.footdd_d[Side::RIGHT] = foot_fb[Side::RIGHT].ComputeAccelerationTarget(rs.foot(Side::RIGHT).pose, rs.foot(Side::RIGHT).vel);
+    qp_input.pelvdd_d = pelv_fb.ComputeAccelerationTarget(rs.pelv().pose(), rs.pelv().velocity());
+    qp_input.torsodd_d = torso_fb.ComputeAccelerationTarget(rs.torso().pose(), rs.torso().velocity());
+    qp_input.footdd_d[Side::LEFT] = foot_fb[Side::LEFT].ComputeAccelerationTarget(rs.foot(Side::LEFT).pose(), rs.foot(Side::LEFT).velocity());
+    qp_input.footdd_d[Side::RIGHT] = foot_fb[Side::RIGHT].ComputeAccelerationTarget(rs.foot(Side::RIGHT).pose(), rs.foot(Side::RIGHT).velocity());
     qp_input.vd_d.segment(6, nj) = 150 * (joint_d - rs.position().segment(6, nj)) - 10 * rs.velocity().segment(6, nj);
 
     // send messages
@@ -247,7 +247,7 @@ int main() {
     VectorXd2QPOutput(output->get_mutable_port(0)->GetMutableVectorData()->get_mutable_value(), &qp_output);
 
     STATE[time_idx] += dt;
-    integrate_state_rpy(dt, q, qd, qp_output.vd);
+    integrate_state_floating_base_rpy(dt, q, qd, qp_output.vd);
     trq = qp_output.joint_torque;
     l_ft = qp_output.foot_wrench_in_sensor_frame[0];
     r_ft = qp_output.foot_wrench_in_sensor_frame[1];
@@ -257,39 +257,5 @@ int main() {
   }
 
   return 0;
-}
-
-
-
-
-void test_lcm_sub() {
-  lcm::LCM lcm;
-  // lcm receiver
-  drake::systems::lcm::LcmReceiveThread lcm_receive_thread(&lcm);
-
-  // lcm pub
-  MessagePublisher pub("test", &lcm, 3);
-  pub.Start();
-
-  std::string channel = "test";
-
-  const drake::systems::lcm::TranslatorBetweenLcmtDrakeSignal translator(3);
-
-  drake::systems::lcm::LcmSubscriberSystem dut(channel, translator, &lcm);
-  std::unique_ptr<drake::systems::ContextBase<double>> context = dut.CreateDefaultContext();
-  std::unique_ptr<drake::systems::SystemOutput<double>> output = dut.AllocateOutput(*context);
-
-  Eigen::VectorXd mlgb;
-
-  while (true) {
-    dut.EvalOutput(*context.get(), output.get());
-    // Gets the output of the LcmSubscriberSystem.
-    // Downcasts the output vector to be a pointer to a BasicVector.
-    const drake::systems::BasicVector<double>& basic_vector =
-        dynamic_cast<const drake::systems::BasicVector<double>&>(*output->get_port(0).get_vector_data());
-
-    mlgb = basic_vector.get_value();
-    std::cout << mlgb.transpose() << std::endl;
-  }
 }
 
