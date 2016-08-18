@@ -6,6 +6,9 @@
 #include "sys2_qp.h"
 #include "drake/common/drake_path.h"
 
+#include "../dummy_integrate.h"
+
+
 class MessagePublisher {
  public:
   MessagePublisher(const std::string& channel_name, ::lcm::LCM* lcm, int size)
@@ -57,7 +60,7 @@ class MessagePublisher {
   const std::string channel_name_;
 
   ::lcm::LCM* lcm_;
-  
+
   std::mutex lock_;
 
   drake::lcmt_drake_signal message_;
@@ -72,7 +75,7 @@ void testIO() {
     drake::GetDrakePath() +
     std::string(
         "/examples/QPInverseDynamicsForHumanoids/valkyrie_sim_drake.urdf");
-  
+
   HumanoidStatus rs(std::make_unique<RigidBodyTree>(urdf, DrakeJoint::ROLLPITCHYAW));
   QPInput qp_input;
   QPOutput qp_output;
@@ -89,15 +92,15 @@ void testIO() {
 
   VectorXd2HumanoidStatus(X, &rs);
   HumanoidStatus2VectorXd(rs, &X1);
-  assert((X - X1).norm() == 0);
+  DRAKE_ASSERT((X - X1).norm() == 0);
 
   Vectorxd2QPInput(in, &qp_input);
   QPInput2VectorXd(qp_input, &in1);
-  assert((in - in1).norm() == 0);
+  DRAKE_ASSERT((in - in1).norm() == 0);
 
   VectorXd2QPOutput(out, &qp_output);
   QPOutput2VectorXd(qp_output, &out1);
-  assert((out - out1).norm() == 0);
+  DRAKE_ASSERT((out - out1).norm() == 0);
 }
 
 
@@ -109,18 +112,18 @@ void testIO() {
 
 int main() {
   testIO();
- 
+
   lcm::LCM lcm;
 
   ////////////////////////////////////////////////////////////////
-  // build the diagram 
+  // build the diagram
   std::string urdf =
     drake::GetDrakePath() +
     std::string(
         "/examples/QPInverseDynamicsForHumanoids/valkyrie_sim_drake.urdf");
   drake::systems::System2QP qp_con(urdf);
   qp_con.set_name("qp_controller");
-   
+
   // 2 input
   drake::systems::lcm::TranslatorBetweenLcmtDrakeSignal state_trans(qp_con.number_of_robot_states());
   drake::systems::lcm::TranslatorBetweenLcmtDrakeSignal qp_input_trans(qp_con.number_of_qp_inputs());
@@ -143,7 +146,7 @@ int main() {
 
   mydiagram.ExportOutput(&qp_con, 0);
 
-  mydiagram.Finalize(); 
+  mydiagram.Finalize();
   ////////////////////////////////////////////////////////////////
   // lcm pub
   MessagePublisher state_pub("state", &lcm, qp_con.number_of_robot_states());
@@ -154,7 +157,7 @@ int main() {
 
   // lcm receiver
   drake::systems::lcm::LcmReceiveThread lcm_receive_thread(&lcm);
-  
+
   ////////////////////////////////////////////////////////////////
   // fake simulation
   std::unique_ptr<drake::systems::ContextBase<double>> context = mydiagram.CreateDefaultContext();
@@ -162,7 +165,7 @@ int main() {
   DRAKE_ASSERT(context->get_num_input_ports() == 0);
   DRAKE_ASSERT(output->get_num_ports() == 1);
 
- 
+
   HumanoidStatus rs(std::make_unique<RigidBodyTree>(urdf, DrakeJoint::ROLLPITCHYAW));
   QPInput qp_input;
   QPOutput qp_output;
@@ -173,13 +176,13 @@ int main() {
   Eigen::VectorXd STATE = Eigen::VectorXd::Zero(qp_con.number_of_robot_states());
   Eigen::VectorXd QP_INPUT = Eigen::VectorXd::Zero(qp_con.number_of_qp_inputs());
   Eigen::VectorXd QP_OUTPUT = Eigen::VectorXd::Zero(qp_con.number_of_qp_outputs());
- 
+
   int time_idx = 0;
   int q_idx = time_idx + 1;
   int v_idx = q_idx + rs.robot().number_of_positions();
   int trq_idx = v_idx + rs.robot().number_of_velocities();
   int l_ft_idx = trq_idx + rs.robot().actuators.size();
-  int r_ft_idx = l_ft_idx + 6; 
+  int r_ft_idx = l_ft_idx + 6;
 
   Eigen::Map<Eigen::VectorXd> q(STATE.data()+q_idx, rs.robot().number_of_positions());
   Eigen::Map<Eigen::VectorXd> qd(STATE.data()+v_idx, rs.robot().number_of_velocities());
@@ -187,30 +190,16 @@ int main() {
   Eigen::Map<Eigen::VectorXd> l_ft(STATE.data()+l_ft_idx, 6);
   Eigen::Map<Eigen::VectorXd> r_ft(STATE.data()+r_ft_idx, 6);
 
-  q[rs.joint_name_to_position_index().at("rightHipRoll")] = 0.01;
-  q[rs.joint_name_to_position_index().at("rightHipPitch")] = -0.5432;
-  q[rs.joint_name_to_position_index().at("rightKneePitch")] = 1.2195;
-  q[rs.joint_name_to_position_index().at("rightAnklePitch")] =
-      -0.7070;
-  q[rs.joint_name_to_position_index().at("rightAnkleRoll")] = -0.0069;
-
-  q[rs.joint_name_to_position_index().at("leftHipRoll")] = -0.01;
-  q[rs.joint_name_to_position_index().at("leftHipPitch")] = -0.5432;
-  q[rs.joint_name_to_position_index().at("leftKneePitch")] = 1.2195;
-  q[rs.joint_name_to_position_index().at("leftAnklePitch")] = -0.7070;
-  q[rs.joint_name_to_position_index().at("leftAnkleRoll")] = 0.0069;
-
-  q[rs.joint_name_to_position_index().at("rightShoulderRoll")] = 1;
-  q[rs.joint_name_to_position_index().at("rightShoulderYaw")] = 0.5;
-  q[rs.joint_name_to_position_index().at("rightElbowPitch")] =
-      M_PI / 2.;
-
-  q[rs.joint_name_to_position_index().at("leftShoulderRoll")] = -1;
-  q[rs.joint_name_to_position_index().at("leftShoulderYaw")] = 0.5;
-  q[rs.joint_name_to_position_index().at("leftElbowPitch")] =
-      -M_PI / 2.; 
-
+  q = rs.GetNominalPosition();
   VectorXd2HumanoidStatus(STATE, &rs);
+
+  Vector6d Kp_default = (Vector6d() << 30, 30, 30, 30, 30, 30).finished();
+  Vector6d Kd_default = (Vector6d() << 4, 4, 4, 4, 4, 4).finished();
+  CartesianSetPoint pelv_fb(0, rs.pelv().pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default);
+  CartesianSetPoint torso_fb(0, rs.torso().pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default);
+  CartesianSetPoint foot_fb[2] = {CartesianSetPoint(0, rs.foot(Side::LEFT).pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default),
+                                  CartesianSetPoint(0, rs.foot(Side::RIGHT).pose, Vector6d::Zero(), Vector6d::Zero(), Kp_default, Kd_default)};
+
   Eigen::Vector3d com_d(rs.com());
   com_d[0] += 0.05;
 
@@ -225,18 +214,25 @@ int main() {
   qp_input.wrench_d[Side::LEFT][5] = 660;
   qp_input.wrench_d[Side::RIGHT][5] = 660;
   qp_input.w_com = 1e2;
-  qp_input.w_pelv = 1e-1;
-  qp_input.w_torso = 1e-1;
-  qp_input.w_foot = 1e2;
-  qp_input.w_vd = 1e-3;
-  qp_input.w_wrench_reg = 1e-5; 
+  qp_input.w_pelv = 1e1;
+  qp_input.w_torso = 1e1;
+  qp_input.w_foot = 1e1;
+  qp_input.w_vd = 1e-1;
+  qp_input.w_wrench_reg = 1e-6;
+
+  VectorXd joint_d = rs.position().segment(6, rs.position().size()-6);
+  int nj = joint_d.size();
 
   double dt = 0.01;
-  
   while (true) {
     // make qp input
-    qp_input.comdd_d = 40 * (com_d - rs.com()) - 4*(rs.comd());
-    
+    qp_input.comdd_d = 40 * (com_d - rs.com()) - 4*rs.comd();
+    qp_input.pelvdd_d = pelv_fb.ComputeAccelerationTarget(rs.pelv().pose, rs.pelv().vel);
+    qp_input.torsodd_d = torso_fb.ComputeAccelerationTarget(rs.torso().pose, rs.torso().vel);
+    qp_input.footdd_d[Side::LEFT] = foot_fb[Side::LEFT].ComputeAccelerationTarget(rs.foot(Side::LEFT).pose, rs.foot(Side::LEFT).vel);
+    qp_input.footdd_d[Side::RIGHT] = foot_fb[Side::RIGHT].ComputeAccelerationTarget(rs.foot(Side::RIGHT).pose, rs.foot(Side::RIGHT).vel);
+    qp_input.vd_d.segment(6, nj) = 150 * (joint_d - rs.position().segment(6, nj)) - 10 * rs.velocity().segment(6, nj);
+
     // send messages
     QPInput2VectorXd(qp_input, &QP_INPUT);
     HumanoidStatus2VectorXd(rs, &STATE);
@@ -250,12 +246,8 @@ int main() {
     // parse output / fwd sim, qp_output will be sent through LCM as well.
     VectorXd2QPOutput(output->get_mutable_port(0)->GetMutableVectorData()->get_mutable_value(), &qp_output);
 
-    std::cout << "comdd_d " << qp_input.comdd_d.transpose() << std::endl;
-    std::cout << "comdd " << qp_output.comdd.transpose() << std::endl;
-
     STATE[time_idx] += dt;
-    q += qd * dt;
-    qd += qp_output.vd * dt;
+    integrate_state_rpy(dt, q, qd, qp_output.vd);
     trq = qp_output.joint_torque;
     l_ft = qp_output.foot_wrench_in_sensor_frame[0];
     r_ft = qp_output.foot_wrench_in_sensor_frame[1];
@@ -263,20 +255,9 @@ int main() {
 
     std::cout << "time: " << rs.time() << " com: " << rs.com().transpose() << std::endl;
   }
-  
 
   return 0;
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -311,4 +292,4 @@ void test_lcm_sub() {
     std::cout << mlgb.transpose() << std::endl;
   }
 }
- 
+

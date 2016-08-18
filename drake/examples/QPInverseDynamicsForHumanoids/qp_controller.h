@@ -8,6 +8,64 @@
 #include "drake/solvers/snopt_solver.h"
 #include "drake/solvers/gurobi_solver.h"
 
+class CartesianSetPoint {
+ public:
+  int frame_id;
+
+  Isometry3d pose_d;
+  Vector6d vel_d;
+  Vector6d acc_d;
+
+  Vector6d Kp;
+  Vector6d Kd;
+  bool disable_mask[6];
+
+  CartesianSetPoint() {
+    frame_id = 0;
+    pose_d.setIdentity();
+    vel_d.setZero();
+    acc_d.setZero();
+    Kp.setZero();
+    Kd.setZero();
+    for (int i = 0; i < 6; i++)
+      disable_mask[i] = false;
+  }
+  
+  CartesianSetPoint(int fid, const Isometry3d &p_d, const Vector6d &v_d, const Vector6d &vd_d, const Vector6d &Kp, const Vector6d &Kd) {
+    frame_id = fid;
+    pose_d = p_d;
+    vel_d = v_d;
+    acc_d = vd_d;
+    this->Kp = Kp;
+    this->Kd = Kd;
+    for (int i = 0; i < 6; i++)
+      disable_mask[i] = false;
+  }
+
+  // rotation first, position second
+  Vector6d ComputeAccelerationTarget(const Isometry3d &pose, const Vector6d &vel) const {
+    // feedforward acc_d + velocity feedback
+    Vector6d qdd = acc_d;
+    qdd += (Kd.array() * (vel_d - vel).array()).matrix();
+
+    // pose feedback
+    Matrix3d R_err = pose_d.linear() * pose.linear().transpose();
+    AngleAxisd angle_axis_err(R_err);
+    
+    Vector3d pos_err = pose_d.translation() - pose.translation();
+    Vector3d rot_err = angle_axis_err.axis() * angle_axis_err.angle();
+
+    // orientation
+    qdd.segment<3>(0) += (Kp.segment<3>(0).array() * rot_err.array()).matrix();
+
+    // position
+    qdd.segment<3>(3) += (Kp.segment<3>(3).array() * pos_err.array()).matrix();
+
+    return qdd;
+  }
+};
+
+
 /**
  * Input to the QP inverse dynamics controller
  */
@@ -93,15 +151,7 @@ struct QPParam {
 class QPController {
  public:
   QPParam param;
-  
-  explicit QPController() {
-    param.mu = 1;
-    param.mu_Mz = 0.1;
-    param.x_max = 0.2;
-    param.x_min = -0.05;
-    param.y_max = 0.05;
-    param.y_min = -0.05; 
-  }
+
   /**
    * The current version explicitly uses SNOPT, but it is really solving a
    * quadratic program. It also instantiates
@@ -115,7 +165,13 @@ class QPController {
   void SetupDoubleSupport(const HumanoidStatus& rs);
   void SetupSingleSupport(const HumanoidStatus& rs);
 
-  QPController(const HumanoidStatus& rs) {
+  explicit QPController(const HumanoidStatus& rs) {
+    param.mu = 1;
+    param.mu_Mz = 0.1;
+    param.x_max = 0.2;
+    param.x_min = -0.05;
+    param.y_max = 0.05;
+    param.y_min = -0.05; 
     SetupDoubleSupport(rs);
   }
 

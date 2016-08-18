@@ -74,7 +74,12 @@ class Constraint {
       upper_bound_ = new_ub;
   }
 
+  inline void set_description(const std::string &des) { description_ = des; }
+  inline const std::string &get_description() const { return description_; }
+
  protected:
+  std::string description_;
+
   void set_bounds(const Eigen::VectorXd& lower_bound,
                   const Eigen::VectorXd& upper_bound) {
     DRAKE_ASSERT(lower_bound.size() == upper_bound.size());

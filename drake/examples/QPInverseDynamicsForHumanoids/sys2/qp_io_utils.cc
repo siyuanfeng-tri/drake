@@ -1,4 +1,5 @@
 #include "qp_io_utils.h"
+#include "drake/common/drake_assert.h"
 
 void VectorXd2HumanoidStatus(const Eigen::VectorXd &v, HumanoidStatus *rs) {
   if (v.size() != get_humanoid_status_size(*rs)) {
@@ -12,10 +13,10 @@ void VectorXd2HumanoidStatus(const Eigen::VectorXd &v, HumanoidStatus *rs) {
   int trq_idx = v_idx + rs->robot().number_of_velocities();
   int l_ft_idx = trq_idx + rs->robot().actuators.size();
   int r_ft_idx = l_ft_idx + 6;
-  assert(r_ft_idx + 6 == get_humanoid_status_size(*rs));
+  DRAKE_ASSERT(r_ft_idx + 6 == get_humanoid_status_size(*rs));
 
-  rs->Update(v[time_idx], 
-      v.segment(q_idx, rs->robot().number_of_positions()), 
+  rs->Update(v[time_idx],
+      v.segment(q_idx, rs->robot().number_of_positions()),
       v.segment(v_idx, rs->robot().number_of_velocities()),
       v.segment(trq_idx, rs->robot().actuators.size()),
       v.segment<6>(l_ft_idx),
@@ -33,10 +34,10 @@ void HumanoidStatus2VectorXd(const HumanoidStatus &rs, Eigen::VectorXd *v) {
   v->segment(idx, rs.position().size()) = rs.position(); idx += rs.position().size();
   v->segment(idx, rs.velocity().size()) = rs.velocity(); idx += rs.velocity().size();
   v->segment(idx, rs.joint_torque().size()) = rs.joint_torque(); idx += rs.joint_torque().size();
-  v->segment(idx, rs.foot_wrench_in_body_frame(Side::LEFT).size()) = rs.foot_wrench_in_body_frame(Side::LEFT); idx += rs.foot_wrench_in_body_frame(Side::LEFT).size();
-  v->segment(idx, rs.foot_wrench_in_body_frame(Side::RIGHT).size()) = rs.foot_wrench_in_body_frame(Side::RIGHT); idx += rs.foot_wrench_in_body_frame(Side::RIGHT).size();
+  v->segment(idx, rs.foot_wrench_in_sensor_frame(Side::LEFT).size()) = rs.foot_wrench_in_sensor_frame(Side::LEFT); idx += rs.foot_wrench_in_sensor_frame(Side::LEFT).size();
+  v->segment(idx, rs.foot_wrench_in_sensor_frame(Side::RIGHT).size()) = rs.foot_wrench_in_sensor_frame(Side::RIGHT); idx += rs.foot_wrench_in_sensor_frame(Side::RIGHT).size();
 
-  assert(idx == get_humanoid_status_size(rs));
+  DRAKE_ASSERT(idx == get_humanoid_status_size(rs));
 }
 
 void Vectorxd2QPInput(const Eigen::VectorXd &v, QPInput *input) {
@@ -61,7 +62,7 @@ void Vectorxd2QPInput(const Eigen::VectorXd &v, QPInput *input) {
   input->w_foot = v(idx); idx += 1;
   input->w_vd = v(idx); idx += 1;
   input->w_wrench_reg = v(idx); idx += 1;
-  assert(idx == get_qp_input_size(*input));
+  DRAKE_ASSERT(idx == get_qp_input_size(*input));
 }
 
 void QPInput2VectorXd(const QPInput &input, Eigen::VectorXd *v) {
@@ -70,7 +71,7 @@ void QPInput2VectorXd(const QPInput &input, Eigen::VectorXd *v) {
     DRAKE_ASSERT(false);
     return;
   }
-  
+
   int idx = 0;
   v->segment<3>(idx) = input.comdd_d; idx += 3;
   v->segment<6>(idx) = input.pelvdd_d; idx += 6;
@@ -88,7 +89,7 @@ void QPInput2VectorXd(const QPInput &input, Eigen::VectorXd *v) {
   (*v)(idx) = input.w_vd; idx += 1;
   (*v)(idx) = input.w_wrench_reg; idx += 1;
 
-  assert(idx == get_qp_input_size(input));
+  DRAKE_ASSERT(idx == get_qp_input_size(input));
 }
 
 void VectorXd2QPOutput(const Eigen::VectorXd &v, QPOutput *output) {
@@ -110,7 +111,7 @@ void VectorXd2QPOutput(const Eigen::VectorXd &v, QPOutput *output) {
   output->foot_wrench_in_sensor_frame[0] = v.segment<6>(idx); idx += 6;
   output->foot_wrench_in_sensor_frame[1] = v.segment<6>(idx); idx += 6;
 
-  assert(idx == get_qp_output_size(*output));
+  DRAKE_ASSERT(idx == get_qp_output_size(*output));
 }
 
 void QPOutput2VectorXd(const QPOutput &output, Eigen::VectorXd *v) {
@@ -118,7 +119,7 @@ void QPOutput2VectorXd(const QPOutput &output, Eigen::VectorXd *v) {
     DRAKE_ASSERT(false);
     return;
   }
-  
+
   int idx = 0;
   v->segment<3>(idx) = output.comdd; idx += 3;
   v->segment<6>(idx) = output.pelvdd; idx += 6;
@@ -132,6 +133,6 @@ void QPOutput2VectorXd(const QPOutput &output, Eigen::VectorXd *v) {
   v->segment<6>(idx) = output.foot_wrench_in_sensor_frame[0]; idx += 6;
   v->segment<6>(idx) = output.foot_wrench_in_sensor_frame[1]; idx += 6;
 
-  assert(idx == get_qp_output_size(output));
+  DRAKE_ASSERT(idx == get_qp_output_size(output));
 }
- 
+

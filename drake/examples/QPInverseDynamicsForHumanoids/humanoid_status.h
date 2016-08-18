@@ -103,6 +103,8 @@ class HumanoidStatus {
               const Ref<const VectorXd>& trq, const Ref<const Vector6d>& l_ft, const Ref<const Vector6d>& r_ft,
               const Ref<const Matrix3d>& rot = Matrix3d::Identity());
 
+  Eigen::VectorXd GetNominalPosition() const;
+
   inline const RigidBodyTree& robot() const { return *robot_; }
   inline const KinematicsCache<double>& cache() const { return cache_; }
   inline const std::unordered_map<std::string, int>& body_name_to_id() const {
@@ -137,11 +139,11 @@ class HumanoidStatus {
     return foot_sensor_[s];
   }
   inline const Vector2d& cop() const { return cop_; }
-  inline const Vector2d& cop_in_body_frame(Side::SideEnum s) const {
-    return cop_in_body_frame_[s];
+  inline const Vector2d& cop_in_sensor_frame(Side::SideEnum s) const {
+    return cop_in_sensor_frame_[s];
   }
-  inline const Vector6d& foot_wrench_in_body_frame(Side::SideEnum s) const {
-    return foot_wrench_in_body_frame_[s];
+  inline const Vector6d& foot_wrench_in_sensor_frame(Side::SideEnum s) const {
+    return foot_wrench_in_sensor_frame_[s];
   }
   inline const Vector6d& foot_wrench_in_world_frame(Side::SideEnum s) const {
     return foot_wrench_in_world_frame_[s];
@@ -150,11 +152,11 @@ class HumanoidStatus {
   inline const BodyOfInterest& foot_sensor(int s) const {
     return foot_sensor(Side::values.at(s));
   }
-  inline const Vector2d& cop_in_body_frame(int s) const {
-    return cop_in_body_frame(Side::values.at(s));
+  inline const Vector2d& cop_in_sensor_frame(int s) const {
+    return cop_in_sensor_frame(Side::values.at(s));
   }
-  inline const Vector6d& foot_wrench_in_body_frame(int s) const {
-    return foot_wrench_in_body_frame(Side::values.at(s));
+  inline const Vector6d& foot_wrench_in_sensor_frame(int s) const {
+    return foot_wrench_in_sensor_frame(Side::values.at(s));
   }
   inline const Vector6d& foot_wrench_in_world_frame(int s) const {
     return foot_wrench_in_world_frame(Side::values.at(s));
@@ -199,10 +201,10 @@ class HumanoidStatus {
 
   Vector2d cop_;  ///< Center of pressure
   Vector2d
-      cop_in_body_frame_[2];  ///< Individual center of pressure in foot frame
+      cop_in_sensor_frame_[2];  ///< Individual center of pressure in foot frame
 
   Vector6d
-      foot_wrench_in_body_frame_[2];  ///< Wrench measured in the body frame
+      foot_wrench_in_sensor_frame_[2];  ///< Wrench measured in the body frame
   Vector6d foot_wrench_in_world_frame_[2];  ///< Wrench rotated to world frame
 
   /**
