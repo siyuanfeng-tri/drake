@@ -5,7 +5,6 @@
 #include <chrono>
 
 #include "dummy_integrate.h"
-#include "util.h"
 
 QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   // Make controller.
@@ -39,11 +38,11 @@ QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   input.w_vd = 1e3;
   input.w_wrench_reg = 1e-5;
 
-  double t0 = get_time();
+  //double t0 = get_time();
   for (int i = 0; i < 100; i++) {
     con.Control(robot_status, input, &output);
   }
-  printf("%g\n", (get_time() - t0) / 100.);
+  //printf("%g\n", (get_time() - t0) / 100.);
 
   // Print quadratic costs for all the terms.
   ComputeQPCost(robot_status, input, output);
