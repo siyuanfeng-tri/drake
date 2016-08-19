@@ -31,6 +31,8 @@ add_executable(testDrakeGeometryUtil testDrakeGeometryUtil.cpp)
 target_link_libraries(testDrakeGeometryUtil drakeGeometryUtil ${GTEST_BOTH_LIBRARIES})
 add_test(NAME testDrakeGeometryUtil COMMAND testDrakeGeometryUtil)
 
+add_executable(test_mrd_logger test_mrd_logger.cc ../mrd_logger.cc)
+
 add_matlab_test(NAME util/test/PassByValueMapTest COMMAND PassByValueMapTest)
 add_matlab_test(NAME util/test/angleDiffTest COMMAND angleDiffTest)
 add_matlab_test(NAME util/test/asintest COMMAND asintest)
