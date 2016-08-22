@@ -9,6 +9,8 @@
 QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   // Make controller.
   QPController con(robot_status);
+  QPControllerNew con_new(robot_status, 4);
+
   QPInput input;
   QPOutput output;
   InitQPOutput(robot_status.robot(), &output);
@@ -38,14 +40,30 @@ QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   input.w_vd = 1e3;
   input.w_wrench_reg = 1e-5;
 
+  // make contact
+  input.all_contacts.push_back(SupportElement(*robot_status.robot().FindBody("leftFoot")));
+  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
+  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
+  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
+  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+  input.all_contacts.push_back(SupportElement(*robot_status.robot().FindBody("rightFoot")));
+  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
+  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
+  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
+  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+
   //double t0 = get_time();
-  for (int i = 0; i < 100; i++) {
-    con.Control(robot_status, input, &output);
+  int N = 1;
+  for (int i = 0; i < N; i++) {
+    //con.Control(robot_status, input, &output);
+    //PrintQPOutput(output);
+    
+    con_new.Control(robot_status, input, &output);
+    PrintQPOutput(output);
   }
-  //printf("%g\n", (get_time() - t0) / 100.);
+  //printf("%g\n", (get_time() - t0) / N);
 
   // Print quadratic costs for all the terms.
-  ComputeQPCost(robot_status, input, output);
 
   return output;
 }
