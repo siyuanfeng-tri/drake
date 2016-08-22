@@ -8,58 +8,55 @@
 
 QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   // Make controller.
-  QPController con(robot_status);
-  QPControllerNew con_new(robot_status, 4);
+  QPController con(robot_status, 4);
 
-  QPInput input;
-  QPOutput output;
-  InitQPOutput(robot_status.robot(), &output);
-  InitQPInput(robot_status.robot(), &input);
+  QPInput input(robot_status.robot());
+  QPOutput output(robot_status.robot());
 
   // Make input.
   // These represent the desired motions for the robot, and are typically
   // outputs of motion planner or hand-crafted behavior state machines.
-  input.comdd_d.setZero();
-  input.pelvdd_d.setZero();
-  input.torsodd_d.setZero();
-  input.footdd_d[Side::LEFT].setZero();
-  input.footdd_d[Side::RIGHT].setZero();
-  input.wrench_d[Side::LEFT].setZero();
-  input.wrench_d[Side::RIGHT].setZero();
-  input.vd_d.setZero();
+  input.comdd_d().setZero();
+  input.pelvdd_d().setZero();
+  input.torsodd_d().setZero();
+  input.footdd_d(Side::LEFT).setZero();
+  input.footdd_d(Side::RIGHT).setZero();
+  input.wrench_d(Side::LEFT).setZero();
+  input.wrench_d(Side::RIGHT).setZero();
+  input.vd_d().setZero();
   // [5] is Fz, 660N * 2 is about robot weight.
-  input.wrench_d[Side::LEFT][5] = 660;
-  input.wrench_d[Side::RIGHT][5] = 660;
+  input.wrench_d(Side::LEFT)[5] = 660;
+  input.wrench_d(Side::RIGHT)[5] = 660;
 
   // Weights are set arbitrarily by the control designer, these typically
   // require tuning.
   input.w_com = 1e2;
   input.w_pelv = 1e1;
   input.w_torso = 1e1;
-  input.w_foot = 1e1;
+  input.w_foot = 1e5;
   input.w_vd = 1e3;
   input.w_wrench_reg = 1e-5;
 
   // make contact
-  input.all_contacts.push_back(SupportElement(*robot_status.robot().FindBody("leftFoot")));
-  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
-  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
-  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
-  input.all_contacts[0].get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
-  input.all_contacts.push_back(SupportElement(*robot_status.robot().FindBody("rightFoot")));
-  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
-  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
-  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
-  input.all_contacts[1].get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+  input.supports().push_back(SupportElement(*robot_status.robot().FindBody("leftFoot")));
+  input.support(0).get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
+  input.support(0).get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
+  input.support(0).get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
+  input.support(0).get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+
+  /*
+  input.supports().push_back(SupportElement(*robot_status.robot().FindBody("rightFoot")));
+  input.support(1).get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
+  input.support(1).get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
+  input.support(1).get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
+  input.support(1).get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+  */
 
   //double t0 = get_time();
   int N = 1;
   for (int i = 0; i < N; i++) {
-    //con.Control(robot_status, input, &output);
-    //PrintQPOutput(output);
-    
-    con_new.Control(robot_status, input, &output);
-    PrintQPOutput(output);
+    con.Control(robot_status, input, &output);
+    std::cout << output;
   }
   //printf("%g\n", (get_time() - t0) / N);
 
@@ -89,9 +86,6 @@ int main() {
                       Vector6d::Zero(), Vector6d::Zero());
 
   QPOutput output = TestGravityCompensation(robot_status);
-
-  // Print results.
-  PrintQPOutput(output);
 
   return 0;
 }

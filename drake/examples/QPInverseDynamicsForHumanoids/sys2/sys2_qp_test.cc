@@ -77,10 +77,8 @@ void testIO() {
         "/examples/QPInverseDynamicsForHumanoids/valkyrie_sim_drake.urdf");
 
   HumanoidStatus rs(std::make_unique<RigidBodyTree>(urdf, DrakeJoint::ROLLPITCHYAW));
-  QPInput qp_input;
-  QPOutput qp_output;
-  InitQPInput(rs.robot(), &qp_input);
-  InitQPOutput(rs.robot(), &qp_output);
+  QPInput qp_input(rs.robot());
+  QPOutput qp_output(rs.robot());
 
   Eigen::VectorXd X, X1, in, in1, out, out1;
   X = Eigen::VectorXd::Random(get_humanoid_status_size(rs));
@@ -167,10 +165,8 @@ int main() {
 
 
   HumanoidStatus rs(std::make_unique<RigidBodyTree>(urdf, DrakeJoint::ROLLPITCHYAW));
-  QPInput qp_input;
-  QPOutput qp_output;
-  InitQPInput(rs.robot(), &qp_input);
-  InitQPOutput(rs.robot(), &qp_output);
+  QPInput qp_input(rs.robot());
+  QPOutput qp_output(rs.robot());
 
   // initial condition
   Eigen::VectorXd STATE = Eigen::VectorXd::Zero(qp_con.number_of_robot_states());
@@ -203,16 +199,9 @@ int main() {
   Eigen::Vector3d com_d(rs.com());
   com_d[0] += 0.05;
 
-  qp_input.pelvdd_d.setZero();
-  qp_input.torsodd_d.setZero();
-  qp_input.footdd_d[Side::LEFT].setZero();
-  qp_input.footdd_d[Side::RIGHT].setZero();
-  qp_input.wrench_d[Side::LEFT].setZero();
-  qp_input.wrench_d[Side::RIGHT].setZero();
-  qp_input.vd_d.setZero();
   // [5] is Fz, 660N * 2 is about robot weight.
-  qp_input.wrench_d[Side::LEFT][5] = 660;
-  qp_input.wrench_d[Side::RIGHT][5] = 660;
+  qp_input.wrench_d(Side::LEFT)[5] = 660;
+  qp_input.wrench_d(Side::RIGHT)[5] = 660;
   qp_input.w_com = 1e2;
   qp_input.w_pelv = 1e1;
   qp_input.w_torso = 1e1;
@@ -226,12 +215,12 @@ int main() {
   double dt = 0.01;
   while (true) {
     // make qp input
-    qp_input.comdd_d = 40 * (com_d - rs.com()) - 4*rs.comd();
-    qp_input.pelvdd_d = pelv_fb.ComputeAccelerationTarget(rs.pelv().pose(), rs.pelv().velocity());
-    qp_input.torsodd_d = torso_fb.ComputeAccelerationTarget(rs.torso().pose(), rs.torso().velocity());
-    qp_input.footdd_d[Side::LEFT] = foot_fb[Side::LEFT].ComputeAccelerationTarget(rs.foot(Side::LEFT).pose(), rs.foot(Side::LEFT).velocity());
-    qp_input.footdd_d[Side::RIGHT] = foot_fb[Side::RIGHT].ComputeAccelerationTarget(rs.foot(Side::RIGHT).pose(), rs.foot(Side::RIGHT).velocity());
-    qp_input.vd_d.segment(6, nj) = 150 * (joint_d - rs.position().segment(6, nj)) - 10 * rs.velocity().segment(6, nj);
+    qp_input.comdd_d() = 40 * (com_d - rs.com()) - 4*rs.comd();
+    qp_input.pelvdd_d() = pelv_fb.ComputeAccelerationTarget(rs.pelv().pose(), rs.pelv().velocity());
+    qp_input.torsodd_d() = torso_fb.ComputeAccelerationTarget(rs.torso().pose(), rs.torso().velocity());
+    qp_input.footdd_d(Side::LEFT) = foot_fb[Side::LEFT].ComputeAccelerationTarget(rs.foot(Side::LEFT).pose(), rs.foot(Side::LEFT).velocity());
+    qp_input.footdd_d(Side::RIGHT) = foot_fb[Side::RIGHT].ComputeAccelerationTarget(rs.foot(Side::RIGHT).pose(), rs.foot(Side::RIGHT).velocity());
+    qp_input.vd_d().segment(6, nj) = 150 * (joint_d - rs.position().segment(6, nj)) - 10 * rs.velocity().segment(6, nj);
 
     // send messages
     QPInput2VectorXd(qp_input, &QP_INPUT);
@@ -247,10 +236,10 @@ int main() {
     VectorXd2QPOutput(output->get_mutable_port(0)->GetMutableVectorData()->get_mutable_value(), &qp_output);
 
     STATE[time_idx] += dt;
-    integrate_state_floating_base_rpy(dt, q, qd, qp_output.vd);
-    trq = qp_output.joint_torque;
-    l_ft = qp_output.foot_wrench_in_sensor_frame[0];
-    r_ft = qp_output.foot_wrench_in_sensor_frame[1];
+    integrate_state_floating_base_rpy(dt, q, qd, qp_output.vd());
+    trq = qp_output.joint_torque();
+    l_ft = qp_output.foot_wrench_in_sensor_frame(0);
+    r_ft = qp_output.foot_wrench_in_sensor_frame(1);
     VectorXd2HumanoidStatus(STATE, &rs);
 
     std::cout << "time: " << rs.time() << " com: " << rs.com().transpose() << std::endl;

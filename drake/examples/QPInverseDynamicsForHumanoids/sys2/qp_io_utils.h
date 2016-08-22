@@ -11,14 +11,14 @@ void HumanoidStatus2VectorXd(const HumanoidStatus &rs, Eigen::VectorXd *v);
 
 // qp input <-> flat vec
 inline int get_qp_input_size(const QPInput &input) {
-  return 3 + 6 * 4 + input.vd_d.size() + 6 * 2 + 6;
+  return 3 + 6 * 4 + input.vd_d().size() + 6 * 2 + 6;
 }
 void Vectorxd2QPInput(const Eigen::VectorXd &v, QPInput *input);
 void QPInput2VectorXd(const QPInput &input, Eigen::VectorXd *v);
 
 // qp output <-> flat vec
 inline int get_qp_output_size(const QPOutput &output) {
-  return 3 + 6 * 4 + output.vd.size() + output.joint_torque.size() + 12 + 12;
+  return 3 + 6 * 4 + output.vd().size() + output.joint_torque().size() + 12 + 12;
 }
 void VectorXd2QPOutput(const Eigen::VectorXd &v, QPOutput *output);
 void QPOutput2VectorXd(const QPOutput &output, Eigen::VectorXd *v);

@@ -47,14 +47,14 @@ void Vectorxd2QPInput(const Eigen::VectorXd &v, QPInput *input) {
   }
 
   int idx = 0;
-  input->comdd_d = v.segment<3>(idx); idx += 3;
-  input->pelvdd_d = v.segment<6>(idx); idx += 6;
-  input->torsodd_d = v.segment<6>(idx); idx += 6;
-  input->footdd_d[0] = v.segment<6>(idx); idx += 6;
-  input->footdd_d[1] = v.segment<6>(idx); idx += 6;
-  input->vd_d = v.segment(idx, input->vd_d.size()); idx += input->vd_d.size();
-  input->wrench_d[0] = v.segment<6>(idx); idx += 6;
-  input->wrench_d[1] = v.segment<6>(idx); idx += 6;
+  input->comdd_d() = v.segment<3>(idx); idx += 3;
+  input->pelvdd_d() = v.segment<6>(idx); idx += 6;
+  input->torsodd_d() = v.segment<6>(idx); idx += 6;
+  input->footdd_d(0) = v.segment<6>(idx); idx += 6;
+  input->footdd_d(1) = v.segment<6>(idx); idx += 6;
+  input->vd_d() = v.segment(idx, input->vd_d().size()); idx += input->vd_d().size();
+  input->wrench_d(0) = v.segment<6>(idx); idx += 6;
+  input->wrench_d(1) = v.segment<6>(idx); idx += 6;
 
   input->w_com = v(idx); idx += 1;
   input->w_pelv = v(idx); idx += 1;
@@ -73,14 +73,14 @@ void QPInput2VectorXd(const QPInput &input, Eigen::VectorXd *v) {
   }
 
   int idx = 0;
-  v->segment<3>(idx) = input.comdd_d; idx += 3;
-  v->segment<6>(idx) = input.pelvdd_d; idx += 6;
-  v->segment<6>(idx) = input.torsodd_d; idx += 6;
-  v->segment<6>(idx) = input.footdd_d[0]; idx += 6;
-  v->segment<6>(idx) = input.footdd_d[1]; idx += 6;
-  v->segment(idx, input.vd_d.size()) = input.vd_d; idx += input.vd_d.size();
-  v->segment<6>(idx) = input.wrench_d[0]; idx += 6;
-  v->segment<6>(idx) = input.wrench_d[1]; idx += 6;
+  v->segment<3>(idx) = input.comdd_d(); idx += 3;
+  v->segment<6>(idx) = input.pelvdd_d(); idx += 6;
+  v->segment<6>(idx) = input.torsodd_d(); idx += 6;
+  v->segment<6>(idx) = input.footdd_d(0); idx += 6;
+  v->segment<6>(idx) = input.footdd_d(1); idx += 6;
+  v->segment(idx, input.vd_d().size()) = input.vd_d(); idx += input.vd_d().size();
+  v->segment<6>(idx) = input.wrench_d(0); idx += 6;
+  v->segment<6>(idx) = input.wrench_d(1); idx += 6;
 
   (*v)(idx) = input.w_com; idx += 1;
   (*v)(idx) = input.w_pelv; idx += 1;
@@ -99,17 +99,17 @@ void VectorXd2QPOutput(const Eigen::VectorXd &v, QPOutput *output) {
   }
 
   int idx = 0;
-  output->comdd = v.segment<3>(idx); idx += 3;
-  output->pelvdd = v.segment<6>(idx); idx += 6;
-  output->torsodd = v.segment<6>(idx); idx += 6;
-  output->footdd[0] = v.segment<6>(idx); idx += 6;
-  output->footdd[1] = v.segment<6>(idx); idx += 6;
-  output->vd = v.segment(idx, output->vd.size()); idx += output->vd.size();
-  output->joint_torque = v.segment(idx, output->joint_torque.size()); idx += output->joint_torque.size();
-  output->foot_wrench_in_world_frame[0] = v.segment<6>(idx); idx += 6;
-  output->foot_wrench_in_world_frame[1] = v.segment<6>(idx); idx += 6;
-  output->foot_wrench_in_sensor_frame[0] = v.segment<6>(idx); idx += 6;
-  output->foot_wrench_in_sensor_frame[1] = v.segment<6>(idx); idx += 6;
+  output->comdd() = v.segment<3>(idx); idx += 3;
+  output->pelvdd() = v.segment<6>(idx); idx += 6;
+  output->torsodd() = v.segment<6>(idx); idx += 6;
+  output->footdd(0) = v.segment<6>(idx); idx += 6;
+  output->footdd(1) = v.segment<6>(idx); idx += 6;
+  output->vd() = v.segment(idx, output->vd().size()); idx += output->vd().size();
+  output->joint_torque() = v.segment(idx, output->joint_torque().size()); idx += output->joint_torque().size();
+  output->foot_wrench_in_world_frame(0) = v.segment<6>(idx); idx += 6;
+  output->foot_wrench_in_world_frame(1) = v.segment<6>(idx); idx += 6;
+  output->foot_wrench_in_sensor_frame(0) = v.segment<6>(idx); idx += 6;
+  output->foot_wrench_in_sensor_frame(1) = v.segment<6>(idx); idx += 6;
 
   DRAKE_ASSERT(idx == get_qp_output_size(*output));
 }
@@ -121,17 +121,17 @@ void QPOutput2VectorXd(const QPOutput &output, Eigen::VectorXd *v) {
   }
 
   int idx = 0;
-  v->segment<3>(idx) = output.comdd; idx += 3;
-  v->segment<6>(idx) = output.pelvdd; idx += 6;
-  v->segment<6>(idx) = output.torsodd; idx += 6;
-  v->segment<6>(idx) = output.footdd[0]; idx += 6;
-  v->segment<6>(idx) = output.footdd[1]; idx += 6;
-  v->segment(idx, output.vd.size()) = output.vd; idx += output.vd.size();
-  v->segment(idx, output.joint_torque.size()) = output.joint_torque; idx += output.joint_torque.size();
-  v->segment<6>(idx) = output.foot_wrench_in_world_frame[0]; idx += 6;
-  v->segment<6>(idx) = output.foot_wrench_in_world_frame[1]; idx += 6;
-  v->segment<6>(idx) = output.foot_wrench_in_sensor_frame[0]; idx += 6;
-  v->segment<6>(idx) = output.foot_wrench_in_sensor_frame[1]; idx += 6;
+  v->segment<3>(idx) = output.comdd(); idx += 3;
+  v->segment<6>(idx) = output.pelvdd(); idx += 6;
+  v->segment<6>(idx) = output.torsodd(); idx += 6;
+  v->segment<6>(idx) = output.footdd(0); idx += 6;
+  v->segment<6>(idx) = output.footdd(1); idx += 6;
+  v->segment(idx, output.vd().size()) = output.vd(); idx += output.vd().size();
+  v->segment(idx, output.joint_torque().size()) = output.joint_torque(); idx += output.joint_torque().size();
+  v->segment<6>(idx) = output.foot_wrench_in_world_frame(0); idx += 6;
+  v->segment<6>(idx) = output.foot_wrench_in_world_frame(1); idx += 6;
+  v->segment<6>(idx) = output.foot_wrench_in_sensor_frame(0); idx += 6;
+  v->segment<6>(idx) = output.foot_wrench_in_sensor_frame(1); idx += 6;
 
   DRAKE_ASSERT(idx == get_qp_output_size(output));
 }
