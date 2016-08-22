@@ -65,6 +65,66 @@ class CartesianSetPoint {
   }
 };
 
+class SupportElement {
+ private:
+  const RigidBody& body_;
+  // these are local offsets within body_
+  std::vector<Eigen::Vector3d> contact_points_;
+  // this is also in body frame, assuming normal is the same for all contact points
+  Eigen::Vector3d normal_;
+  double mu_;
+
+ public:
+  SupportElement(const RigidBody &b) : body_(b) {
+    normal_ = Vector3d(0, 0, 1);
+    mu_ = 1;
+  }
+
+  Eigen::MatrixXd ComputeBasisMatrix(const RigidBodyTree &robot, const KinematicsCache<double> &cache, int num_basis_per_contact_pt) const {
+    Eigen::MatrixXd basis(3 * contact_points_.size(), num_basis_per_contact_pt  * contact_points_.size());
+    Eigen::Matrix3d body_rot = robot.relativeTransform(cache, 0, body_.get_body_index()).linear();
+
+    Eigen::Vector3d t1, t2, tangent_vec, base;
+    double theta;
+
+    basis.setZero();
+    if (fabs(1 - normal_[2]) < EPSILON) {  // handle the unit-normal case (since it's
+      // unit length, just check z)
+      t1 << 1, 0, 0;
+    } else if (fabs(1 + normal_[2]) < EPSILON) {
+      t1 << -1, 0, 0;  // same for the reflected case
+    } else {           // now the general case
+      t1 << normal_[1], -normal_[0], 0;
+      t1 /= sqrt(normal_[1] * normal_[1] + normal_[0] * normal_[0]);
+    }
+    t2 = t1.cross(normal_);
+    
+    for (size_t i = 0; i < contact_points_.size(); i++) {
+      for (int k = 0; k < num_basis_per_contact_pt; k++) {
+        theta = k * 2 * M_PI / num_basis_per_contact_pt;
+        tangent_vec = cos(theta) * t1 + sin(theta) * t2;
+        base = (normal_ + mu_ * tangent_vec).normalized();
+        basis.block(3 * i, num_basis_per_contact_pt * i + k, 3, 1) = body_rot * base;
+      }
+    }
+    return basis;
+  }
+
+  Eigen::MatrixXd ComputeJacobianAtContactPoints(const RigidBodyTree &robot, const KinematicsCache<double> &cache) const {
+    Eigen::MatrixXd JJ(3 * contact_points_.size(), robot.number_of_velocities());
+    for (size_t i = 0; i < contact_points_.size(); i++)
+      JJ.block(3 * i, 0, 3, robot.number_of_velocities()) = GetTaskSpaceJacobian(robot, cache, body_, contact_points_[i]).bottomRows(3);
+    return JJ;
+  }
+
+  inline std::vector<Eigen::Vector3d> &get_mutable_contact_points() { return contact_points_; }
+  inline double mu() const { return mu_; }
+  inline void set_mu(double m) { mu_ = m; }
+  inline const std::vector<Eigen::Vector3d> &contact_points() const { return contact_points_; }
+  inline const Eigen::Vector3d &normal() const { return normal_; }
+  inline const RigidBody& body() const { return body_; }
+};
+ 
 
 /**
  * Input to the QP inverse dynamics controller
@@ -72,6 +132,8 @@ class CartesianSetPoint {
 struct QPInput {
   // Names for each generalized coordinate.
   std::vector<std::string> coord_names;
+
+  std::vector<SupportElement> all_contacts;
 
   // Desired task space accelerations for various body parts.
   // Postfix _d indicates desired values.
@@ -210,58 +272,6 @@ class QPController {
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_lambda_reg_;
 };
 
-class SupportElement {
- private:
-  const RigidBody& body_;
-  // these are local offsets within body_
-  std::vector<Eigen::Vector3d> contact_points_;
-  // this is also in body frame, assuming normal is the same for all contact points
-  Eigen::Vector3d normal_;
-
- public:
-  SupportElement(const RigidBody &b) : body_(b) {
-    normal_ = Vector3d(0, 0, 1);
-  }
-
-  void ComputeBasisMatrix(const RigidBodyTree &robot, const KinematicsCache<double> &cache, int num_basis_per_contact_pt, Eigen::Ref<Eigen::MatrixXd> basis) const {
-    DRAKE_ASSERT((size_t)basis.rows() == 3 * contact_points_.size() && basis.cols() == num_basis_per_contact_pt);
-    Eigen::Matrix3d body_rot = robot.relativeTransform(cache, 0, body_.get_body_index()).linear();
-
-    Eigen::Vector3d t1, t2;
-    double theta;
-
-    if (1 - normal_[2] < EPSILON) {  // handle the unit-normal case (since it's
-      // unit length, just check z)
-      t1 << 1, 0, 0;
-    } else if (1 + normal_[2] < EPSILON) {
-      t1 << -1, 0, 0;  // same for the reflected case
-    } else {           // now the general case
-      t1 << normal_[1], -normal_[0], 0;
-      t1 /= sqrt(normal_[1] * normal_[1] + normal_[0] * normal_[0]);
-    }
-
-    t2 = t1.cross(normal_);
-    for (size_t i = 0; i < contact_points_.size(); i++) {
-      for (int k = 0; k < num_basis_per_contact_pt; k++) {
-        theta = k * 2 * M_PI / num_basis_per_contact_pt;
-        basis.block(3 * i, k, 3, 1) = cos(theta) * t1 + sin(theta) * t2;
-      }
-    }
-    basis = body_rot * basis;
-  }
-
-  template <typename Derived> void ComputeJacobianAtContactPoints(const RigidBodyTree &robot, const KinematicsCache<double> &cache, Eigen::MatrixBase<Derived> &JJ) const {
-    DRAKE_ASSERT((size_t)JJ.rows() == 3 * contact_points_.size() && JJ.cols() == robot.number_of_velocities());
-
-    for (size_t i = 0; i < contact_points_.size(); i++)
-      JJ.block(3 * i, 0, 3, robot.number_of_velocities()) = GetTaskSpaceJacobian(robot, cache, body_, contact_points_[i]).bottomRows(3);
-  }
-
-  inline std::vector<Eigen::Vector3d> &get_mutable_contact_points() { return contact_points_; }
-  inline const std::vector<Eigen::Vector3d> &contact_points() const { return contact_points_; }
-  inline const Eigen::Vector3d &normal() const { return normal_; }
-  inline const RigidBody& body() const { return body_; }
-};
 
 class QPControllerNew {
  private:
@@ -278,6 +288,10 @@ class QPControllerNew {
   Eigen::VectorXd inequality_upper_bound_;
   Eigen::VectorXd inequality_lower_bound_;
 
+  Eigen::MatrixXd JB_;
+  Eigen::MatrixXd point_force_to_wrench_;
+  Eigen::VectorXd contact_wrenches_;
+
   // update the problem
   drake::solvers::OptimizationProblem prog_;
   drake::solvers::SnoptSolver solver_;
@@ -285,6 +299,7 @@ class QPControllerNew {
 
   int num_contacts_;
   int num_vd_;
+  int num_point_forces_;
   int num_basis_;
   int num_torque_;
   int num_variable_;
@@ -299,6 +314,21 @@ class QPControllerNew {
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_pelvdd_;
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_torsodd_;
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_vd_reg_;
+
+  void SetZero() {
+    stacked_contact_jacobians_.setZero();
+    basis_to_force_matrix_.setZero();
+    torque_linear_.setZero();
+    torque_constant_.setZero();
+    dynamics_linear_.setZero();
+    dynamics_constant_.setZero();
+    inequality_linear_.setZero();
+    inequality_upper_bound_.setZero();
+    inequality_lower_bound_.setZero();
+
+    JB_.setZero();
+    point_force_to_wrench_.setZero();
+  }
 
  public:
   QPParam param;
