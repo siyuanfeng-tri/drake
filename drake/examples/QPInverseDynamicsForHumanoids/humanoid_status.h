@@ -144,6 +144,8 @@ class HumanoidStatus {
   inline const Vector3d& comd() const { return comd_; }
   inline const MatrixXd& J_com() const { return J_com_; }
   inline const Vector3d& Jdot_times_v_com() const { return Jdot_times_v_com_; }
+  inline const MatrixXd& centroidal_momentum_matrix() const { return centroidal_momentum_matrix_; }
+  inline const Vector6d& centroidal_momentum_matrix_dot_times_v() const { return centroidal_momentum_matrix_dot_times_v_; }
   inline const BodyOfInterest& pelv() const { return bodies_of_interest_[0]; }
   inline const BodyOfInterest& torso() const { return bodies_of_interest_[1]; }
   inline const BodyOfInterest& foot(Side::SideEnum s) const {
@@ -211,6 +213,8 @@ class HumanoidStatus {
   Vector3d comd_;              ///< Com velocity
   MatrixXd J_com_;             ///< Com Jacobian: comd = J_com * v
   Vector3d Jdot_times_v_com_;  ///< J_com_dot * v
+  MatrixXd centroidal_momentum_matrix_;
+  Vector6d centroidal_momentum_matrix_dot_times_v_;
 
   std::vector<BodyOfInterest> bodies_of_interest_;
 

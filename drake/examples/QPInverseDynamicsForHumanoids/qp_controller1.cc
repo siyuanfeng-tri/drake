@@ -1,18 +1,11 @@
 #include "drake/solvers/optimization.h"
 #include "drake/solvers/snopt_solver.h"
 #include "drake/solvers/gurobi_solver.h"
+#include "drake/util/drakeGeometryUtil.h"
 
 #include "qp_controller.h"
 
 using namespace drake::solvers;
-
-template <typename Derived> Eigen::Matrix3d cross_product_to_matrix(const Eigen::MatrixBase<Derived> &v) {
-  DRAKE_ASSERT(v.rows() == 3 && v.cols() == 1);
-  return (Eigen::Matrix3d() <<
-			0, -v(2), v(1),
-			v(2), 0, -v(0),
-		  -v(1), v(0), 0).finished();
-}
 
 // TODO(siyuan.feng@tri.global): some version of this should go to
 // optimization.h
@@ -113,6 +106,8 @@ void QPControllerNew::ResizeQP(const HumanoidStatus& rs, const std::vector<Suppo
   // resize tmp matrices
   torque_linear_.resize(num_torque_, num_variable_);
   dynamics_linear_.resize(6, num_variable_);
+
+  point_force_to_wrench_.resize(6 * num_contacts_, 3 * num_point_forces_);
 }
 
 int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
@@ -121,7 +116,6 @@ int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
     std::cerr << "input is invalid\n";
     return -1;
   }
-
   ResizeQP(rs, input.all_contacts);
   SetZero();
 
@@ -288,15 +282,14 @@ int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
     VectorXd val;
     std::shared_ptr<Constraint> cost = cost_b.constraint();
     cost->Eval(VariableList2VectorXd(cost_b.variable_list()), val);
-    std::cout << cost->get_description() << ": " << val.transpose()
-              << std::endl;
+    //std::cout << cost->get_description() << ": " << val.transpose()
+    //          << std::endl;
   }
 
   for (auto eq_b : eqs) {
     std::shared_ptr<LinearEqualityConstraint> eq = eq_b.constraint();
     VectorXd X = VariableList2VectorXd(eq_b.variable_list());
     DRAKE_ASSERT((eq->A() * X - eq->lower_bound()).isZero(EPSILON));
-    //std::cout << eq->get_description() << ": " << (eq->A() * X - eq->lower_bound()).transpose() << std::endl;
   }
 
   for (auto ineq_b : ineqs) {
@@ -324,7 +317,6 @@ int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
   }
 
   // matrix from basis to wrench
-  point_force_to_wrench_.resize(6 * num_contacts_, 3 * num_point_forces_);
   rowIdx = colIdx = 0;
   for (int i = 0; i < num_contacts_; i++) {
     const SupportElement &contact = input.all_contacts[i];
@@ -335,7 +327,7 @@ int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
       // Force part: just sum up all the point forces, so theese are I
       point_force_to_wrench_.block<3, 3>(rowIdx + 3, colIdx).setIdentity();
       // Torque part:
-      point_force_to_wrench_.block<3, 3>(rowIdx, colIdx) = cross_product_to_matrix(contact_point - ref_point);
+      point_force_to_wrench_.block<3, 3>(rowIdx, colIdx) = vectorToSkewSymmetric(contact_point - ref_point);
       colIdx += 3;
     }
     rowIdx += 6;
@@ -346,10 +338,11 @@ int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
 
   // Compute wrench for left and right foot in the world frame.
   for (int i = 0; i < num_contacts_; i++) {
-    if (input.all_contacts[i].body().get_body_index() == rs.foot_sensor(Side::LEFT).body().get_body_index()) {
+    int contact_body_idx = input.all_contacts[i].body().get_body_index();
+    if (contact_body_idx == rs.foot_sensor(Side::LEFT).body().get_body_index()) {
       output->foot_wrench_in_world_frame[Side::LEFT] = contact_wrenches_.segment<6>(6 * i);
     }
-    else if (input.all_contacts[i].body().get_body_index() == rs.foot_sensor(Side::RIGHT).body().get_body_index()) {
+    else if (contact_body_idx == rs.foot_sensor(Side::RIGHT).body().get_body_index()) {
       output->foot_wrench_in_world_frame[Side::RIGHT] = contact_wrenches_.segment<6>(6 * i);
     }
   }
@@ -370,6 +363,17 @@ int QPControllerNew::Control(const HumanoidStatus& rs, const QPInput& input,
         rs.foot_sensor(i).pose().linear().transpose() *
         output->foot_wrench_in_sensor_frame[i].tail<3>();
   }
+
+  // Sanity check, net external wrench should = centroidal_matrix * vd + centroidal_matrix_dot * v
+  Vector6d Ld = rs.centroidal_momentum_matrix() * output->vd + rs.centroidal_momentum_matrix_dot_times_v();
+  Vector6d net_wrench = rs.robot().getMass() * rs.robot().a_grav;
+  for (int i = 0; i < num_contacts_; i++) {
+    int contact_body_idx = input.all_contacts[i].body().get_body_index();
+    net_wrench += contact_wrenches_.segment<6>(6 * i);
+    const Vector3d ref_point = rs.robot().transformPoints(rs.cache(), Vector3d::Zero(), contact_body_idx, 0);
+    net_wrench.segment<3>(0) += (ref_point - rs.com()).cross(contact_wrenches_.segment<3>(6 * i + 3));
+  }
+  DRAKE_ASSERT((net_wrench - Ld).isZero(EPSILON));
 
   if (!is_qp_output_sane(*output)) {
     std::cerr << "output is invalid\n";
