@@ -32,31 +32,33 @@ class BodyOfInterest {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  public:
-  explicit BodyOfInterest(const std::string &name, const RigidBody& body, const Vector3d &off)
-    : name_(name), body_(body), offset_(off) {}
+  explicit BodyOfInterest(const std::string& name, const RigidBody& body,
+                          const Vector3d& off)
+      : name_(name), body_(body), offset_(off) {}
 
   /**
-   * Updates pose, velocity, Jacobian, Jacobian_dot_times_v based on @p robot and @p cache.
+   * Updates pose, velocity, Jacobian, Jacobian_dot_times_v based on @p robot
+   * and @p cache.
    * @param robot is the robot model.
    * @param cache is the kinematics cache. It needs to be initialed first
    */
-  void Update(const RigidBodyTree &robot, const KinematicsCache<double> &cache) {
+  void Update(const RigidBodyTree& robot,
+              const KinematicsCache<double>& cache) {
     pose_.translation() = offset_;
     pose_.linear().setIdentity();
     pose_ = robot.relativeTransform(cache, 0, body_.get_body_index()) * pose_;
 
     vel_ = GetTaskSpaceVel(robot, cache, body_, offset_);
     J_ = GetTaskSpaceJacobian(robot, cache, body_, offset_);
-    Jdot_times_v_ =
-      GetTaskSpaceJacobianDotTimesV(robot, cache, body_, offset_);
+    Jdot_times_v_ = GetTaskSpaceJacobianDotTimesV(robot, cache, body_, offset_);
   }
 
-  inline const std::string &name() const { return name_; }
+  inline const std::string& name() const { return name_; }
   inline const RigidBody& body() const { return body_; }
-  inline const Isometry3d &pose() const { return pose_; }
-  inline const Vector6d &velocity() const { return vel_; }
-  inline const MatrixXd &J() const { return J_; }
-  inline const Vector6d &Jdot_times_v() const { return Jdot_times_v_; }
+  inline const Isometry3d& pose() const { return pose_; }
+  inline const Vector6d& velocity() const { return vel_; }
+  inline const MatrixXd& J() const { return J_; }
+  inline const Vector6d& Jdot_times_v() const { return Jdot_times_v_; }
 };
 
 /**
@@ -72,14 +74,21 @@ class HumanoidStatus {
   static const Vector3d kFootToSensorOffset;
 
   explicit HumanoidStatus(const std::shared_ptr<RigidBodyTree> robot_in)
-      : robot_(robot_in), cache_(robot_->bodies),
-        bodies_of_interest_ {
-          BodyOfInterest("pelvis", *robot_->FindBody("pelvis"), Vector3d::Zero()),
-          BodyOfInterest("torso", *robot_->FindBody("torso"), Vector3d::Zero()),
-          BodyOfInterest("leftFoot", *robot_->FindBody("leftFoot"), Vector3d::Zero()),
-          BodyOfInterest("rightFoot", *robot_->FindBody("rightFoot"), Vector3d::Zero()),
-          BodyOfInterest("leftFootSensor", *robot_->FindBody("leftFoot"), kFootToSensorOffset),
-          BodyOfInterest("rightFootSensor", *robot_->FindBody("rightFoot"), kFootToSensorOffset),
+      : robot_(robot_in),
+        cache_(robot_->bodies),
+        bodies_of_interest_{
+            BodyOfInterest("pelvis", *robot_->FindBody("pelvis"),
+                           Vector3d::Zero()),
+            BodyOfInterest("torso", *robot_->FindBody("torso"),
+                           Vector3d::Zero()),
+            BodyOfInterest("leftFoot", *robot_->FindBody("leftFoot"),
+                           Vector3d::Zero()),
+            BodyOfInterest("rightFoot", *robot_->FindBody("rightFoot"),
+                           Vector3d::Zero()),
+            BodyOfInterest("leftFootSensor", *robot_->FindBody("leftFoot"),
+                           kFootToSensorOffset),
+            BodyOfInterest("rightFootSensor", *robot_->FindBody("rightFoot"),
+                           kFootToSensorOffset),
         } {
     // Build map
     body_name_to_id_ = std::unordered_map<std::string, int>();
@@ -118,8 +127,9 @@ class HumanoidStatus {
    * the foot frame. This is useful if the foot ft sensor has a different
    * orientation than the foot.
    */
-  void Update(double t, const Ref<const VectorXd>& q, const Ref<const VectorXd>& v,
-              const Ref<const VectorXd>& trq, const Ref<const Vector6d>& l_ft, const Ref<const Vector6d>& r_ft,
+  void Update(double t, const Ref<const VectorXd>& q,
+              const Ref<const VectorXd>& v, const Ref<const VectorXd>& trq,
+              const Ref<const Vector6d>& l_ft, const Ref<const Vector6d>& r_ft,
               const Ref<const Matrix3d>& rot = Matrix3d::Identity());
 
   /**
@@ -151,20 +161,28 @@ class HumanoidStatus {
   inline const Vector3d& comd() const { return comd_; }
   inline const MatrixXd& J_com() const { return J_com_; }
   inline const Vector3d& Jdot_times_v_com() const { return Jdot_times_v_com_; }
-  inline const MatrixXd& centroidal_momentum_matrix() const { return centroidal_momentum_matrix_; }
-  inline const Vector6d& centroidal_momentum_matrix_dot_times_v() const { return centroidal_momentum_matrix_dot_times_v_; }
+  inline const MatrixXd& centroidal_momentum_matrix() const {
+    return centroidal_momentum_matrix_;
+  }
+  inline const Vector6d& centroidal_momentum_matrix_dot_times_v() const {
+    return centroidal_momentum_matrix_dot_times_v_;
+  }
   inline const BodyOfInterest& pelv() const { return bodies_of_interest_[0]; }
   inline const BodyOfInterest& torso() const { return bodies_of_interest_[1]; }
   inline const BodyOfInterest& foot(Side::SideEnum s) const {
-    if (s == Side::LEFT) return bodies_of_interest_[2];
-    else return bodies_of_interest_[3];
+    if (s == Side::LEFT)
+      return bodies_of_interest_[2];
+    else
+      return bodies_of_interest_[3];
   }
   inline const BodyOfInterest& foot(int s) const {
     return foot(Side::values.at(s));
   }
   inline const BodyOfInterest& foot_sensor(Side::SideEnum s) const {
-    if (s == Side::LEFT) return bodies_of_interest_[4];
-    else return bodies_of_interest_[5];
+    if (s == Side::LEFT)
+      return bodies_of_interest_[4];
+    else
+      return bodies_of_interest_[5];
   }
   inline const Vector2d& cop() const { return cop_; }
   inline const Vector2d& cop_in_sensor_frame(Side::SideEnum s) const {
@@ -232,7 +250,10 @@ class HumanoidStatus {
   Vector2d
       cop_in_sensor_frame_[2];  ///< Individual center of pressure in foot frame
 
-  Vector6d
-      foot_wrench_in_sensor_frame_[2];  ///< Wrench rotated to align with the foot frame, located at the sensor position.
-  Vector6d foot_wrench_in_world_frame_[2];  ///< Wrench rotated to align with the world frame, located at the ankle joint.
+  Vector6d foot_wrench_in_sensor_frame_[2];  ///< Wrench rotated to align with
+                                             ///the foot frame, located at the
+                                             ///sensor position.
+  Vector6d foot_wrench_in_world_frame_[2];   ///< Wrench rotated to align with
+                                             ///the world frame, located at the
+                                             ///ankle joint.
 };

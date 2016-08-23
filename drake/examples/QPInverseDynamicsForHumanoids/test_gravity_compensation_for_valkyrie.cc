@@ -38,27 +38,36 @@ QPOutput TestGravityCompensation(HumanoidStatus& robot_status) {
   input.w_wrench_reg = 1e-5;
 
   // make contact
-  input.supports().push_back(SupportElement(*robot_status.robot().FindBody("leftFoot")));
-  input.support(0).get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
-  input.support(0).get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
-  input.support(0).get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
-  input.support(0).get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+  input.supports().push_back(
+      SupportElement(*robot_status.robot().FindBody("leftFoot")));
+  input.support(0).get_mutable_contact_points().push_back(
+      Vector3d(0.2, 0.05, -0.09));
+  input.support(0).get_mutable_contact_points().push_back(
+      Vector3d(0.2, -0.05, -0.09));
+  input.support(0).get_mutable_contact_points().push_back(
+      Vector3d(-0.05, -0.05, -0.09));
+  input.support(0).get_mutable_contact_points().push_back(
+      Vector3d(-0.05, 0.05, -0.09));
 
-  input.supports().push_back(SupportElement(*robot_status.robot().FindBody("rightFoot")));
-  input.support(1).get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
-  input.support(1).get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
-  input.support(1).get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
-  input.support(1).get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+  input.supports().push_back(
+      SupportElement(*robot_status.robot().FindBody("rightFoot")));
+  input.support(1).get_mutable_contact_points().push_back(
+      Vector3d(0.2, 0.05, -0.09));
+  input.support(1).get_mutable_contact_points().push_back(
+      Vector3d(0.2, -0.05, -0.09));
+  input.support(1).get_mutable_contact_points().push_back(
+      Vector3d(-0.05, -0.05, -0.09));
+  input.support(1).get_mutable_contact_points().push_back(
+      Vector3d(-0.05, 0.05, -0.09));
 
   int N = 1;
   for (int i = 0; i < N; i++) {
     con.Control(robot_status, input, &output);
     std::cout << output;
   }
-  
+
   return output;
 }
-
 
 int main() {
   // Loads model.
@@ -81,9 +90,9 @@ int main() {
                       Vector6d::Zero(), Vector6d::Zero());
 
   QPOutput output = TestGravityCompensation(robot_status);
-  
-  robot_status.Update(0, q, v,
-                      output.joint_torque(),
-                      output.foot_wrench_in_sensor_frame(Side::LEFT), output.foot_wrench_in_sensor_frame(Side::RIGHT));
+
+  robot_status.Update(0, q, v, output.joint_torque(),
+                      output.foot_wrench_in_sensor_frame(Side::LEFT),
+                      output.foot_wrench_in_sensor_frame(Side::RIGHT));
   return 0;
 }

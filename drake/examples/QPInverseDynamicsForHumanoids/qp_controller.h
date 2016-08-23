@@ -17,12 +17,13 @@
 class CartesianSetPoint {
  public:
   // In which frame is everything specified.
-  // TODO(siyuan.feng@tri.global): this is currently assumed to be 0 (world frame)
+  // TODO(siyuan.feng@tri.global): this is currently assumed to be 0 (world
+  // frame)
   int frame_id;
 
   Isometry3d pose_d;  ///< Desired pose
-  Vector6d vel_d;  ///< Desired velocity
-  Vector6d acc_d;  ///< Desired acceleration
+  Vector6d vel_d;     ///< Desired velocity
+  Vector6d acc_d;     ///< Desired acceleration
 
   Vector6d Kp;  ///< Position gains
   Vector6d Kd;  ///< Velocity gains
@@ -37,19 +38,19 @@ class CartesianSetPoint {
     acc_d.setZero();
     Kp.setZero();
     Kd.setZero();
-    for (int i = 0; i < 6; i++)
-      disable_mask[i] = false;
+    for (int i = 0; i < 6; i++) disable_mask[i] = false;
   }
 
-  CartesianSetPoint(int fid, const Isometry3d &p_d, const Vector6d &v_d, const Vector6d &vd_d, const Vector6d &Kp, const Vector6d &Kd) {
+  CartesianSetPoint(int fid, const Isometry3d& p_d, const Vector6d& v_d,
+                    const Vector6d& vd_d, const Vector6d& Kp,
+                    const Vector6d& Kd) {
     frame_id = fid;
     pose_d = p_d;
     vel_d = v_d;
     acc_d = vd_d;
     this->Kp = Kp;
     this->Kd = Kd;
-    for (int i = 0; i < 6; i++)
-      disable_mask[i] = false;
+    for (int i = 0; i < 6; i++) disable_mask[i] = false;
   }
 
   /**
@@ -57,7 +58,8 @@ class CartesianSetPoint {
    * xdd_d = Kp*(x* - x) + Kd*(xd* - xd) + xdd*.
    * First 3 are angular acceleration, and last 3 are linear acceleration.
    */
-  Vector6d ComputeAccelerationTarget(const Isometry3d &pose, const Vector6d &vel) const {
+  Vector6d ComputeAccelerationTarget(const Isometry3d& pose,
+                                     const Vector6d& vel) const {
     // feedforward acc + velocity feedback
     Vector6d qdd = acc_d;
     qdd += (Kd.array() * (vel_d - vel).array()).matrix();
@@ -79,39 +81,47 @@ class CartesianSetPoint {
   }
 };
 
-
 /**
  * This class describes contact related information for each contact link.
  */
 class SupportElement {
  private:
-  const RigidBody& body_; ///< Link in contact
+  const RigidBody& body_;  ///< Link in contact
   // These are local offsets within body_.
   std::vector<Eigen::Vector3d> contact_points_;
   // This is also in the body frame.
-  // TODO(siyuan.feng@tri.global): normal is currently assumed to be the same for all the contact points.
+  // TODO(siyuan.feng@tri.global): normal is currently assumed to be the same
+  // for all the contact points.
   Eigen::Vector3d normal_;
-  double mu_; ///< Friction coeff
+  double mu_;  ///< Friction coeff
 
  public:
-  explicit SupportElement(const RigidBody &b) : body_(b) {
+  explicit SupportElement(const RigidBody& b) : body_(b) {
     normal_ = Vector3d(0, 0, 1);
     mu_ = 1;
   }
 
   /**
-   * Computes a matrix (Basis) that converts a vector of scalars (Beta) to stacked point forces (F).
-   * All the point forces are in the world frame, and applied at contact_points_.
+   * Computes a matrix (Basis) that converts a vector of scalars (Beta) to
+   * stacked point forces (F).
+   * All the point forces are in the world frame, and applied at
+   * contact_points_.
    * Basis also approximates all the friction cones at contact_points_.
-   * Basis is 3 * contact_points_.size() by num_basis_per_contact_pt  * contact_points_.size()
+   * Basis is 3 * contact_points_.size() by num_basis_per_contact_pt  *
+   * contact_points_.size()
    * @param robot model
-   * @param cache stores the kinematics information, needs to be initialized first.
+   * @param cache stores the kinematics information, needs to be initialized
+   * first.
    * @param num_basis_per_contact_pt number of basis per contact point
    * @return Basis matrix
    */
-  Eigen::MatrixXd ComputeBasisMatrix(const RigidBodyTree &robot, const KinematicsCache<double> &cache, int num_basis_per_contact_pt) const {
-    Eigen::MatrixXd basis(3 * contact_points_.size(), num_basis_per_contact_pt  * contact_points_.size());
-    Eigen::Matrix3d body_rot = robot.relativeTransform(cache, 0, body_.get_body_index()).linear();
+  Eigen::MatrixXd ComputeBasisMatrix(const RigidBodyTree& robot,
+                                     const KinematicsCache<double>& cache,
+                                     int num_basis_per_contact_pt) const {
+    Eigen::MatrixXd basis(3 * contact_points_.size(),
+                          num_basis_per_contact_pt * contact_points_.size());
+    Eigen::Matrix3d body_rot =
+        robot.relativeTransform(cache, 0, body_.get_body_index()).linear();
     basis.setZero();
 
     Eigen::Vector3d t1, t2, tangent_vec, base;
@@ -124,8 +134,7 @@ class SupportElement {
     // same for the reflected case
     else if (fabs(1 + normal_[2]) < EPSILON) {
       t1 << -1, 0, 0;
-    }
-    else {
+    } else {
       t1 << normal_[1], -normal_[0], 0;
       t1 /= sqrt(normal_[1] * normal_[1] + normal_[0] * normal_[0]);
     }
@@ -137,7 +146,8 @@ class SupportElement {
         tangent_vec = cos(theta) * t1 + sin(theta) * t2;
         base = (normal_ + mu_ * tangent_vec).normalized();
         // rotate basis into world frame
-        basis.block(3 * i, num_basis_per_contact_pt * i + k, 3, 1) = body_rot * base;
+        basis.block(3 * i, num_basis_per_contact_pt * i + k, 3, 1) =
+            body_rot * base;
       }
     }
     return basis;
@@ -146,39 +156,52 @@ class SupportElement {
   /**
    * Computes the stacked task space Jacobian matrix at each contact point
    * @param robot model
-   * @param cache stores the kinematics information, needs to be initialized first.
+   * @param cache stores the kinematics information, needs to be initialized
+   * first.
    * @return stacked Jacobian matrix
    */
-  Eigen::MatrixXd ComputeJacobianAtContactPoints(const RigidBodyTree &robot, const KinematicsCache<double> &cache) const {
-    Eigen::MatrixXd JJ(3 * contact_points_.size(), robot.number_of_velocities());
+  Eigen::MatrixXd ComputeJacobianAtContactPoints(
+      const RigidBodyTree& robot, const KinematicsCache<double>& cache) const {
+    Eigen::MatrixXd JJ(3 * contact_points_.size(),
+                       robot.number_of_velocities());
     for (size_t i = 0; i < contact_points_.size(); i++)
-      JJ.block(3 * i, 0, 3, robot.number_of_velocities()) = GetTaskSpaceJacobian(robot, cache, body_, contact_points_[i]).bottomRows(3);
+      JJ.block(3 * i, 0, 3, robot.number_of_velocities()) =
+          GetTaskSpaceJacobian(robot, cache, body_, contact_points_[i])
+              .bottomRows(3);
     return JJ;
   }
 
   /**
-   * Computes the stacked task space Jacobian dot times v vector at each contact point
+   * Computes the stacked task space Jacobian dot times v vector at each contact
+   * point
    * @param robot model
-   * @param cache stores the kinematics information, needs to be initialized first.
+   * @param cache stores the kinematics information, needs to be initialized
+   * first.
    * @return stacked Jacobian dot times v vector
    */
-  Eigen::VectorXd ComputeJacobianDotTimesVAtContactPoints(const RigidBodyTree &robot, const KinematicsCache<double> &cache) const {
+  Eigen::VectorXd ComputeJacobianDotTimesVAtContactPoints(
+      const RigidBodyTree& robot, const KinematicsCache<double>& cache) const {
     Eigen::VectorXd Jdv(3 * contact_points_.size());
     for (size_t i = 0; i < contact_points_.size(); i++)
-      Jdv.segment<3>(3 * i) = GetTaskSpaceJacobianDotTimesV(robot, cache, body_, contact_points_[i]).bottomRows(3);
+      Jdv.segment<3>(3 * i) =
+          GetTaskSpaceJacobianDotTimesV(robot, cache, body_, contact_points_[i])
+              .bottomRows(3);
     return Jdv;
   }
 
   inline double mu() const { return mu_; }
-  inline const std::vector<Eigen::Vector3d> &contact_points() const { return contact_points_; }
-  inline const Eigen::Vector3d &normal() const { return normal_; }
+  inline const std::vector<Eigen::Vector3d>& contact_points() const {
+    return contact_points_;
+  }
+  inline const Eigen::Vector3d& normal() const { return normal_; }
   inline const RigidBody& body() const { return body_; }
 
-  inline std::vector<Eigen::Vector3d> &get_mutable_contact_points() { return contact_points_; }
+  inline std::vector<Eigen::Vector3d>& get_mutable_contact_points() {
+    return contact_points_;
+  }
   inline void set_mu(double m) { mu_ = m; }
-  inline void set_normal(const Eigen::Vector3d &n) { normal_ = n.normalized(); }
+  inline void set_normal(const Eigen::Vector3d& n) { normal_ = n.normalized(); }
 };
-
 
 /**
  * Input to the QP inverse dynamics controller
@@ -214,56 +237,72 @@ class QPInput {
     for (int i = 0; i < r.number_of_velocities(); i++) {
       // strip out the "dot" part from name
       coord_names_[i] =
-        r.getVelocityName(i).substr(0, r.getVelocityName(i).size() - 3);
+          r.getVelocityName(i).substr(0, r.getVelocityName(i).size() - 3);
     }
     vd_d_.resize(r.number_of_velocities());
   }
 
   inline bool is_valid() const {
     return ((int)coord_names_.size() == vd_d_.size()) &&
-      (coord_names_.size() != 0);
+           (coord_names_.size() != 0);
   }
 
   // Getters
-  inline const std::string &coord_name(int idx) const { return coord_names_.at(idx); }
-  inline const SupportElement &support(int idx) const { return supports_.at(idx); }
-  inline const std::vector<SupportElement> &supports() const { return supports_; }
-  inline const Vector3d &comdd_d() const { return comdd_d_; }
-  inline const Vector6d &pelvdd_d() const { return pelvdd_d_; }
-  inline const Vector6d &torsodd_d() const { return torsodd_d_; }
-  inline const Vector6d &footdd_d(Side::SideEnum s) const {
-    if (s == Side::LEFT) return footdd_d_[0];
-    else return footdd_d_[1];
+  inline const std::string& coord_name(int idx) const {
+    return coord_names_.at(idx);
   }
-  inline const Vector6d &footdd_d(int s) const { return footdd_d(Side::values.at(s)); }
-  inline const VectorXd &vd_d() const { return vd_d_; }
-  inline const Vector6d &wrench_d(Side::SideEnum s) const {
-    if (s == Side::LEFT) return wrench_d_[0];
-    else return wrench_d_[1];
+  inline const SupportElement& support(int idx) const {
+    return supports_.at(idx);
   }
-  inline const Vector6d &wrench_d(int s) const { return wrench_d(Side::values.at(s)); }
+  inline const std::vector<SupportElement>& supports() const {
+    return supports_;
+  }
+  inline const Vector3d& comdd_d() const { return comdd_d_; }
+  inline const Vector6d& pelvdd_d() const { return pelvdd_d_; }
+  inline const Vector6d& torsodd_d() const { return torsodd_d_; }
+  inline const Vector6d& footdd_d(Side::SideEnum s) const {
+    if (s == Side::LEFT)
+      return footdd_d_[0];
+    else
+      return footdd_d_[1];
+  }
+  inline const Vector6d& footdd_d(int s) const {
+    return footdd_d(Side::values.at(s));
+  }
+  inline const VectorXd& vd_d() const { return vd_d_; }
+  inline const Vector6d& wrench_d(Side::SideEnum s) const {
+    if (s == Side::LEFT)
+      return wrench_d_[0];
+    else
+      return wrench_d_[1];
+  }
+  inline const Vector6d& wrench_d(int s) const {
+    return wrench_d(Side::values.at(s));
+  }
 
   // Setters
-  inline std::vector<SupportElement> &supports() { return supports_; }
-  inline SupportElement &support(int idx) { return supports_.at(idx); }
-  inline Vector3d &comdd_d() { return comdd_d_; }
-  inline Vector6d &pelvdd_d() { return pelvdd_d_; }
-  inline Vector6d &torsodd_d() { return torsodd_d_; }
-  inline Vector6d &footdd_d(Side::SideEnum s) {
-    if (s == Side::LEFT) return footdd_d_[0];
-    else return footdd_d_[1];
+  inline std::vector<SupportElement>& supports() { return supports_; }
+  inline SupportElement& support(int idx) { return supports_.at(idx); }
+  inline Vector3d& comdd_d() { return comdd_d_; }
+  inline Vector6d& pelvdd_d() { return pelvdd_d_; }
+  inline Vector6d& torsodd_d() { return torsodd_d_; }
+  inline Vector6d& footdd_d(Side::SideEnum s) {
+    if (s == Side::LEFT)
+      return footdd_d_[0];
+    else
+      return footdd_d_[1];
   }
-  inline Vector6d &footdd_d(int s) { return footdd_d(Side::values.at(s)); }
-  inline VectorXd &vd_d() { return vd_d_; }
-  inline Vector6d &wrench_d(Side::SideEnum s) {
-    if (s == Side::LEFT) return wrench_d_[0];
-    else return wrench_d_[1];
+  inline Vector6d& footdd_d(int s) { return footdd_d(Side::values.at(s)); }
+  inline VectorXd& vd_d() { return vd_d_; }
+  inline Vector6d& wrench_d(Side::SideEnum s) {
+    if (s == Side::LEFT)
+      return wrench_d_[0];
+    else
+      return wrench_d_[1];
   }
-  inline Vector6d &wrench_d(int s) { return wrench_d(Side::values.at(s)); }
+  inline Vector6d& wrench_d(int s) { return wrench_d(Side::values.at(s)); }
 };
-std::ostream& operator<< (std::ostream &out, const QPInput& input);
-
-
+std::ostream& operator<<(std::ostream& out, const QPInput& input);
 
 /**
  * Output of the QP inverse dynamics controller
@@ -296,7 +335,7 @@ class QPOutput {
     for (int i = 0; i < r.number_of_velocities(); i++) {
       // strip out the "dot" part from name
       coord_names_[i] =
-        r.getVelocityName(i).substr(0, r.getVelocityName(i).size() - 3);
+          r.getVelocityName(i).substr(0, r.getVelocityName(i).size() - 3);
     }
     vd_.resize(r.number_of_velocities());
     joint_torque_.resize(r.actuators.size());
@@ -309,56 +348,87 @@ class QPOutput {
   }
 
   // Getters
-  inline const std::string &coord_name(int idx) const { return coord_names_.at(idx); }
-  inline const Vector3d &comdd() const { return comdd_; }
-  inline const Vector6d &pelvdd() const { return pelvdd_; }
-  inline const Vector6d &torsodd() const { return torsodd_; }
-  inline const Vector6d &footdd(Side::SideEnum s) const {
-    if (s == Side::LEFT) return footdd_[0];
-    else return footdd_[1];
+  inline const std::string& coord_name(int idx) const {
+    return coord_names_.at(idx);
   }
-  inline const VectorXd &vd() const { return vd_; }
-  inline const VectorXd &joint_torque() const { return joint_torque_; }
-  inline const Vector6d &foot_wrench_in_world_frame(Side::SideEnum s) const {
-    if (s == Side::LEFT) return foot_wrench_in_world_frame_[0];
-    else return foot_wrench_in_world_frame_[1] ;
+  inline const Vector3d& comdd() const { return comdd_; }
+  inline const Vector6d& pelvdd() const { return pelvdd_; }
+  inline const Vector6d& torsodd() const { return torsodd_; }
+  inline const Vector6d& footdd(Side::SideEnum s) const {
+    if (s == Side::LEFT)
+      return footdd_[0];
+    else
+      return footdd_[1];
   }
-  inline const Vector6d &foot_wrench_in_sensor_frame(Side::SideEnum s) const {
-    if (s == Side::LEFT) return foot_wrench_in_sensor_frame_[0];
-    else return foot_wrench_in_sensor_frame_[1] ;
+  inline const VectorXd& vd() const { return vd_; }
+  inline const VectorXd& joint_torque() const { return joint_torque_; }
+  inline const Vector6d& foot_wrench_in_world_frame(Side::SideEnum s) const {
+    if (s == Side::LEFT)
+      return foot_wrench_in_world_frame_[0];
+    else
+      return foot_wrench_in_world_frame_[1];
   }
-  inline const Vector6d &footdd(int s) const { return footdd(Side::values.at(s)); }
-  inline const Vector6d &foot_wrench_in_world_frame(int s) const { return foot_wrench_in_world_frame(Side::values.at(s)); }
-  inline const Vector6d &foot_wrench_in_sensor_frame(int s) const { return foot_wrench_in_sensor_frame(Side::values.at(s)); }
-  inline const std::vector<std::pair<std::string, double>> &costs() const { return costs_; };
-  inline const std::pair<std::string, double> &costs(size_t i) const { return costs_.at(i); };
+  inline const Vector6d& foot_wrench_in_sensor_frame(Side::SideEnum s) const {
+    if (s == Side::LEFT)
+      return foot_wrench_in_sensor_frame_[0];
+    else
+      return foot_wrench_in_sensor_frame_[1];
+  }
+  inline const Vector6d& footdd(int s) const {
+    return footdd(Side::values.at(s));
+  }
+  inline const Vector6d& foot_wrench_in_world_frame(int s) const {
+    return foot_wrench_in_world_frame(Side::values.at(s));
+  }
+  inline const Vector6d& foot_wrench_in_sensor_frame(int s) const {
+    return foot_wrench_in_sensor_frame(Side::values.at(s));
+  }
+  inline const std::vector<std::pair<std::string, double>>& costs() const {
+    return costs_;
+  };
+  inline const std::pair<std::string, double>& costs(size_t i) const {
+    return costs_.at(i);
+  };
 
   // Setters
-  inline Vector3d &comdd() { return comdd_; }
-  inline Vector6d &pelvdd() { return pelvdd_; }
-  inline Vector6d &torsodd() { return torsodd_; }
-  inline Vector6d &footdd(Side::SideEnum s) {
-    if (s == Side::LEFT) return footdd_[0];
-    else return footdd_[1];
+  inline Vector3d& comdd() { return comdd_; }
+  inline Vector6d& pelvdd() { return pelvdd_; }
+  inline Vector6d& torsodd() { return torsodd_; }
+  inline Vector6d& footdd(Side::SideEnum s) {
+    if (s == Side::LEFT)
+      return footdd_[0];
+    else
+      return footdd_[1];
   }
-  inline VectorXd &vd() { return vd_; }
-  inline VectorXd &joint_torque() { return joint_torque_; }
-  inline Vector6d &foot_wrench_in_world_frame(Side::SideEnum s) {
-    if (s == Side::LEFT) return foot_wrench_in_world_frame_[0];
-    else return foot_wrench_in_world_frame_[1] ;
+  inline VectorXd& vd() { return vd_; }
+  inline VectorXd& joint_torque() { return joint_torque_; }
+  inline Vector6d& foot_wrench_in_world_frame(Side::SideEnum s) {
+    if (s == Side::LEFT)
+      return foot_wrench_in_world_frame_[0];
+    else
+      return foot_wrench_in_world_frame_[1];
   }
-  inline Vector6d &foot_wrench_in_sensor_frame(Side::SideEnum s) {
-    if (s == Side::LEFT) return foot_wrench_in_sensor_frame_[0];
-    else return foot_wrench_in_sensor_frame_[1] ;
+  inline Vector6d& foot_wrench_in_sensor_frame(Side::SideEnum s) {
+    if (s == Side::LEFT)
+      return foot_wrench_in_sensor_frame_[0];
+    else
+      return foot_wrench_in_sensor_frame_[1];
   }
-  inline Vector6d &footdd(int s) { return footdd(Side::values.at(s)); }
-  inline Vector6d &foot_wrench_in_world_frame(int s) { return foot_wrench_in_world_frame(Side::values.at(s)); }
-  inline Vector6d &foot_wrench_in_sensor_frame(int s) { return foot_wrench_in_sensor_frame(Side::values.at(s)); }
-  inline std::vector<std::pair<std::string, double>> &costs() { return costs_; };
-  inline std::pair<std::string, double> &costs(size_t i) { return costs_.at(i); };
+  inline Vector6d& footdd(int s) { return footdd(Side::values.at(s)); }
+  inline Vector6d& foot_wrench_in_world_frame(int s) {
+    return foot_wrench_in_world_frame(Side::values.at(s));
+  }
+  inline Vector6d& foot_wrench_in_sensor_frame(int s) {
+    return foot_wrench_in_sensor_frame(Side::values.at(s));
+  }
+  inline std::vector<std::pair<std::string, double>>& costs() {
+    return costs_;
+  };
+  inline std::pair<std::string, double>& costs(size_t i) {
+    return costs_.at(i);
+  };
 };
-std::ostream& operator<< (std::ostream &out, const QPOutput& output);
-
+std::ostream& operator<<(std::ostream& out, const QPOutput& output);
 
 class QPController {
  private:
@@ -396,12 +466,14 @@ class QPController {
   // prog_ is only allocated in ResizeQP, Control only updates the appropriate
   // matrices / vectors.
   drake::solvers::OptimizationProblem prog_;
-  // TODO(siyuan.feng@tri.global): switch to other faster solvers when they are ready: gurobi / fastQP
+  // TODO(siyuan.feng@tri.global): switch to other faster solvers when they are
+  // ready: gurobi / fastQP
   drake::solvers::SnoptSolver solver_;
 
   // pointers to different cost / constraint terms inside prog_
   std::shared_ptr<drake::solvers::LinearEqualityConstraint> eq_dynamics_;
-  std::vector<std::shared_ptr<drake::solvers::LinearEqualityConstraint>> eq_contacts_;
+  std::vector<std::shared_ptr<drake::solvers::LinearEqualityConstraint>>
+      eq_contacts_;
   std::shared_ptr<drake::solvers::LinearConstraint> ineq_contact_wrench_;
   std::shared_ptr<drake::solvers::LinearConstraint> ineq_torque_limit_;
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_comdd_;
@@ -414,9 +486,11 @@ class QPController {
    * Resize the QP. This resizes the temporary matrices. It also
    * reinitialize prog_ to the correct size, so that Control only updates the
    * matrices and vectors in prog_ instead of making a new one on every call.
-   * Size change typically happens when contact state changes (making / breaking contacts).
+   * Size change typically happens when contact state changes (making / breaking
+   * contacts).
    */
-  void ResizeQP(const HumanoidStatus& rs, const std::vector<SupportElement> &all_contacts);
+  void ResizeQP(const HumanoidStatus& rs,
+                const std::vector<SupportElement>& all_contacts);
 
   /**
    * Zeros out the temporary matrices.
@@ -438,7 +512,8 @@ class QPController {
    * @param rs robot configuration
    * @param n number of basis vector per contact point
    */
-  explicit QPController(const HumanoidStatus& rs, int n) : num_basis_per_contact_point_(n) {}
+  explicit QPController(const HumanoidStatus& rs, int n)
+      : num_basis_per_contact_point_(n) {}
 
   /**
    * Computes the generalized acceleration, joint torque and contact wrenches
@@ -449,5 +524,4 @@ class QPController {
    * @return 0 if successful. < 1 if error.
    */
   int Control(const HumanoidStatus& rs, const QPInput& input, QPOutput* output);
-
 };
