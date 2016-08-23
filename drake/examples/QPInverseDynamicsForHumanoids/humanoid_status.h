@@ -16,18 +16,17 @@ class BodyOfInterest {
   std::string name_;
   /// The link which this BOI is attached to
   const RigidBody& body_;
-
-  Isometry3d pose_;
+  /// Offset is specified in the body frame.
   Vector3d offset_;
 
+  Isometry3d pose_;
   /// This is the task space velocity, or twist of a frame that has the same
   /// orientation as the world frame, but located at the origin of the body
   /// frame.
   Vector6d vel_;
-
-  /// task space Jacobian, xdot = J * v
+  /// Task space Jacobian, xdot = J * v
   MatrixXd J_;
-  /// task space Jd * v
+  /// Task space Jd * v
   Vector6d Jdot_times_v_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -36,6 +35,11 @@ class BodyOfInterest {
   explicit BodyOfInterest(const std::string &name, const RigidBody& body, const Vector3d &off)
     : name_(name), body_(body), offset_(off) {}
 
+  /**
+   * Updates pose, velocity, Jacobian, Jacobian_dot_times_v based on @p robot and @p cache.
+   * @param robot is the robot model.
+   * @param cache is the kinematics cache. It needs to be initialed first
+   */
   void Update(const RigidBodyTree &robot, const KinematicsCache<double> &cache) {
     pose_.translation() = offset_;
     pose_.linear().setIdentity();
@@ -77,7 +81,7 @@ class HumanoidStatus {
           BodyOfInterest("leftFootSensor", *robot_->FindBody("leftFoot"), kFootToSensorOffset),
           BodyOfInterest("rightFootSensor", *robot_->FindBody("rightFoot"), kFootToSensorOffset),
         } {
-    // build map
+    // Build map
     body_name_to_id_ = std::unordered_map<std::string, int>();
     for (auto it = robot_->bodies.begin(); it != robot_->bodies.end(); ++it) {
       body_name_to_id_[(*it)->get_name()] = it - robot_->bodies.begin();
@@ -118,6 +122,9 @@ class HumanoidStatus {
               const Ref<const VectorXd>& trq, const Ref<const Vector6d>& l_ft, const Ref<const Vector6d>& r_ft,
               const Ref<const Matrix3d>& rot = Matrix3d::Identity());
 
+  /**
+   * Returns a nominal q.
+   */
   Eigen::VectorXd GetNominalPosition() const;
 
   inline const RigidBodyTree& robot() const { return *robot_; }
@@ -208,14 +215,17 @@ class HumanoidStatus {
   MatrixXd M_;          ///< Inertial matrix
   VectorXd bias_term_;  ///< Bias term: M * vd + h = tau + J^T * lambda
 
-  // computed from kinematics
+  // Computed from kinematics
   Vector3d com_;               ///< Center of mass
   Vector3d comd_;              ///< Com velocity
   MatrixXd J_com_;             ///< Com Jacobian: comd = J_com * v
   Vector3d Jdot_times_v_com_;  ///< J_com_dot * v
+  // Centroidal momentum = [angular; linear] momentum.
+  // [angular; linear] = centroidal_momentum_matrix_ * v
   MatrixXd centroidal_momentum_matrix_;
   Vector6d centroidal_momentum_matrix_dot_times_v_;
 
+  // A list of body of interest, e.g. pelvis, feet, etc.
   std::vector<BodyOfInterest> bodies_of_interest_;
 
   Vector2d cop_;  ///< Center of pressure
@@ -223,23 +233,6 @@ class HumanoidStatus {
       cop_in_sensor_frame_[2];  ///< Individual center of pressure in foot frame
 
   Vector6d
-      foot_wrench_in_sensor_frame_[2];  ///< Wrench measured in the body frame
-  Vector6d foot_wrench_in_world_frame_[2];  ///< Wrench rotated to world frame
-
-  /**
-   * Computes kinematic related values.
-   * @param body where BodyOfInterest is attached to
-   * @param pose stores the output transformation
-   * @param vel stores the output task space velocity
-   * @param J stores the task space Jacobian
-   * @param Jdot_times_v stores the task space Jacobian_dot * v
-   * @param local_offset offset between point of interest to body origin in
-   * body frame
-   */
-  /*
-  void FillKinematics(const std::shared_ptr<RigidBodyTree> robot,
-                      const RigidBody& body, Isometry3d* pose, Vector6d* vel,
-                      MatrixXd* J, Vector6d* Jdot_times_v,
-                      const Ref<const Vector3d>& local_offset = Vector3d::Zero()) const;
-  */
+      foot_wrench_in_sensor_frame_[2];  ///< Wrench rotated to align with the foot frame, located at the sensor position.
+  Vector6d foot_wrench_in_world_frame_[2];  ///< Wrench rotated to align with the world frame, located at the ankle joint.
 };

@@ -6,18 +6,28 @@
 
 #include "drake/solvers/optimization.h"
 #include "drake/solvers/snopt_solver.h"
-#include "drake/solvers/gurobi_solver.h"
 
+/**
+ * This is used to compute target task space acceleration, which is the input
+ * to the inverse dynamics controller. The target acceleration is computed by:
+ * xdd_d = Kp*(x* - x) + Kd*(xd* - xd) + xdd*.
+ * * are the set points. Kp, Kd are position and velocity gains.
+ * First 3 are angular acceleration, and last 3 are linear acceleration.
+ */
 class CartesianSetPoint {
  public:
+  // In which frame is everything specified.
+  // TODO(siyuan.feng@tri.global): this is currently assumed to be 0 (world frame)
   int frame_id;
 
-  Isometry3d pose_d;
-  Vector6d vel_d;
-  Vector6d acc_d;
+  Isometry3d pose_d;  ///< Desired pose
+  Vector6d vel_d;  ///< Desired velocity
+  Vector6d acc_d;  ///< Desired acceleration
 
-  Vector6d Kp;
-  Vector6d Kd;
+  Vector6d Kp;  ///< Position gains
+  Vector6d Kd;  ///< Velocity gains
+  // Disable tracking for this dimension if set to true.
+  // TODO(siyuan.feng@tri.global): This is currently assumed to be false
   bool disable_mask[6];
 
   CartesianSetPoint() {
@@ -42,9 +52,13 @@ class CartesianSetPoint {
       disable_mask[i] = false;
   }
 
-  // rotation first, position second
+  /**
+   * Computes target acceleration using PD feedback + feedfoward acceleration.
+   * xdd_d = Kp*(x* - x) + Kd*(xd* - xd) + xdd*.
+   * First 3 are angular acceleration, and last 3 are linear acceleration.
+   */
   Vector6d ComputeAccelerationTarget(const Isometry3d &pose, const Vector6d &vel) const {
-    // feedforward acc_d + velocity feedback
+    // feedforward acc + velocity feedback
     Vector6d qdd = acc_d;
     qdd += (Kd.array() * (vel_d - vel).array()).matrix();
 
@@ -65,51 +79,76 @@ class CartesianSetPoint {
   }
 };
 
+
+/**
+ * This class describes contact related information for each contact link.
+ */
 class SupportElement {
  private:
-  const RigidBody& body_;
-  // these are local offsets within body_
+  const RigidBody& body_; ///< Link in contact
+  // These are local offsets within body_.
   std::vector<Eigen::Vector3d> contact_points_;
-  // this is also in body frame, assuming normal is the same for all contact points
+  // This is also in the body frame.
+  // TODO(siyuan.feng@tri.global): normal is currently assumed to be the same for all the contact points.
   Eigen::Vector3d normal_;
-  double mu_;
+  double mu_; ///< Friction coeff
 
  public:
-  SupportElement(const RigidBody &b) : body_(b) {
+  explicit SupportElement(const RigidBody &b) : body_(b) {
     normal_ = Vector3d(0, 0, 1);
     mu_ = 1;
   }
 
+  /**
+   * Computes a matrix (Basis) that converts a vector of scalars (Beta) to stacked point forces (F).
+   * All the point forces are in the world frame, and applied at contact_points_.
+   * Basis also approximates all the friction cones at contact_points_.
+   * Basis is 3 * contact_points_.size() by num_basis_per_contact_pt  * contact_points_.size()
+   * @param robot model
+   * @param cache stores the kinematics information, needs to be initialized first.
+   * @param num_basis_per_contact_pt number of basis per contact point
+   * @return Basis matrix
+   */
   Eigen::MatrixXd ComputeBasisMatrix(const RigidBodyTree &robot, const KinematicsCache<double> &cache, int num_basis_per_contact_pt) const {
     Eigen::MatrixXd basis(3 * contact_points_.size(), num_basis_per_contact_pt  * contact_points_.size());
     Eigen::Matrix3d body_rot = robot.relativeTransform(cache, 0, body_.get_body_index()).linear();
+    basis.setZero();
 
     Eigen::Vector3d t1, t2, tangent_vec, base;
     double theta;
 
-    basis.setZero();
-    if (fabs(1 - normal_[2]) < EPSILON) {  // handle the unit-normal case (since it's
-      // unit length, just check z)
+    // Computes the tangent vectors that are perpendicular to normal_
+    if (fabs(1 - normal_[2]) < EPSILON) {
       t1 << 1, 0, 0;
-    } else if (fabs(1 + normal_[2]) < EPSILON) {
-      t1 << -1, 0, 0;  // same for the reflected case
-    } else {           // now the general case
+    }
+    // same for the reflected case
+    else if (fabs(1 + normal_[2]) < EPSILON) {
+      t1 << -1, 0, 0;
+    }
+    else {
       t1 << normal_[1], -normal_[0], 0;
       t1 /= sqrt(normal_[1] * normal_[1] + normal_[0] * normal_[0]);
     }
     t2 = t1.cross(normal_);
-    
+
     for (size_t i = 0; i < contact_points_.size(); i++) {
       for (int k = 0; k < num_basis_per_contact_pt; k++) {
         theta = k * 2 * M_PI / num_basis_per_contact_pt;
         tangent_vec = cos(theta) * t1 + sin(theta) * t2;
         base = (normal_ + mu_ * tangent_vec).normalized();
+        // rotate basis into world frame
         basis.block(3 * i, num_basis_per_contact_pt * i + k, 3, 1) = body_rot * base;
       }
     }
     return basis;
   }
 
+  /**
+   * Computes the stacked task space Jacobian matrix at each contact point
+   * @param robot model
+   * @param cache stores the kinematics information, needs to be initialized first.
+   * @return stacked Jacobian matrix
+   */
   Eigen::MatrixXd ComputeJacobianAtContactPoints(const RigidBodyTree &robot, const KinematicsCache<double> &cache) const {
     Eigen::MatrixXd JJ(3 * contact_points_.size(), robot.number_of_velocities());
     for (size_t i = 0; i < contact_points_.size(); i++)
@@ -117,6 +156,12 @@ class SupportElement {
     return JJ;
   }
 
+  /**
+   * Computes the stacked task space Jacobian dot times v vector at each contact point
+   * @param robot model
+   * @param cache stores the kinematics information, needs to be initialized first.
+   * @return stacked Jacobian dot times v vector
+   */
   Eigen::VectorXd ComputeJacobianDotTimesVAtContactPoints(const RigidBodyTree &robot, const KinematicsCache<double> &cache) const {
     Eigen::VectorXd Jdv(3 * contact_points_.size());
     for (size_t i = 0; i < contact_points_.size(); i++)
@@ -124,14 +169,16 @@ class SupportElement {
     return Jdv;
   }
 
-  inline std::vector<Eigen::Vector3d> &get_mutable_contact_points() { return contact_points_; }
   inline double mu() const { return mu_; }
-  inline void set_mu(double m) { mu_ = m; }
   inline const std::vector<Eigen::Vector3d> &contact_points() const { return contact_points_; }
   inline const Eigen::Vector3d &normal() const { return normal_; }
   inline const RigidBody& body() const { return body_; }
+
+  inline std::vector<Eigen::Vector3d> &get_mutable_contact_points() { return contact_points_; }
+  inline void set_mu(double m) { mu_ = m; }
+  inline void set_normal(const Eigen::Vector3d &n) { normal_ = n.normalized(); }
 };
- 
+
 
 /**
  * Input to the QP inverse dynamics controller
@@ -140,6 +187,7 @@ class QPInput {
  private:
   // Names for each generalized coordinate.
   std::vector<std::string> coord_names_;
+  // Support information
   std::vector<SupportElement> supports_;
 
   // Desired task space accelerations for various body parts.
@@ -161,7 +209,7 @@ class QPInput {
   double w_vd;
   double w_wrench_reg;
 
-  QPInput(const RigidBodyTree& r) {
+  explicit QPInput(const RigidBodyTree& r) {
     coord_names_.resize(r.number_of_velocities());
     for (int i = 0; i < r.number_of_velocities(); i++) {
       // strip out the "dot" part from name
@@ -175,7 +223,7 @@ class QPInput {
     return ((int)coord_names_.size() == vd_d_.size()) &&
       (coord_names_.size() != 0);
   }
-  
+
   // Getters
   inline const std::string &coord_name(int idx) const { return coord_names_.at(idx); }
   inline const SupportElement &support(int idx) const { return supports_.at(idx); }
@@ -183,15 +231,15 @@ class QPInput {
   inline const Vector3d &comdd_d() const { return comdd_d_; }
   inline const Vector6d &pelvdd_d() const { return pelvdd_d_; }
   inline const Vector6d &torsodd_d() const { return torsodd_d_; }
-  inline const Vector6d &footdd_d(Side::SideEnum s) const { 
-    if (s == Side::LEFT) return footdd_d_[0]; 
-    else return footdd_d_[1]; 
+  inline const Vector6d &footdd_d(Side::SideEnum s) const {
+    if (s == Side::LEFT) return footdd_d_[0];
+    else return footdd_d_[1];
   }
   inline const Vector6d &footdd_d(int s) const { return footdd_d(Side::values.at(s)); }
   inline const VectorXd &vd_d() const { return vd_d_; }
-  inline const Vector6d &wrench_d(Side::SideEnum s) const { 
+  inline const Vector6d &wrench_d(Side::SideEnum s) const {
     if (s == Side::LEFT) return wrench_d_[0];
-    else return wrench_d_[1]; 
+    else return wrench_d_[1];
   }
   inline const Vector6d &wrench_d(int s) const { return wrench_d(Side::values.at(s)); }
 
@@ -201,17 +249,17 @@ class QPInput {
   inline Vector3d &comdd_d() { return comdd_d_; }
   inline Vector6d &pelvdd_d() { return pelvdd_d_; }
   inline Vector6d &torsodd_d() { return torsodd_d_; }
-  inline Vector6d &footdd_d(Side::SideEnum s) { 
-    if (s == Side::LEFT) return footdd_d_[0]; 
-    else return footdd_d_[1]; 
+  inline Vector6d &footdd_d(Side::SideEnum s) {
+    if (s == Side::LEFT) return footdd_d_[0];
+    else return footdd_d_[1];
   }
   inline Vector6d &footdd_d(int s) { return footdd_d(Side::values.at(s)); }
   inline VectorXd &vd_d() { return vd_d_; }
-  inline Vector6d &wrench_d(Side::SideEnum s) { 
+  inline Vector6d &wrench_d(Side::SideEnum s) {
     if (s == Side::LEFT) return wrench_d_[0];
-    else return wrench_d_[1]; 
+    else return wrench_d_[1];
   }
-  inline Vector6d &wrench_d(int s) { return wrench_d(Side::values.at(s)); } 
+  inline Vector6d &wrench_d(int s) { return wrench_d(Side::values.at(s)); }
 };
 std::ostream& operator<< (std::ostream &out, const QPInput& input);
 
@@ -234,13 +282,16 @@ class QPOutput {
   VectorXd vd_;            ///< Computed generalized coordinate accelerations
   VectorXd joint_torque_;  ///< Computed joint torque
 
-  /// Computed contact wrench in the world frame
+  // Computed contact wrench in the world frame
   Vector6d foot_wrench_in_world_frame_[2];
-  /// Computed contact wrench transformed to the sensor frame
+  // Computed contact wrench transformed to the sensor frame
   Vector6d foot_wrench_in_sensor_frame_[2];
 
+  // Pair of cost term and cost (only the quadratic and linear part)
+  std::vector<std::pair<std::string, double>> costs_;
+
  public:
-  QPOutput(const RigidBodyTree& r) {
+  explicit QPOutput(const RigidBodyTree& r) {
     coord_names_.resize(r.number_of_velocities());
     for (int i = 0; i < r.number_of_velocities(); i++) {
       // strip out the "dot" part from name
@@ -254,17 +305,15 @@ class QPOutput {
   inline bool is_valid() const {
     bool ret = (int)coord_names_.size() == vd_.size();
     ret &= vd_.size() == joint_torque_.size() + 6;
-    return ret;    
+    return ret;
   }
-
-  double ComputeQPCost(const HumanoidStatus& rs, const QPInput& input) const;
 
   // Getters
   inline const std::string &coord_name(int idx) const { return coord_names_.at(idx); }
   inline const Vector3d &comdd() const { return comdd_; }
   inline const Vector6d &pelvdd() const { return pelvdd_; }
   inline const Vector6d &torsodd() const { return torsodd_; }
-  inline const Vector6d &footdd(Side::SideEnum s) const { 
+  inline const Vector6d &footdd(Side::SideEnum s) const {
     if (s == Side::LEFT) return footdd_[0];
     else return footdd_[1];
   }
@@ -277,16 +326,18 @@ class QPOutput {
   inline const Vector6d &foot_wrench_in_sensor_frame(Side::SideEnum s) const {
     if (s == Side::LEFT) return foot_wrench_in_sensor_frame_[0];
     else return foot_wrench_in_sensor_frame_[1] ;
-  }  
+  }
   inline const Vector6d &footdd(int s) const { return footdd(Side::values.at(s)); }
   inline const Vector6d &foot_wrench_in_world_frame(int s) const { return foot_wrench_in_world_frame(Side::values.at(s)); }
   inline const Vector6d &foot_wrench_in_sensor_frame(int s) const { return foot_wrench_in_sensor_frame(Side::values.at(s)); }
+  inline const std::vector<std::pair<std::string, double>> &costs() const { return costs_; };
+  inline const std::pair<std::string, double> &costs(size_t i) const { return costs_.at(i); };
 
   // Setters
   inline Vector3d &comdd() { return comdd_; }
   inline Vector6d &pelvdd() { return pelvdd_; }
   inline Vector6d &torsodd() { return torsodd_; }
-  inline Vector6d &footdd(Side::SideEnum s) { 
+  inline Vector6d &footdd(Side::SideEnum s) {
     if (s == Side::LEFT) return footdd_[0];
     else return footdd_[1];
   }
@@ -299,10 +350,12 @@ class QPOutput {
   inline Vector6d &foot_wrench_in_sensor_frame(Side::SideEnum s) {
     if (s == Side::LEFT) return foot_wrench_in_sensor_frame_[0];
     else return foot_wrench_in_sensor_frame_[1] ;
-  }  
+  }
   inline Vector6d &footdd(int s) { return footdd(Side::values.at(s)); }
   inline Vector6d &foot_wrench_in_world_frame(int s) { return foot_wrench_in_world_frame(Side::values.at(s)); }
-  inline Vector6d &foot_wrench_in_sensor_frame(int s) { return foot_wrench_in_sensor_frame(Side::values.at(s)); } 
+  inline Vector6d &foot_wrench_in_sensor_frame(int s) { return foot_wrench_in_sensor_frame(Side::values.at(s)); }
+  inline std::vector<std::pair<std::string, double>> &costs() { return costs_; };
+  inline std::pair<std::string, double> &costs(size_t i) { return costs_.at(i); };
 };
 std::ostream& operator<< (std::ostream &out, const QPOutput& output);
 
@@ -327,11 +380,12 @@ class QPController {
   Eigen::MatrixXd point_force_to_wrench_;
   Eigen::VectorXd contact_wrenches_;
 
-  // update the problem
-  drake::solvers::OptimizationProblem prog_;
-  drake::solvers::SnoptSolver solver_;
-  //GurobiSolver solver_;
+  // Number of basis per contact_point, this needs to be > 3
+  // The bigger this number the close to approximate a real friction cone.
+  // Typically set to 4.
+  const int num_basis_per_contact_point_;
 
+  // These determines the size of the QP. These are set in ResizeQP
   int num_supports_;
   int num_vd_;
   int num_point_forces_;
@@ -339,8 +393,13 @@ class QPController {
   int num_torque_;
   int num_variable_;
 
-  void ResizeQP(const HumanoidStatus& rs, const std::vector<SupportElement> &all_contacts);
+  // prog_ is only allocated in ResizeQP, Control only updates the appropriate
+  // matrices / vectors.
+  drake::solvers::OptimizationProblem prog_;
+  // TODO(siyuan.feng@tri.global): switch to other faster solvers when they are ready: gurobi / fastQP
+  drake::solvers::SnoptSolver solver_;
 
+  // pointers to different cost / constraint terms inside prog_
   std::shared_ptr<drake::solvers::LinearEqualityConstraint> eq_dynamics_;
   std::vector<std::shared_ptr<drake::solvers::LinearEqualityConstraint>> eq_contacts_;
   std::shared_ptr<drake::solvers::LinearConstraint> ineq_contact_wrench_;
@@ -351,25 +410,44 @@ class QPController {
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_footdd_[2];
   std::shared_ptr<drake::solvers::QuadraticConstraint> cost_vd_reg_;
 
+  /**
+   * Resize the QP. This resizes the temporary matrices. It also
+   * reinitialize prog_ to the correct size, so that Control only updates the
+   * matrices and vectors in prog_ instead of making a new one on every call.
+   * Size change typically happens when contact state changes (making / breaking contacts).
+   */
+  void ResizeQP(const HumanoidStatus& rs, const std::vector<SupportElement> &all_contacts);
+
+  /**
+   * Zeros out the temporary matrices.
+   * Only necessary for those that are updated by block operations.
+   */
   void SetZero() {
     basis_to_force_matrix_.setZero();
     torque_linear_.setZero();
-    torque_constant_.setZero();
     dynamics_linear_.setZero();
-    dynamics_constant_.setZero();
     inequality_linear_.setZero();
+    point_force_to_wrench_.setZero();
 
     JB_.setZero();
     point_force_to_wrench_.setZero();
   }
 
  public:
+  /**
+   * @param rs robot configuration
+   * @param n number of basis vector per contact point
+   */
+  explicit QPController(const HumanoidStatus& rs, int n) : num_basis_per_contact_point_(n) {}
 
+  /**
+   * Computes the generalized acceleration, joint torque and contact wrenches
+   * that best tracks the input given the current robot configuration.
+   * @param rs, robot configuration
+   * @param input specified by a higher level controller
+   * @param output stores the output
+   * @return 0 if successful. < 1 if error.
+   */
   int Control(const HumanoidStatus& rs, const QPInput& input, QPOutput* output);
 
-  const int n_basis_per_contact_point;
-  void AllocateProblem();
-
-  explicit QPController(const HumanoidStatus& rs, int n) : n_basis_per_contact_point(n) {
-  }
 };

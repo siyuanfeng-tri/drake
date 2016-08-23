@@ -22,4 +22,4 @@ inline int get_qp_output_size(const QPOutput &output) {
 }
 void VectorXd2QPOutput(const Eigen::VectorXd &v, QPOutput *output);
 void QPOutput2VectorXd(const QPOutput &output, Eigen::VectorXd *v);
- 
+

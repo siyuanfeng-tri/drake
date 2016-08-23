@@ -71,18 +71,24 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<co
   // ft sensor
   foot_wrench_in_sensor_frame_[Side::LEFT] = l_ft;
   foot_wrench_in_sensor_frame_[Side::RIGHT] = r_ft;
+  Vector6d tmp_wrench;
   for (int i = 0; i < 2; i++) {
+    // Rotate the sensor measurement first. Rot is the rotation between the sensor frame and the foot frame.
     foot_wrench_in_sensor_frame_[i].head(3) =
         rot * foot_wrench_in_sensor_frame_[i].head(3);
     foot_wrench_in_sensor_frame_[i].tail(3) =
         rot * foot_wrench_in_sensor_frame_[i].tail(3);
-    foot_wrench_in_world_frame_[i].head(3) =
-        foot_sensor(i).pose().linear() * foot_wrench_in_sensor_frame_[i].head(3);
-    foot_wrench_in_world_frame_[i].tail(3) =
-        foot_sensor(i).pose().linear() * foot_wrench_in_sensor_frame_[i].tail(3);
+
+    // H^w_s = sensor frame = rs.foot_sensor(i).pose()
+    // H^w_ak = world frame aligned, but located at ankle joint = [I, rs.foot(i).pose().translation()]
+    // To transform wrench from s frame to ak frame, we need H^ak_s.
+    Isometry3d H_s_to_w = foot_sensor(i).pose();
+    Isometry3d H_ak_to_w(Isometry3d::Identity());
+    H_ak_to_w.translation() = foot(i).pose().translation();
+    foot_wrench_in_world_frame_[i] = transformSpatialForce(H_ak_to_w.inverse() * H_s_to_w, foot_wrench_in_sensor_frame_[i]);
   }
 
-  // cop
+  // Compute center of pressure (CoP)
   Vector2d cop_w[2];
   double Fz[2];
   for (int i = 0; i < 2; i++) {
@@ -90,19 +96,20 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q, const Ref<co
     if (fabs(Fz[i]) < 1e-3) {
       cop_in_sensor_frame_[i][0] = 0;
       cop_in_sensor_frame_[i][1] = 0;
-      cop_w[i][0] = foot_sensor(i).pose().translation()[0];
-      cop_w[i][1] = foot_sensor(i).pose().translation()[1];
+      cop_w[i][0] = foot(i).pose().translation()[0];
+      cop_w[i][1] = foot(i).pose().translation()[1];
     } else {
-      // cop relative to the ft sensor
+      // CoP relative to the ft sensor
       cop_in_sensor_frame_[i][0] =
           -foot_wrench_in_sensor_frame_[i][1] / foot_wrench_in_sensor_frame_[i][5];
       cop_in_sensor_frame_[i][1] =
           foot_wrench_in_sensor_frame_[i][0] / foot_wrench_in_sensor_frame_[i][5];
 
+      // CoP in the world frame
       cop_w[i][0] = -foot_wrench_in_world_frame_[i][1] / Fz[i] +
-                    foot_sensor(i).pose().translation()[0];
+                    foot(i).pose().translation()[0];
       cop_w[i][1] = foot_wrench_in_world_frame_[i][0] / Fz[i] +
-                    foot_sensor(i).pose().translation()[1];
+                    foot(i).pose().translation()[1];
     }
   }
 
