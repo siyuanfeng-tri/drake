@@ -132,7 +132,7 @@ qp_controller_params:
     slack_limit: 100
     w_grf: 0.00
     mu: 1
-    w_zmp: 1.0
+    w_zmp: 100.0
     w_qdd_delta: 0.0
     useTorqueAlphaFilter: False
     Kp_accel: 1.0

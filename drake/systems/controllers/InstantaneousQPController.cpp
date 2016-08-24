@@ -1261,7 +1261,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
     // min
     Ain.block(constraint_start_index, nq + beta_start, 1, active_support_length) = -B_rotate.row(2);
-    bin(constraint_start_index++) = lower;
+    bin(constraint_start_index++) = -lower;
 
     // std::cout << "foot " << c << " beta start " << beta_start << " active_support_length " << active_support_length << " [u,l] " << active_support.total_normal_force_upper_bound << " " << active_support.total_normal_force_lower_bound << std::endl;
     beta_start += active_support_length;
