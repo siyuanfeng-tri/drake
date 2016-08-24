@@ -33,11 +33,20 @@ typedef struct _support_state_element {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 } SupportStateElement;
 
+
 struct DrakeRobotState {
+  enum ContactState {
+    NOT_INITIALIZED = -1,
+    NOT_IN_CONTACT = 0,
+    IN_CONTACT = 1,
+  };
   // drake-ordered position and velocity vectors, with timestamp (in s)
   double t;
   Eigen::VectorXd q;
   Eigen::VectorXd qd;
+
+  ContactState left_foot_contact_state = NOT_INITIALIZED;
+  ContactState right_foot_contact_state = NOT_INITIALIZED;
 };
 
 struct DrakeRobotStateWithTorque{
