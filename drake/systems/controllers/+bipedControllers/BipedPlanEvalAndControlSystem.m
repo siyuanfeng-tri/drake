@@ -76,6 +76,10 @@ classdef BipedPlanEvalAndControlSystem < DrakeSystem
         else
           qp_input_msg = qp_input_obj;
         end
+        for i = 1 : qp_input_msg.num_support_data
+            qp_input_msg.support_data(i).total_normal_force_lower_bound = 0;
+            qp_input_msg.support_data(i).total_normal_force_upper_bound = 4000;
+        end
         if ~obj.quiet
           ptime = toc(t0);
           fprintf(1, 'plan eval: %f, ', ptime);
