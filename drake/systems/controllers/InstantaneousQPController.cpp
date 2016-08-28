@@ -302,6 +302,8 @@ VectorXd InstantaneousQPController::velocityReference(
       (1 - params.eta) * controller_state.vref_integrator_state +
       params.eta * qd + qdd_limited * dt;
 
+  // TODO: sfeng disable the integrator resetting on contact switching.
+  /*
   if (params.zero_ankles_on_contact && foot_contact[0] == 1) {
     for (i = 0; i < rpc.position_indices.ankles.at(Side::LEFT).size(); i++) {
       controller_state.vref_integrator_state(
@@ -328,6 +330,7 @@ VectorXd InstantaneousQPController::velocityReference(
           Side::RIGHT)[i]) = qd(rpc.position_indices.legs.at(Side::RIGHT)[i]);
     }
   }
+  */
 
   controller_state.foot_contact_prev[0] = foot_contact[0];
   controller_state.foot_contact_prev[1] = foot_contact[1];
@@ -1543,6 +1546,17 @@ int InstantaneousQPController::setupAndSolveQP(
   for (int i = 0; i < qp_output.u.size(); i++) {
     if (std::isnan(qp_output.u(i))) qp_output.u(i) = 0;
   }
+
+  /*
+   * sfeng aug 28, this helps reduce the torque tracking / vel integrator for the left knee.
+   * solves the pelvis lowering issue for ssl as well. going to try offset the torque offset
+   * directly in the turbo driver.
+  for (int i = 0; i < robot->actuators.size(); i++) {
+    if (robot->actuators[i].name.compare("leftKneePitch") == 0) {
+      qp_output.u[i] -= 10;
+    }
+  }
+  */
 
   // low pass filter the output trq
   // only if enabled in the params
