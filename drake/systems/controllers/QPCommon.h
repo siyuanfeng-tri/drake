@@ -238,6 +238,7 @@ struct QPControllerParams {
         Jpdotv_multiplier(1.0),
         w_zmp(1.0),
         min_knee_angle(0.0),
+        ankle_torque_alpha(0.0),
         use_center_of_mass_observer(false),
         center_of_mass_observer_gain(Eigen::Matrix4d::Zero()) {}
 
@@ -259,6 +260,7 @@ struct QPControllerParams {
   double w_qdd_delta;
   double mu;
   double min_knee_angle;
+  double ankle_torque_alpha;
   bool use_center_of_mass_observer;
   Eigen::Matrix4d center_of_mass_observer_gain;
 
@@ -276,6 +278,7 @@ struct QPControllerParams {
         lhs.Kp_accel == rhs.Kp_accel &&
         lhs.contact_threshold == rhs.contact_threshold &&
         lhs.min_knee_angle == rhs.min_knee_angle &&
+        lhs.ankle_torque_alpha == rhs.ankle_torque_alpha &&
         lhs.use_center_of_mass_observer == rhs.use_center_of_mass_observer &&
         lhs.center_of_mass_observer_gain.isApprox(
             rhs.center_of_mass_observer_gain);
