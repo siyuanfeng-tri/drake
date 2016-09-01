@@ -15,7 +15,7 @@ namespace systems {
 
 class System2QP : public LeafSystem<double> {
  public:
-  explicit System2QP(const std::string &urdf_name) 
+  explicit System2QP(const std::string &urdf_name)
     : urdf_name_(urdf_name), robot_(std::make_shared<RigidBodyTree>(urdf_name, DrakeJoint::ROLLPITCHYAW)) {
 
     // init some qp stuff

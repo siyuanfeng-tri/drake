@@ -57,7 +57,7 @@ function(drake_setup_java_for_matlab)
       OUTPUT_QUIET
       INPUT_FILE ${_input_file})
 
-    if(_result EQUAL 0)
+    #if(_result EQUAL 0)
       if(EXISTS ${_logfile})
         file(READ ${_logfile} _output)
 
@@ -92,10 +92,10 @@ function(drake_setup_java_for_matlab)
           "Could not determine MATLAB JVM version because MATLAB log file was not created")
       endif()
     endif()
-  else()
-    message(WARNING
-      "Could not determine MATLAB JVM version because MATLAB exited with nonzero result ${_result}")
-  endif()
+    # else()
+    #message(WARNING
+    #  "Could not determine MATLAB JVM version because MATLAB exited with nonzero result ${_result}")
+    #endif()
 endfunction()
 
 #------------------------------------------------------------------------------

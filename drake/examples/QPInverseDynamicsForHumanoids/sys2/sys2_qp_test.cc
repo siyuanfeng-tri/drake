@@ -1,5 +1,6 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/lcm/translator_between_lcmt_drake_signal.h"
+#include "drake/systems/framework/diagram_builder.h"
 #include "drake/lcmt_drake_signal.hpp"
 
 #include "drake/systems/lcm/lcm_receive_thread.h"
@@ -135,16 +136,15 @@ int main() {
   qp_output_pub.set_name("qp_output_to_lcm");
 
   // connect the diagram
-  drake::systems::Diagram<double> mydiagram;
-  mydiagram.set_name("Sys2 QP diagram");
+  drake::systems::DiagramBuilder<double> builder;
+  builder.Connect(state_sub.get_output_port(0), qp_con.get_input_port(0));
+  builder.Connect(qp_input_sub.get_output_port(0), qp_con.get_input_port(1));
+  builder.Connect(qp_con.get_output_port(0), qp_output_pub.get_input_port(0));
+  builder.ExportOutput(qp_con.get_output_port(0));
 
-  mydiagram.Connect(&state_sub, 0, &qp_con, 0);
-  mydiagram.Connect(&qp_input_sub, 0, &qp_con, 1);
-  mydiagram.Connect(&qp_con, 0, &qp_output_pub, 0);
+  std::unique_ptr<drake::systems::Diagram<double>> mydiagram = builder.Build();
+  mydiagram->set_name("Sys2 QP diagram");
 
-  mydiagram.ExportOutput(&qp_con, 0);
-
-  mydiagram.Finalize();
   ////////////////////////////////////////////////////////////////
   // lcm pub
   MessagePublisher state_pub("state", &lcm, qp_con.number_of_robot_states());
@@ -158,8 +158,8 @@ int main() {
 
   ////////////////////////////////////////////////////////////////
   // fake simulation
-  std::unique_ptr<drake::systems::ContextBase<double>> context = mydiagram.CreateDefaultContext();
-  std::unique_ptr<drake::systems::SystemOutput<double>> output = mydiagram.AllocateOutput(*context);
+  std::unique_ptr<drake::systems::ContextBase<double>> context = mydiagram->CreateDefaultContext();
+  std::unique_ptr<drake::systems::SystemOutput<double>> output = mydiagram->AllocateOutput(*context);
   DRAKE_ASSERT(context->get_num_input_ports() == 0);
   DRAKE_ASSERT(output->get_num_ports() == 1);
 
@@ -200,6 +200,9 @@ int main() {
   com_d[0] += 0.05;
 
   // [5] is Fz, 660N * 2 is about robot weight.
+  qp_input.wrench_d(Side::LEFT).setZero();
+  qp_input.wrench_d(Side::RIGHT).setZero();
+  qp_input.vd_d().setZero();
   qp_input.wrench_d(Side::LEFT)[5] = 660;
   qp_input.wrench_d(Side::RIGHT)[5] = 660;
   qp_input.w_com = 1e2;
@@ -227,13 +230,12 @@ int main() {
     HumanoidStatus2VectorXd(rs, &STATE);
     state_pub.SetValue(STATE);
     qp_input_pub.SetValue(QP_INPUT);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     // call controller
-    mydiagram.EvalOutput(*context, output.get());
+    mydiagram->EvalOutput(*context, output.get());
 
     // parse output / fwd sim, qp_output will be sent through LCM as well.
-    VectorXd2QPOutput(output->get_mutable_port(0)->GetMutableVectorData()->get_mutable_value(), &qp_output);
+    VectorXd2QPOutput(output->get_vector_data(0)->get_value(), &qp_output);
 
     STATE[time_idx] += dt;
     integrate_state_floating_base_rpy(dt, q, qd, qp_output.vd());

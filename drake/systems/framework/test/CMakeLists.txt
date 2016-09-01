@@ -68,3 +68,8 @@ add_executable(diagram_context_test diagram_context_test.cc)
 target_link_libraries(diagram_context_test
                       drakeSystemFramework ${GTEST_BOTH_LIBRARIES})
 add_test(NAME diagram_context_test COMMAND diagram_context_test)
+
+add_executable(abstract_value_io_test abstract_value_io_test.cc)
+target_link_libraries(abstract_value_io_test
+                      drakeSystemFramework ${GTEST_BOTH_LIBRARIES})
+add_test(NAME abstract_value_io_test COMMAND abstract_value_io_test)
