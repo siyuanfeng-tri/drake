@@ -8,14 +8,15 @@ void System2QP::EvalOutput(const ContextBase<double> &context, SystemOutput<doub
   DRAKE_ASSERT(context.get_num_input_ports() == 2);
   DRAKE_ASSERT(output->get_num_ports() == 1);
 
-  HumanoidStatus rs(robot_);
-  QPInput qp_input(*robot_);
-  QPOutput qp_output(*robot_);
+  // get robot status
+  const HumanoidStatus &rs = context.get_abstract_input(0)->GetValue<HumanoidStatus>();
 
-  VectorXd2HumanoidStatus(context.get_vector_input(0)->get_value(), &rs);
-  Vectorxd2QPInput(context.get_vector_input(1)->get_value(), &qp_input);
+  // get qp input
+  const AbstractValue* abs_in = context.get_abstract_input(1);
+  const QPInput &qp_input = abs_in->GetValue<QPInput>();
 
-  Eigen::VectorXd tmp(number_of_qp_outputs());
+  // qp output
+  QPOutput qp_output(rs.robot());
 
   std::cout << qp_input;
   std::cout << context.get_vector_input(0)->get_value() << std::endl;
@@ -24,11 +25,11 @@ void System2QP::EvalOutput(const ContextBase<double> &context, SystemOutput<doub
       context.get_vector_input(1)->get_value().hasNaN()) {
     std::cout << "System2QP: not valid input\n";
     qp_output.vd().setZero();
-    QPOutput2VectorXd(qp_output, &tmp);
-    output->GetMutableVectorData(0)->get_mutable_value() = tmp;
+    output->GetMutableData(0)->SetValue(qp_output);
     return;
   }
 
+  /*
   qp_input.supports().push_back(SupportElement(*robot_->FindBody("leftFoot")));
   qp_input.support(0).get_mutable_contact_points().push_back(Vector3d(0.2, 0.05, -0.09));
   qp_input.support(0).get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
@@ -40,6 +41,7 @@ void System2QP::EvalOutput(const ContextBase<double> &context, SystemOutput<doub
   qp_input.support(1).get_mutable_contact_points().push_back(Vector3d(0.2, -0.05, -0.09));
   qp_input.support(1).get_mutable_contact_points().push_back(Vector3d(-0.05, -0.05, -0.09));
   qp_input.support(1).get_mutable_contact_points().push_back(Vector3d(-0.05, 0.05, -0.09));
+  */
 
   QPController qp_controller(rs, 4);
 
@@ -55,8 +57,9 @@ void System2QP::EvalOutput(const ContextBase<double> &context, SystemOutput<doub
   std::cout << "===================================\n";
   */
 
-  QPOutput2VectorXd(qp_output, &tmp);
-  output->GetMutableVectorData(0)->get_mutable_value() = tmp;
+  //QPOutput2VectorXd(qp_output, &tmp);
+  //output->GetMutableVectorData(0)->get_mutable_value() = tmp;
+  output->GetMutableData(0)->SetValue(qp_output);
 }
 
 

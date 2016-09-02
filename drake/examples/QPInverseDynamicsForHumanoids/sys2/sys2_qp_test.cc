@@ -112,6 +112,7 @@ void testIO() {
 int main() {
   testIO();
 
+  /*
   lcm::LCM lcm;
 
   ////////////////////////////////////////////////////////////////
@@ -246,6 +247,7 @@ int main() {
 
     std::cout << "time: " << rs.time() << " com: " << rs.com().transpose() << std::endl;
   }
+  */
 
   return 0;
 }

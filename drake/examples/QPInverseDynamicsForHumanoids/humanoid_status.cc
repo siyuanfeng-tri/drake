@@ -49,25 +49,25 @@ void HumanoidStatus::Update(double t, const Ref<const VectorXd>& q,
   joint_torque_ = trq;
 
   cache_.initialize(position_, velocity_);
-  robot_->doKinematics(cache_, true);
+  robot_.doKinematics(cache_, true);
 
-  M_ = robot_->massMatrix(cache_);
+  M_ = robot_.massMatrix(cache_);
   eigen_aligned_unordered_map<RigidBody const*, drake::TwistVector<double>>
       f_ext;
-  bias_term_ = robot_->dynamicsBiasTerm(cache_, f_ext);
+  bias_term_ = robot_.dynamicsBiasTerm(cache_, f_ext);
 
   // com
-  com_ = robot_->centerOfMass(cache_);
-  J_com_ = robot_->centerOfMassJacobian(cache_);
-  Jdot_times_v_com_ = robot_->centerOfMassJacobianDotTimesV(cache_);
+  com_ = robot_.centerOfMass(cache_);
+  J_com_ = robot_.centerOfMassJacobian(cache_);
+  Jdot_times_v_com_ = robot_.centerOfMassJacobianDotTimesV(cache_);
   comd_ = J_com_ * v;
-  centroidal_momentum_matrix_ = robot_->centroidalMomentumMatrix(cache_);
+  centroidal_momentum_matrix_ = robot_.centroidalMomentumMatrix(cache_);
   centroidal_momentum_matrix_dot_times_v_ =
-      robot_->centroidalMomentumMatrixDotTimesV(cache_);
+      robot_.centroidalMomentumMatrixDotTimesV(cache_);
 
   // body parts
   for (size_t i = 0; i < bodies_of_interest_.size(); i++)
-    bodies_of_interest_[i].Update(*robot_, cache_);
+    bodies_of_interest_[i].Update(robot_, cache_);
 
   // ft sensor
   foot_wrench_in_sensor_frame_[Side::LEFT] = l_ft;

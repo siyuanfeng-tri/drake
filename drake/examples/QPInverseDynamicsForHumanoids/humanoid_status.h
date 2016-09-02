@@ -73,43 +73,62 @@ class HumanoidStatus {
   /// Offset from the foot frame to force torque sensor in the foot frame.
   static const Vector3d kFootToSensorOffset;
 
-  explicit HumanoidStatus(const std::shared_ptr<RigidBodyTree> robot_in)
+  explicit HumanoidStatus(const RigidBodyTree &robot_in)
       : robot_(robot_in),
-        cache_(robot_->bodies),
+        cache_(robot_.bodies),
         bodies_of_interest_{
-            BodyOfInterest("pelvis", *robot_->FindBody("pelvis"),
+            BodyOfInterest("pelvis", *robot_.FindBody("pelvis"),
                            Vector3d::Zero()),
-            BodyOfInterest("torso", *robot_->FindBody("torso"),
+            BodyOfInterest("torso", *robot_.FindBody("torso"),
                            Vector3d::Zero()),
-            BodyOfInterest("leftFoot", *robot_->FindBody("leftFoot"),
+            BodyOfInterest("leftFoot", *robot_.FindBody("leftFoot"),
                            Vector3d::Zero()),
-            BodyOfInterest("rightFoot", *robot_->FindBody("rightFoot"),
+            BodyOfInterest("rightFoot", *robot_.FindBody("rightFoot"),
                            Vector3d::Zero()),
-            BodyOfInterest("leftFootSensor", *robot_->FindBody("leftFoot"),
+            BodyOfInterest("leftFootSensor", *robot_.FindBody("leftFoot"),
                            kFootToSensorOffset),
-            BodyOfInterest("rightFootSensor", *robot_->FindBody("rightFoot"),
+            BodyOfInterest("rightFootSensor", *robot_.FindBody("rightFoot"),
                            kFootToSensorOffset),
         } {
     // Build map
     body_name_to_id_ = std::unordered_map<std::string, int>();
-    for (auto it = robot_->bodies.begin(); it != robot_->bodies.end(); ++it) {
-      body_name_to_id_[(*it)->get_name()] = it - robot_->bodies.begin();
+    for (auto it = robot_.bodies.begin(); it != robot_.bodies.end(); ++it) {
+      body_name_to_id_[(*it)->get_name()] = it - robot_.bodies.begin();
     }
 
     joint_name_to_position_index_ = std::unordered_map<std::string, int>();
-    for (int i = 0; i < robot_->number_of_positions(); i++) {
-      joint_name_to_position_index_[robot_->getPositionName(i)] = i;
+    for (int i = 0; i < robot_.number_of_positions(); i++) {
+      joint_name_to_position_index_[robot_.getPositionName(i)] = i;
     }
-    for (size_t i = 0; i < robot_->actuators.size(); i++) {
-      actuator_name_to_id_[robot_->actuators[i].name_] = i;
+    for (size_t i = 0; i < robot_.actuators.size(); i++) {
+      actuator_name_to_id_[robot_.actuators[i].name_] = i;
     }
 
     time_ = time0_ = 0;
 
-    position_.resize(robot_->number_of_positions());
-    velocity_.resize(robot_->number_of_velocities());
-    joint_torque_.resize(robot_->actuators.size());
+    position_.resize(robot_.number_of_positions());
+    velocity_.resize(robot_.number_of_velocities());
+    joint_torque_.resize(robot_.actuators.size());
   }
+
+  HumanoidStatus& operator= (const HumanoidStatus& other) {
+    if (&other == this)
+      return *this;
+
+    if (&robot_ != &other.robot()) {
+      throw std::runtime_error("can't assign with different robot ref");
+    }
+
+    Update(other.time(),
+        other.position(),
+        other.velocity(),
+        other.joint_torque(),
+        other.foot_wrench_in_sensor_frame(Side::LEFT),
+        other.foot_wrench_in_sensor_frame(Side::RIGHT));
+
+    return *this;
+  }
+
 
   /**
    * Do kinematics and compute useful information based on kinematics and
@@ -137,7 +156,7 @@ class HumanoidStatus {
    */
   Eigen::VectorXd GetNominalPosition() const;
 
-  inline const RigidBodyTree& robot() const { return *robot_; }
+  inline const RigidBodyTree& robot() const { return robot_; }
   inline const KinematicsCache<double>& cache() const { return cache_; }
   inline const std::unordered_map<std::string, int>& body_name_to_id() const {
     return body_name_to_id_;
@@ -211,7 +230,7 @@ class HumanoidStatus {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
-  const std::shared_ptr<RigidBodyTree> robot_;
+  const RigidBodyTree &robot_;
   KinematicsCache<double> cache_;
 
   /// Maps body name to its index

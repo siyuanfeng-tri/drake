@@ -75,8 +75,8 @@ int main() {
       drake::GetDrakePath() +
       std::string(
           "/examples/QPInverseDynamicsForHumanoids/valkyrie_sim_drake.urdf");
-  HumanoidStatus robot_status(
-      std::make_shared<RigidBodyTree>(urdf, DrakeJoint::ROLLPITCHYAW));
+  RigidBodyTree robot(urdf, DrakeJoint::ROLLPITCHYAW);
+  HumanoidStatus robot_status(robot);
 
   // Sets state and does kinematics.
   VectorXd q(robot_status.robot().number_of_positions());
