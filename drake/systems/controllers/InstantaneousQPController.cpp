@@ -91,9 +91,13 @@ void InstantaneousQPController::initialize() {
   }
 
   std::vector<std::string> ankle_names = {"leftAnklePitchActuator", "leftAnkleRollActuator", "rightAnklePitchActuator", "rightAnkleRollActuator"};
+  std::vector<std::string> hip_z_names = {"leftHipYaw", "rightHipYaw"};
 
-  for(int i = 0; i < ankle_names.size(); i++){
-    ankle_input_idx.emplace(actuator_name_to_input_idx[ankle_names[i]]);
+  for(int i = 0; i < ankle_names.size(); i++) {
+    heavy_trq_filter_idx.emplace(actuator_name_to_input_idx[ankle_names[i]]);
+  }
+  for(int i = 0; i < hip_z_names.size(); i++) {
+    heavy_trq_filter_idx.emplace(actuator_name_to_input_idx[hip_z_names[i]]);
   }
 
   qdd_lb = Eigen::VectorXd::Zero(nq).array() -
@@ -1583,14 +1587,14 @@ int InstantaneousQPController::setupAndSolveQP(
 
   for (int i = 0; i < trq_prev.size(); i++) {
     // not ankle
-    if (ankle_input_idx.find(i) == ankle_input_idx.end()) {
+    if (heavy_trq_filter_idx.find(i) == heavy_trq_filter_idx.end()) {
       trq_prev[i] = trq_alpha * trq_prev[i] + (1 - trq_alpha) * qp_output.u[i];
     }
     else {
       double aa = std::max(params.ankle_torque_alpha, trq_alpha);
       trq_prev[i] = aa * trq_prev[i] + (1 - aa) * qp_output.u[i];
     }
-  }  
+  }
   qp_output.u = trq_prev;
 
   // y = B_act.jacobiSvd(ComputeThinU|ComputeThinV).solve(H_act*qdd + C_act -
