@@ -12,6 +12,7 @@
 #include "drake/systems/plants/RigidBodyTree.h"
 #include "drake/systems/trajectories/PiecewisePolynomial.h"
 #include "drake/drakeControlUtil_export.h"
+#include "drake/systems/robotInterfaces/Side.h"
 
 const int m_surface_tangents =
     2;  // number of faces in the friction cone approx
@@ -83,6 +84,32 @@ class ContactState {
 
   inline void remove_contact(const ContactBody body) {
     body_in_contact_.at(body) = false;
+  }
+
+  inline bool is_double_support() const {
+    return (is_in_contact(L_FOOT) && is_in_contact(R_FOOT));
+  }
+
+  inline bool is_single_support_left() const {
+    return (is_in_contact(L_FOOT) && !is_in_contact(R_FOOT));
+  }
+
+  inline bool is_single_support_right() const {
+    return (!is_in_contact(L_FOOT) && is_in_contact(R_FOOT));
+  }
+
+  inline bool is_hand_in_contact(Side side) const {
+    if (side.underlying() == Side::LEFT)
+      return is_in_contact(L_HAND);
+    else
+      return is_in_contact(R_HAND);
+  }
+
+  inline bool is_foot_in_contact(Side side) const {
+    if (side.underlying() == Side::LEFT)
+      return is_in_contact(L_FOOT);
+    else
+      return is_in_contact(R_FOOT);
   }
 
   inline size_t num_bodies_in_contact() const {
