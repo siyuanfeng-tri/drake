@@ -414,6 +414,8 @@ Vector6d bodySpatialMotionPD(
   // @param Kp     The gain in task frame
   // @param Kd     The gain in task frame
   // @param T_task_to_world  The homogeneous transform from task to world
+  // @retval body_vdot_with_pd this is the desired acceleration in world frame,
+  // it's task space linear/ang acceleration. Doesn't use twist
   // @retval twist_dot, [angular_acceleration, xyz_acceleration] in body frame
 
   Isometry3d T_world_to_task = T_task_to_world.inverse();

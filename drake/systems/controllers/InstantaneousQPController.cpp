@@ -1089,6 +1089,8 @@ int InstantaneousQPController::setupAndSolveQP(
   VectorXd u_d = R_DQyD_ls.inverse() * lin.transpose();
   qp_output.comdd_d = u_d;
 
+    
+
   VectorXd f(nparams);
   {
     if (nc > 0) {
