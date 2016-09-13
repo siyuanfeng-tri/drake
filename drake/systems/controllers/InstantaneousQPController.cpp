@@ -1094,19 +1094,24 @@ int InstantaneousQPController::setupAndSolveQP(
     if (nc > 0) {
       // NOTE: moved Hqp calcs below, because I compute the inverse directly for
       // FastQP (and sparse Hqp for gurobi)
-      VectorXd tmp = C_ls * xlimp;
-      VectorXd tmp1 = Jcomdotv;
-      MatrixXd tmp2 = R_DQyD_ls * Jcom;
+      // VectorXd tmp = C_ls * xlimp;
+      // VectorXd tmp1 = Jcomdotv;
+      // MatrixXd tmp2 = R_DQyD_ls * Jcom;
 
-      /*
-      fqp = tmp.transpose() * Qy * D_ls * Jcom;
-      fqp += tmp1.transpose() * tmp2;
-      fqp += (S * x_bar + 0.5 * s1).transpose() * B_ls * Jcom;
-      fqp -= u0.transpose() * tmp2;
-      fqp -= y0.transpose() * Qy * D_ls * Jcom;
-      fqp *= w_zmp;
-      */
-      fqp = w_zmp * (Jcomdotv - comdd_d).transpose() * Jcom;
+      // fqp = tmp.transpose() * Qy * D_ls * Jcom;
+      // fqp += tmp1.transpose() * tmp2;
+      // fqp += (S * x_bar + 0.5 * s1).transpose() * B_ls * Jcom;
+      // fqp -= u0.transpose() * R_ls * Jcom;
+      // fqp -= y0.transpose() * Qy * D_ls * Jcom;
+      // fqp *= w_zmp;
+
+      fqp = (C_ls * xlimp - y0).transpose() * Qy * D_ls
+          + (Jcomdotv - u0).transpose() * R_ls
+          + Jcomdotv.transpose() * D_ls.transpose() * Qy * D_ls
+          + (S * x_bar + 0.5 * s1).transpose() * B_ls;
+      fqp = w_zmp * fqp * Jcom;
+
+      //fqp = w_zmp * (Jcomdotv - comdd_d).transpose() * Jcom;
 
       fqp -= (w_qdd.array() * pid_out.qddot_des.array()).matrix().transpose();
       if(qp_output.qdd.size() == nq){
@@ -1400,8 +1405,9 @@ int InstantaneousQPController::setupAndSolveQP(
 
 
     if (nc > 0) {
-      //Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
-      Hqp = w_zmp * Jcom.transpose() * Jcom;
+      Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
+
+      //Hqp = w_zmp * Jcom.transpose() * Jcom;
 
       if (include_angular_momentum) {
         Hqp += Ak.transpose() * params.W_kdot * Ak;
