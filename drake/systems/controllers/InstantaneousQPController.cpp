@@ -1083,13 +1083,11 @@ int InstantaneousQPController::setupAndSolveQP(
   double w_qdd_delta = params.w_qdd_delta;
 
   // compute u without constraints
-  VectorXd lin = -(C_ls*xlimp-y0).transpose() * Qy * D_ls
+  Matrix<double,1,Eigen::Dynamic> lin = -(C_ls*xlimp-y0).transpose() * Qy * D_ls
                  + u0.transpose() * R_ls
                  - (S*x_bar+0.5*s1).transpose() * B_ls;
-  VectorXd u_d = R_DQyD_ls.inverse() * lin.transpose();
-  qp_output.comdd_d = u_d;
-
-    
+  VectorXd comdd_d = R_DQyD_ls.inverse() * lin.transpose();
+  qp_output.comdd_d = comdd_d;
 
   VectorXd f(nparams);
   {
@@ -1100,13 +1098,16 @@ int InstantaneousQPController::setupAndSolveQP(
       VectorXd tmp1 = Jcomdotv;
       MatrixXd tmp2 = R_DQyD_ls * Jcom;
 
+      /*
       fqp = tmp.transpose() * Qy * D_ls * Jcom;
-      // mexPrintf("fqp head: %f %f %f\n", fqp(0), fqp(1), fqp(2));
       fqp += tmp1.transpose() * tmp2;
       fqp += (S * x_bar + 0.5 * s1).transpose() * B_ls * Jcom;
       fqp -= u0.transpose() * tmp2;
       fqp -= y0.transpose() * Qy * D_ls * Jcom;
       fqp *= w_zmp;
+      */
+      fqp = w_zmp * (Jcomdotv - comdd_d).transpose() * Jcom;
+
       fqp -= (w_qdd.array() * pid_out.qddot_des.array()).matrix().transpose();
       if(qp_output.qdd.size() == nq){
         fqp -= (w_qdd_delta * qp_output.qdd.array()).matrix().transpose();
@@ -1399,7 +1400,9 @@ int InstantaneousQPController::setupAndSolveQP(
 
 
     if (nc > 0) {
-      Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
+      //Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
+      Hqp = w_zmp * Jcom.transpose() * Jcom;
+
       if (include_angular_momentum) {
         Hqp += Ak.transpose() * params.W_kdot * Ak;
       }
