@@ -18,4 +18,7 @@ struct lcmt_zmp_data
 	double s1dot[4][1];
 	double s2;
 	double s2dot;
+
+  // these are just for debugging, the nominal com / comd
+  double com[4][1];
 }

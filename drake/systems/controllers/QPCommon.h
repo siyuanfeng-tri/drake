@@ -43,6 +43,7 @@ struct RobotPropertyCache {
   std::map<Side, int> foot_ids;
   std::map<Side, int> hand_ids;
   int pelvis_id;
+  int torso_id;
 };
 
 struct VRefIntegratorParams {
@@ -57,6 +58,14 @@ struct VRefIntegratorParams {
                          const VRefIntegratorParams& rhs) {
     return lhs.zero_ankles_on_contact == rhs.zero_ankles_on_contact &&
            lhs.eta == rhs.eta && lhs.delta_max == rhs.delta_max;
+  }
+
+  friend std::ostream& operator<< (std::ostream& stream, const VRefIntegratorParams& param) {
+    stream << "VRefIntegratorParams:\n"
+      << "zero_ankles_on_contact: " << param.zero_ankles_on_contact << std::endl
+      << "eta: " << param.eta << std::endl
+      << "delta_max: " << param.delta_max << std::endl;
+    return stream;
   }
 };
 
@@ -75,6 +84,14 @@ struct IntegratorParams {
     return lhs.gains.isApprox(rhs.gains) && lhs.clamps.isApprox(rhs.clamps) &&
            lhs.eta == rhs.eta;
   }
+
+  friend std::ostream& operator<< (std::ostream& stream, IntegratorParams& param) {
+    stream << "IntegratorParams:\n"
+      << "gains: " << param.gains << std::endl
+      << "clamps: " << param.clamps << std::endl
+      << "eta: " << param.eta << std::endl;
+    return stream;
+  }
 };
 
 struct Bounds {
@@ -87,6 +104,13 @@ struct Bounds {
 
   friend bool operator==(const Bounds& lhs, const Bounds& rhs) {
     return lhs.min.isApprox(rhs.min) && lhs.max.isApprox(rhs.max);
+  }
+
+  friend std::ostream& operator<< (std::ostream& stream, Bounds& bounds) {
+    stream << "Bounds:\n"
+      << "min: " << bounds.min.transpose() << std::endl
+      << "max: " << bounds.max.transpose() << std::endl;
+    return stream;
   }
 };
 
@@ -122,6 +146,11 @@ struct JointSoftLimitParams {
         lhs.k_logistic.isApprox(rhs.k_logistic);
     return is_equal;
   }
+
+  friend std::ostream& operator<< (std::ostream& stream, JointSoftLimitParams& param) {
+    stream << "JointSoftLimitParams: NEED TO IMPLEMENT THIS\n";
+    return stream;
+  }
 };
 
 struct WholeBodyParams {
@@ -147,6 +176,11 @@ struct WholeBodyParams {
            lhs.w_qdd.isApprox(rhs.w_qdd) && lhs.integrator == rhs.integrator &&
            lhs.qdd_bounds == rhs.qdd_bounds;
   }
+
+  friend std::ostream& operator<< (std::ostream& stream, WholeBodyParams& params) {
+    stream << "WholeBodyParams: NEED TO IMPLEMENT THIS\n";
+    return stream;
+  }
 };
 
 struct BodyMotionParams {
@@ -165,6 +199,15 @@ struct BodyMotionParams {
                          const BodyMotionParams& rhs) {
     return lhs.Kp.isApprox(rhs.Kp) && lhs.Kd.isApprox(rhs.Kd) &&
            lhs.accel_bounds == rhs.accel_bounds && lhs.weight == rhs.weight;
+  }
+
+  friend std::ostream& operator<< (std::ostream& stream, BodyMotionParams& param) {
+    stream << "BodyMotionParams:\n"
+      << "Kp: " << param.Kp.transpose() << std::endl
+      << "Kd: " << param.Kd.transpose() << std::endl
+      << param.accel_bounds
+      << "weight: " << param.weight << std::endl;
+    return stream;
   }
 };
 
@@ -197,6 +240,11 @@ struct HardwareGains {
         lhs.ff_qd_d.isApprox(rhs.ff_qd_d);
     return is_equal;
   }
+
+  friend std::ostream& operator<< (std::ostream& stream, HardwareGains& gains) {
+    stream << "HardwareGains: NEED TO IMPLEMENT THIS\n";
+    return stream;
+  }
 };
 
 struct HardwareParams {
@@ -216,6 +264,11 @@ struct HardwareParams {
     return lhs.gains == rhs.gains &&
            lhs.joint_is_force_controlled == rhs.joint_is_force_controlled &&
            lhs.joint_is_position_controlled == rhs.joint_is_position_controlled;
+  }
+
+  friend std::ostream& operator<< (std::ostream& stream, HardwareParams& gains) {
+    stream << "HardwareParams: NEED TO IMPLEMENT THIS\n";
+    return stream;
   }
 };
 
@@ -238,6 +291,7 @@ struct QPControllerParams {
         Jpdotv_multiplier(1.0),
         w_zmp(1.0),
         min_knee_angle(0.0),
+        ankle_torque_alpha(0.0),
         use_center_of_mass_observer(false),
         center_of_mass_observer_gain(Eigen::Matrix4d::Zero()) {}
 
@@ -259,6 +313,7 @@ struct QPControllerParams {
   double w_qdd_delta;
   double mu;
   double min_knee_angle;
+  double ankle_torque_alpha;
   bool use_center_of_mass_observer;
   Eigen::Matrix4d center_of_mass_observer_gain;
 
@@ -276,10 +331,38 @@ struct QPControllerParams {
         lhs.Kp_accel == rhs.Kp_accel &&
         lhs.contact_threshold == rhs.contact_threshold &&
         lhs.min_knee_angle == rhs.min_knee_angle &&
+        lhs.ankle_torque_alpha == rhs.ankle_torque_alpha &&
         lhs.use_center_of_mass_observer == rhs.use_center_of_mass_observer &&
         lhs.center_of_mass_observer_gain.isApprox(
             rhs.center_of_mass_observer_gain);
     return is_equal;
+  }
+
+  friend std::ostream& operator<< (std::ostream& stream, QPControllerParams& params) {
+    stream << "QPControllerParams:\n"
+      << params.whole_body;
+    for (size_t i = 0; i < params.body_motion.size(); i++)
+      stream << params.body_motion[i];
+    stream << params.vref_integrator
+      << params.joint_soft_limits
+      << params.hardware
+      << "W_kdot: " << params.W_kdot << std::endl
+      << "Kp_ang: " << params.Kp_ang << std::endl
+      << "w_slack: " << params.w_slack << std::endl
+      << "slack_limit: " << params.slack_limit << std::endl
+      << "w_grf: " << params.w_grf << std::endl
+      << "Jpdotv_multiplier: " << params.Jpdotv_multiplier << std::endl
+      << "Kp_accel: " << params.Kp_accel << std::endl
+      << "contact_threshold: " << params.contact_threshold << std::endl
+      << "useTorqueAlphaFilter: " << params.useTorqueAlphaFilter << std::endl
+      << "w_zmp: " << params.w_zmp << std::endl
+      << "w_qdd_delta: " << params.w_qdd_delta << std::endl
+      << "mu: " << params.mu << std::endl
+      << "min_knee_angle: " << params.min_knee_angle << std::endl
+      << "ankle_torque_alpha: " << params.ankle_torque_alpha << std::endl
+      << "use_center_of_mass_observer: " << params.use_center_of_mass_observer << std::endl
+      << "center_of_mass_observer_gain: " << params.center_of_mass_observer_gain << std::endl;
+    return stream;
   }
 };
 

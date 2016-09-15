@@ -68,6 +68,9 @@ class InstantaneousQPController {
   GRBenv* env;
 
   std::map<std::string, QPControllerParams> param_sets;
+  std::map<std::string, int> actuator_name_to_input_idx;
+  std::set<int> heavy_trq_filter_idx;
+
   RobotPropertyCache rpc;
   Eigen::VectorXd umin, umax;
   int use_fast_qp;

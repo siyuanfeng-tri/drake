@@ -322,6 +322,7 @@ QPControllerParams loadSingleParamSet(const YAML::Node& config,
   params.mu = get(config, "mu").as<double>();
   params.Jpdotv_multiplier = get(config, "Jpdotv_multiplier").as<double>();
   params.Kp_accel = get(config, "Kp_accel").as<double>();
+  params.ankle_torque_alpha = get(config, "ankle_torque_alpha").as<double>();
   params.contact_threshold = get(config, "contact_threshold").as<double>();
   params.useTorqueAlphaFilter = get(config, "useTorqueAlphaFilter").as<bool>();
   params.min_knee_angle = get(config, "min_knee_angle").as<double>();

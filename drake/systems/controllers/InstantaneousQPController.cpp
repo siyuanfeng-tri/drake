@@ -87,6 +87,17 @@ void InstantaneousQPController::initialize() {
   for (int i = 0; i < robot->actuators.size(); i++) {
     umin(i) = robot->actuators.at(i).effort_limit_min;
     umax(i) = robot->actuators.at(i).effort_limit_max;
+    actuator_name_to_input_idx[robot->actuators.at(i).name] = i;
+  }
+
+  std::vector<std::string> ankle_names = {"leftAnklePitchActuator", "leftAnkleRollActuator", "rightAnklePitchActuator", "rightAnkleRollActuator"};
+  std::vector<std::string> hip_z_names = {"leftHipYaw", "rightHipYaw"};
+
+  for(int i = 0; i < ankle_names.size(); i++) {
+    heavy_trq_filter_idx.emplace(actuator_name_to_input_idx[ankle_names[i]]);
+  }
+  for(int i = 0; i < hip_z_names.size(); i++) {
+    heavy_trq_filter_idx.emplace(actuator_name_to_input_idx[hip_z_names[i]]);
   }
 
   qdd_lb = Eigen::VectorXd::Zero(nq).array() -
@@ -302,6 +313,8 @@ VectorXd InstantaneousQPController::velocityReference(
       (1 - params.eta) * controller_state.vref_integrator_state +
       params.eta * qd + qdd_limited * dt;
 
+  // TODO: sfeng disable the integrator resetting on contact switching.
+  /*
   if (params.zero_ankles_on_contact && foot_contact[0] == 1) {
     for (i = 0; i < rpc.position_indices.ankles.at(Side::LEFT).size(); i++) {
       controller_state.vref_integrator_state(
@@ -328,6 +341,7 @@ VectorXd InstantaneousQPController::velocityReference(
           Side::RIGHT)[i]) = qd(rpc.position_indices.legs.at(Side::RIGHT)[i]);
     }
   }
+  */
 
   controller_state.foot_contact_prev[0] = foot_contact[0];
   controller_state.foot_contact_prev[1] = foot_contact[1];
@@ -1069,28 +1083,36 @@ int InstantaneousQPController::setupAndSolveQP(
   double w_qdd_delta = params.w_qdd_delta;
 
   // compute u without constraints
-  VectorXd lin = -(C_ls*xlimp-y0).transpose() * Qy * D_ls
+  Matrix<double,1,Eigen::Dynamic> lin = -(C_ls*xlimp-y0).transpose() * Qy * D_ls
                  + u0.transpose() * R_ls
                  - (S*x_bar+0.5*s1).transpose() * B_ls;
-  VectorXd u_d = R_DQyD_ls.inverse() * lin.transpose();
-  qp_output.comdd_d = u_d;
+  VectorXd comdd_d = R_DQyD_ls.inverse() * lin.transpose();
+  qp_output.comdd_d = comdd_d;
 
   VectorXd f(nparams);
   {
     if (nc > 0) {
       // NOTE: moved Hqp calcs below, because I compute the inverse directly for
       // FastQP (and sparse Hqp for gurobi)
-      VectorXd tmp = C_ls * xlimp;
-      VectorXd tmp1 = Jcomdotv;
-      MatrixXd tmp2 = R_DQyD_ls * Jcom;
+      // VectorXd tmp = C_ls * xlimp;
+      // VectorXd tmp1 = Jcomdotv;
+      // MatrixXd tmp2 = R_DQyD_ls * Jcom;
 
-      fqp = tmp.transpose() * Qy * D_ls * Jcom;
-      // mexPrintf("fqp head: %f %f %f\n", fqp(0), fqp(1), fqp(2));
-      fqp += tmp1.transpose() * tmp2;
-      fqp += (S * x_bar + 0.5 * s1).transpose() * B_ls * Jcom;
-      fqp -= u0.transpose() * tmp2;
-      fqp -= y0.transpose() * Qy * D_ls * Jcom;
-      fqp *= w_zmp;
+      // fqp = tmp.transpose() * Qy * D_ls * Jcom;
+      // fqp += tmp1.transpose() * tmp2;
+      // fqp += (S * x_bar + 0.5 * s1).transpose() * B_ls * Jcom;
+      // fqp -= u0.transpose() * R_ls * Jcom;
+      // fqp -= y0.transpose() * Qy * D_ls * Jcom;
+      // fqp *= w_zmp;
+
+      fqp = (C_ls * xlimp - y0).transpose() * Qy * D_ls
+          + (Jcomdotv - u0).transpose() * R_ls
+          + Jcomdotv.transpose() * D_ls.transpose() * Qy * D_ls
+          + (S * x_bar + 0.5 * s1).transpose() * B_ls;
+      fqp = w_zmp * fqp * Jcom;
+
+      //fqp = w_zmp * (Jcomdotv - comdd_d).transpose() * Jcom;
+
       fqp -= (w_qdd.array() * pid_out.qddot_des.array()).matrix().transpose();
       if(qp_output.qdd.size() == nq){
         fqp -= (w_qdd_delta * qp_output.qdd.array()).matrix().transpose();
@@ -1261,7 +1283,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
     // min
     Ain.block(constraint_start_index, nq + beta_start, 1, active_support_length) = -B_rotate.row(2);
-    bin(constraint_start_index++) = lower;
+    bin(constraint_start_index++) = -lower;
 
     // std::cout << "foot " << c << " beta start " << beta_start << " active_support_length " << active_support_length << " [u,l] " << active_support.total_normal_force_upper_bound << " " << active_support.total_normal_force_lower_bound << std::endl;
     beta_start += active_support_length;
@@ -1384,6 +1406,9 @@ int InstantaneousQPController::setupAndSolveQP(
 
     if (nc > 0) {
       Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
+
+      //Hqp = w_zmp * Jcom.transpose() * Jcom;
+
       if (include_angular_momentum) {
         Hqp += Ak.transpose() * params.W_kdot * Ak;
       }
@@ -1544,6 +1569,17 @@ int InstantaneousQPController::setupAndSolveQP(
     if (std::isnan(qp_output.u(i))) qp_output.u(i) = 0;
   }
 
+  /*
+   * sfeng aug 28, this helps reduce the torque tracking / vel integrator for the left knee.
+   * solves the pelvis lowering issue for ssl as well. going to try offset the torque offset
+   * directly in the turbo driver.
+  for (int i = 0; i < robot->actuators.size(); i++) {
+    if (robot->actuators[i].name.compare("leftKneePitch") == 0) {
+      qp_output.u[i] -= 10;
+    }
+  }
+  */
+
   // low pass filter the output trq
   // only if enabled in the params
   if(params.useTorqueAlphaFilter){
@@ -1559,7 +1595,17 @@ int InstantaneousQPController::setupAndSolveQP(
     trq_prev.resize(qp_output.u.size());
     trq_prev = qp_output.u;
   }
-  trq_prev = trq_alpha * trq_prev + (1-trq_alpha) * qp_output.u;
+
+  for (int i = 0; i < trq_prev.size(); i++) {
+    // not ankle
+    if (heavy_trq_filter_idx.find(i) == heavy_trq_filter_idx.end()) {
+      trq_prev[i] = trq_alpha * trq_prev[i] + (1 - trq_alpha) * qp_output.u[i];
+    }
+    else {
+      double aa = std::max(params.ankle_torque_alpha, trq_alpha);
+      trq_prev[i] = aa * trq_prev[i] + (1 - aa) * qp_output.u[i];
+    }
+  }
   qp_output.u = trq_prev;
 
   // y = B_act.jacobiSvd(ComputeThinU|ComputeThinV).solve(H_act*qdd + C_act -

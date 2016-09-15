@@ -4,12 +4,15 @@
 #include <math.h>
 #include <set>
 #include <vector>
+#include <array>
+#include <list>
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 
 #include "drake/systems/plants/RigidBodyTree.h"
 #include "drake/systems/trajectories/PiecewisePolynomial.h"
 #include "drake/drakeControlUtil_export.h"
+#include "drake/systems/robotInterfaces/Side.h"
 
 const int m_surface_tangents =
     2;  // number of faces in the friction cone approx
@@ -33,20 +36,109 @@ typedef struct _support_state_element {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 } SupportStateElement;
 
+class ContactState {
+ public:
+  enum ContactBody {
+    PELVIS = 0,
+    L_FOOT,
+    R_FOOT,
+    L_HAND,
+    R_HAND, // add more here
+    SIZE_OF_CONTACT_BODY
+  };
+
+  ContactState() {
+    for (size_t i = 0; i < body_in_contact_.size(); i++)
+      body_in_contact_.at(i) = false;
+  }
+
+  explicit ContactState(const std::list<ContactBody> &contacts) {
+    for (size_t i = 0; i < body_in_contact_.size(); i++)
+      body_in_contact_.at(i) = false;
+    for (auto it = contacts.begin(); it != contacts.end(); it++)
+      body_in_contact_.at((size_t)(*it)) = true;
+  }
+
+  inline static const ContactState &DS() {
+    static ContactState ret({L_FOOT, R_FOOT});
+    return ret;
+  }
+
+  inline static const ContactState &SSL() {
+    static ContactState ret({L_FOOT});
+    return ret;
+  }
+
+  inline static const ContactState &SSR() {
+    static ContactState ret({R_FOOT});
+    return ret;
+  }
+
+  inline bool is_in_contact(const ContactBody body) const {
+    return body_in_contact_.at(body);
+  }
+
+  inline void set_contact(const ContactBody body) {
+    body_in_contact_.at(body) = true;
+  }
+
+  inline void remove_contact(const ContactBody body) {
+    body_in_contact_.at(body) = false;
+  }
+
+  inline bool is_double_support() const {
+    return (is_in_contact(L_FOOT) && is_in_contact(R_FOOT));
+  }
+
+  inline bool is_single_support_left() const {
+    return (is_in_contact(L_FOOT) && !is_in_contact(R_FOOT));
+  }
+
+  inline bool is_single_support_right() const {
+    return (!is_in_contact(L_FOOT) && is_in_contact(R_FOOT));
+  }
+
+  inline bool is_hand_in_contact(Side side) const {
+    if (side.underlying() == Side::LEFT)
+      return is_in_contact(L_HAND);
+    else
+      return is_in_contact(R_HAND);
+  }
+
+  inline bool is_foot_in_contact(Side side) const {
+    if (side.underlying() == Side::LEFT)
+      return is_in_contact(L_FOOT);
+    else
+      return is_in_contact(R_FOOT);
+  }
+
+  inline size_t num_bodies_in_contact() const {
+    size_t ctr = 0;
+    for (size_t i = 0; i < body_in_contact_.size(); i++)
+      if (body_in_contact_.at(i))
+        ctr++;
+    return ctr;
+  }
+
+  const std::list<ContactBody> bodies_in_contact() const {
+    std::list<ContactBody> contacts;
+    for (size_t i = 0; i < body_in_contact_.size(); i++)
+      if (body_in_contact_.at(i))
+        contacts.push_back((ContactBody)i);
+    return contacts;
+  }
+
+ private:
+  std::array<bool, SIZE_OF_CONTACT_BODY> body_in_contact_;
+};
 
 struct DrakeRobotState {
-  enum ContactState {
-    NOT_INITIALIZED = -1,
-    NOT_IN_CONTACT = 0,
-    IN_CONTACT = 1,
-  };
   // drake-ordered position and velocity vectors, with timestamp (in s)
   double t;
   Eigen::VectorXd q;
   Eigen::VectorXd qd;
 
-  ContactState left_foot_contact_state = NOT_INITIALIZED;
-  ContactState right_foot_contact_state = NOT_INITIALIZED;
+  ContactState contact_state;
 };
 
 struct DrakeRobotStateWithTorque{
