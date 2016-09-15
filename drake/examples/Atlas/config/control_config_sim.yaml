@@ -166,9 +166,13 @@ qp_controller_params:
         weight: 0.001
 
   walking:
+    w_zmp: 100
     body_specific:
       DEFAULT:
         weight: 0.001
+      utorso:
+        Kp: {x: 0, y: 0, z: 0, wx: 200, wy: 200, wz: 200}
+        weight: 0.075
       pelvis:
         Kp: {x: 0, y: 0, z: 150, wx: 200, wy: 200, wz: 200}
         weight: 0.075
@@ -412,3 +416,5 @@ qp_controller_params:
       DEFAULT:
         Kp: {x: 0, y: 0, z: 0, wx: 0, wy: 0, wz: 0}
         damping_ratio: 0
+
+######################## bracing ##################################
