@@ -31,6 +31,14 @@ class DRAKETRAJECTORIES_EXPORT PiecewiseFunction {
 
   double getEndTime() const;
 
+  void setStartTime(double time);
+
+  void setEndTime(double time);
+
+  void setStartTime(int segment_number, double time);
+
+  void setEndTime(int segment_number, double time);
+
   int getSegmentIndex(double t) const;
 
   const std::vector<double>& getSegmentTimes() const;
