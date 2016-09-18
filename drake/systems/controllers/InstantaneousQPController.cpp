@@ -153,6 +153,8 @@ void InstantaneousQPController::initialize() {
 
   controller_state.center_of_mass_observer_state = Eigen::Vector4d::Zero();
   controller_state.last_com_ddot = Eigen::Vector3d::Zero();
+
+  comdd_prev.setZero();
 }
 
 void InstantaneousQPController::loadConfigurationFromYAML(
@@ -979,7 +981,6 @@ int InstantaneousQPController::setupAndSolveQP(
   MatrixXd Jcom;
   VectorXd Jcomdotv;
 
-
   // whether we are using planar COM or full 3D com
   if (x0.size() == 6) {
     Jcom = J;
@@ -1105,13 +1106,16 @@ int InstantaneousQPController::setupAndSolveQP(
       // fqp -= y0.transpose() * Qy * D_ls * Jcom;
       // fqp *= w_zmp;
 
-      fqp = (C_ls * xlimp - y0).transpose() * Qy * D_ls
-          + (Jcomdotv - u0).transpose() * R_ls
-          + Jcomdotv.transpose() * D_ls.transpose() * Qy * D_ls
-          + (S * x_bar + 0.5 * s1).transpose() * B_ls;
-      fqp = w_zmp * fqp * Jcom;
 
-      //fqp = w_zmp * (Jcomdotv - comdd_d).transpose() * Jcom;
+      //fqp = (C_ls * xlimp - y0).transpose() * Qy * D_ls
+      //    + (Jcomdotv - u0).transpose() * R_ls
+      //    + Jcomdotv.transpose() * D_ls.transpose() * Qy * D_ls
+      //    + (S * x_bar + 0.5 * s1).transpose() * B_ls;
+      //fqp = w_zmp * fqp * Jcom;
+
+      fqp = w_zmp * (Jcomdotv - comdd_d).transpose() * Jcom;
+
+      fqp += params.w_comdd_delta * (Jcomdotv - comdd_prev.head(Jcom.rows())).transpose() * Jcom;
 
       fqp -= (w_qdd.array() * pid_out.qddot_des.array()).matrix().transpose();
       if(qp_output.qdd.size() == nq){
@@ -1405,9 +1409,9 @@ int InstantaneousQPController::setupAndSolveQP(
 
 
     if (nc > 0) {
-      Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
-
-      //Hqp = w_zmp * Jcom.transpose() * Jcom;
+      //Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
+      Hqp = w_zmp * Jcom.transpose() * Jcom;
+      Hqp += params.w_comdd_delta * Jcom.transpose() * Jcom;
 
       if (include_angular_momentum) {
         Hqp += Ak.transpose() * params.W_kdot * Ak;
@@ -1623,6 +1627,8 @@ int InstantaneousQPController::setupAndSolveQP(
 
   // reconstruct cartdd
   qp_output.comdd = Jcom * qp_output.qdd + Jcomdotv;
+  comdd_prev.head(Jcom.rows()) = qp_output.comdd;
+
   int sf_idx[3];
   sf_idx[0] = rpc.foot_ids[Side::LEFT];
   sf_idx[1] = rpc.foot_ids[Side::RIGHT];
