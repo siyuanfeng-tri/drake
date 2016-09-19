@@ -33,6 +33,16 @@ double PiecewiseFunction::getEndTime(int segment_number) const {
   return segment_times[segment_number + 1];
 }
 
+void PiecewiseFunction::setStartTime(int segment_number, double time) {
+  segmentNumberRangeCheck(segment_number);
+  segment_times[segment_number] = time;
+}
+
+void PiecewiseFunction::setEndTime(int segment_number, double time) {
+  segmentNumberRangeCheck(segment_number);
+  segment_times[segment_number + 1] = time;
+}
+
 double PiecewiseFunction::getDuration(int segment_number) const {
   return getEndTime(segment_number) - getStartTime(segment_number);
 }
@@ -41,6 +51,12 @@ double PiecewiseFunction::getStartTime() const { return getStartTime(0); }
 
 double PiecewiseFunction::getEndTime() const {
   return getEndTime(getNumberOfSegments() - 1);
+}
+
+void PiecewiseFunction::setStartTime(double time) { setStartTime(0, time); }
+
+void PiecewiseFunction::setEndTime(double time) {
+  setEndTime(getNumberOfSegments() - 1, time);
 }
 
 int PiecewiseFunction::getSegmentIndex(double t) const {

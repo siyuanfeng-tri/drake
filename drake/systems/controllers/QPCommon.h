@@ -290,6 +290,7 @@ struct QPControllerParams {
         mu(0.7),
         Jpdotv_multiplier(1.0),
         w_zmp(1.0),
+        w_comdd_delta(0),
         min_knee_angle(0.0),
         ankle_torque_alpha(0.0),
         use_center_of_mass_observer(false),
@@ -310,6 +311,7 @@ struct QPControllerParams {
   double contact_threshold;
   bool useTorqueAlphaFilter;
   double w_zmp;
+  double w_comdd_delta;
   double w_qdd_delta;
   double mu;
   double min_knee_angle;
@@ -356,6 +358,7 @@ struct QPControllerParams {
       << "contact_threshold: " << params.contact_threshold << std::endl
       << "useTorqueAlphaFilter: " << params.useTorqueAlphaFilter << std::endl
       << "w_zmp: " << params.w_zmp << std::endl
+      << "w_comdd_delta: " << params.w_comdd_delta << std::endl
       << "w_qdd_delta: " << params.w_qdd_delta << std::endl
       << "mu: " << params.mu << std::endl
       << "min_knee_angle: " << params.min_knee_angle << std::endl
