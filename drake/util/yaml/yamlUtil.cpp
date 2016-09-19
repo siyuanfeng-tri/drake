@@ -319,6 +319,7 @@ QPControllerParams loadSingleParamSet(const YAML::Node& config,
   params.w_grf = get(config, "w_grf").as<double>();
   params.w_zmp = get(config, "w_zmp").as<double>();
   params.w_comdd_delta = get(config, "w_comdd_delta").as<double>();
+  params.w_z_trq = get(config, "w_z_trq").as<double>();
   params.w_qdd_delta = get(config, "w_qdd_delta").as<double>();
   params.mu = get(config, "mu").as<double>();
   params.Jpdotv_multiplier = get(config, "Jpdotv_multiplier").as<double>();

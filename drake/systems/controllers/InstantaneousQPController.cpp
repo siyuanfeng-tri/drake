@@ -52,7 +52,6 @@ static void reconstructContactWrench(
     contact_output[j].wrench.setZero();
 
     // compute wrench wrt to body position
-    contact_output[j].wrench.setZero();
     contact_output[j].ref_point = robot.transformPoints(cache, Vector3d::Zero(), body_id, 0);
 
     for (size_t k = 0; k < contact_pts.size(); k++) {
@@ -1266,6 +1265,48 @@ int InstantaneousQPController::setupAndSolveQP(
 
   // contact normal force component stuff
   int beta_start = 0;
+  basisToContactWrench.resize(6*active_supports.size(), num_active_contact_pts * nd);
+  basisToContactWrench.setZero();
+  for (size_t c = 0; c < active_supports.size(); c++) {
+    const auto& active_support = active_supports[c];
+    const auto& contact_pts = active_support.contact_pts; // this is relative in body frame
+    int active_support_length = nd * contact_pts.size();
+    // force part
+    basisToContactWrench.block(6 * c + 3, beta_start, 3, active_support_length) = B.middleCols(beta_start, active_support_length);
+    // torque part
+    basisToContactWrench.block(6 * c, beta_start, 3, active_support_length) = B.middleCols(beta_start, active_support_length);
+    int body_id = active_support.body_idx;
+    Vector3d ref_pt = robot->transformPoints(cache, Vector3d::Zero(), body_id, 0);
+    for (size_t i = 0; i < contact_pts.size(); i++) {
+      Vector3d contact_pt = robot->transformPoints(cache, contact_pts[i], body_id, 0);
+      basisToContactWrench.block(6 * c, beta_start + nd * i, 3, nd) =
+        vectorToSkewSymmetric(contact_pt - ref_pt) * basisToContactWrench.block(6 * c, beta_start + nd * i, 3, nd);
+    }
+    beta_start += active_support_length;
+  }
+
+  for (size_t c = 0; c < active_supports.size(); c++) {
+    const auto& active_support = active_supports[c];
+
+    double upper = active_support.total_normal_force_upper_bound;
+    double lower = active_support.total_normal_force_lower_bound;
+
+    if (upper >= 1.5 * robot->getMass() * 9.81 || lower < 0 || upper < lower) {
+      upper = 1.5 * robot->getMass() * 9.81;
+      lower = 0;
+    }
+
+    // max
+    Ain.block(constraint_start_index, nq, 1, num_active_contact_pts * nd) = basisToContactWrench.row(6 * c + 5);
+    bin(constraint_start_index++) = upper;
+
+    // min
+    Ain.block(constraint_start_index, nq, 1, num_active_contact_pts * nd) = -basisToContactWrench.row(6 * c + 5);
+    bin(constraint_start_index++) = -lower;
+  }
+
+  /*
+  beta_start = 0;
   for (size_t c = 0; c < active_supports.size(); c++) {
     const auto& active_support = active_supports[c];
     int active_support_length = nd * active_support.contact_pts.size();
@@ -1292,6 +1333,7 @@ int InstantaneousQPController::setupAndSolveQP(
     // std::cout << "foot " << c << " beta start " << beta_start << " active_support_length " << active_support_length << " [u,l] " << active_support.total_normal_force_upper_bound << " " << active_support.total_normal_force_lower_bound << std::endl;
     beta_start += active_support_length;
   }
+  */
 
   for (int i = 0; i < n_ineq; i++) {
     // remove inf constraints---needed by gurobi
@@ -1491,7 +1533,13 @@ int InstantaneousQPController::setupAndSolveQP(
       }
     }
 
-    Qnfdiag = MatrixXd::Constant(nf, 1, params.w_grf + REG);
+    //Qnfdiag = MatrixXd::Constant(nf, 1, params.w_grf + REG);
+    Qnfdiag = (params.w_grf + REG) * MatrixXd::Identity(nf, nf);
+    for (int c = 0; c < active_supports.size(); c++) {
+      // penalize z trq
+      Qnfdiag += params.w_z_trq * basisToContactWrench.row(6 * c + 2).transpose() * basisToContactWrench.row(6 * c + 2);
+    }
+
     Qneps = MatrixXd::Constant(neps, 1, params.w_slack + REG);
 
     QBlkDiag[0] = &Hqp;

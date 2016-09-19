@@ -96,6 +96,8 @@ class InstantaneousQPController {
   Eigen::Vector3d
       Akdot_times_v;  // centroidal angular momentum velocity-dependent bias
 
+  Eigen::MatrixXd basisToContactWrench;
+
   // logical separation for the controller state, that is, things we expect to
   // change at every iteration
   // and which must persist to the next iteration
@@ -134,6 +136,7 @@ class InstantaneousQPController {
 
   void initialize();
   void loadConfigurationFromYAML(const std::string& control_config_filename);
+
 };
 
 void applyURDFModifications(std::unique_ptr<RigidBodyTree>& robot,

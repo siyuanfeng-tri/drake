@@ -23,7 +23,7 @@ kinematic_tree_metadata:
     neck: [neck_ay]
     back_bkz: back_bkz
     back_bky: back_bky
-    
+
 joint_names:
   - back_bkz
   - back_bky
@@ -191,7 +191,7 @@ qp_controller_params:
       zero_ankles_on_contact: false
       eta: 0.001
       delta_max: 10
-    integrator: 
+    integrator:
       eta: 0.0
     W_kdot: 0
     Kp_ang: 0
@@ -201,6 +201,7 @@ qp_controller_params:
     w_grf: 0.00
     mu: 1
     w_zmp: 100.0
+    w_z_trq: 0.0
     w_qdd_delta: 0.0
     Kp_accel: 1.0
     contact_threshold: 0.002
@@ -211,7 +212,7 @@ qp_controller_params:
       l_zmp: 10
       l_com: 6.324555320336759 # 2 * sqrt(l_zmp)
     input_specific:
-      DEFAULT: 
+      DEFAULT:
         hardware:
           joint_is_force_controlled: false
           joint_is_position_controlled: true
@@ -425,12 +426,12 @@ qp_controller_params:
         damping_ratio: 0.8
         weight: 0.01
     position_specific:
-      DEFAULT: 
+      DEFAULT:
         w_qdd: 0
         damping_ratio: 0.5
       neck_ay:
         w_qdd: 0
-      back_bkx: 
+      back_bkx:
         w_qdd: 0.001
         Kp: 50
         damping_ratio: 0.5
@@ -495,12 +496,12 @@ qp_controller_params:
         damping_ratio: 0.7
         weight: 0.05
     position_specific:
-      DEFAULT: 
+      DEFAULT:
         w_qdd: 0
         damping_ratio: 0.5
       neck_ay:
         w_qdd: 0
-      back_bkx: 
+      back_bkx:
         w_qdd: 0.0005
         Kp: 50
         damping_ratio: 0.5
@@ -705,19 +706,19 @@ qp_controller_params:
           clamp: 0
       l_arm_shx:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       l_arm_shz:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       l_arm_ely:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       l_arm_elx:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       l_arm_uwy:
         integrator:
@@ -733,19 +734,19 @@ qp_controller_params:
           clamp: 0
       r_arm_shx:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       r_arm_shz:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       r_arm_ely:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       r_arm_elx:
         integrator:
-          gain: 0 
+          gain: 0
           clamp: 0
       r_arm_uwy:
         integrator:
@@ -773,7 +774,7 @@ qp_controller_params:
           k_q_p: 0
           k_qd_p: 0
       back_bkx_motor:
-        hardware: 
+        hardware:
           joint_is_force_controlled: false
           joint_is_position_controlled: true
           k_q_p: 20
@@ -805,7 +806,7 @@ qp_controller_params:
           k_q_p: 10
           k_qd_p: 0.1
       l_leg_kny_motor:
-        hardware: 
+        hardware:
           joint_is_force_controlled: false
           joint_is_position_controlled: true
           k_q_p: 10
@@ -841,7 +842,7 @@ qp_controller_params:
           k_q_p: 10
           k_qd_p: 0.1
       r_leg_kny_motor:
-        hardware: 
+        hardware:
           joint_is_force_controlled: false
           joint_is_position_controlled: true
           k_q_p: 10
