@@ -1533,12 +1533,22 @@ int InstantaneousQPController::setupAndSolveQP(
       }
     }
 
-    //Qnfdiag = MatrixXd::Constant(nf, 1, params.w_grf + REG);
-    Qnfdiag = (params.w_grf + REG) * MatrixXd::Identity(nf, nf);
+    // version 1:
+    Qnfdiag = MatrixXd::Constant(nf, 1, params.w_grf + REG);
+
+    // version 2:
+    //Qnfdiag = (params.w_grf + REG) * MatrixXd::Identity(nf, nf);
+    //Qnfdiag += (params.w_grf + REG) * basisToContactWrench.transpose() * basisToContactWrench;
+
+    /*
     for (int c = 0; c < active_supports.size(); c++) {
       // penalize z trq
       Qnfdiag += params.w_z_trq * basisToContactWrench.row(6 * c + 2).transpose() * basisToContactWrench.row(6 * c + 2);
     }
+    */
+
+    // version 3:
+    //Qnfdiag = (params.w_grf + REG) * basisToContactWrench.transpose() * basisToContactWrench;
 
     Qneps = MatrixXd::Constant(neps, 1, params.w_slack + REG);
 
@@ -1672,6 +1682,14 @@ int InstantaneousQPController::setupAndSolveQP(
 
   // reconstruct grf.
   reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_output);
+  /*
+  VectorXd grff = basisToContactWrench * beta;
+  std::cout << "grf\n" << grff << std::endl;
+  for (int i = 0; i < qp_output.contact_output.size(); i++) {
+    std::cout << "jj\n" << basisToContactWrench.row(6 * i + 2) * beta << std::endl;
+    std::cout << "bbbb\n" << qp_output.contact_output[i].wrench << std::endl;
+  }
+  */
 
   // reconstruct cartdd
   qp_output.comdd = Jcom * qp_output.qdd + Jcomdotv;
