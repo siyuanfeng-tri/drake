@@ -15,6 +15,8 @@ struct QPControllerState {
   Eigen::VectorXd vref_integrator_state;
   Eigen::VectorXd q_integrator_state;
   std::set<int> active;
+  // first is val bin_lb_ub - Ain_lb_ub * x; should >= 0
+  std::set<std::pair<double, std::string>> active_ineq;
   int num_active_contact_pts;
 
   // center of mass observer

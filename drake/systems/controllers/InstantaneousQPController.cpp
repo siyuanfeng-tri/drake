@@ -86,6 +86,11 @@ void InstantaneousQPController::initialize() {
   for (int i = 0; i < robot->actuators.size(); i++) {
     umin(i) = robot->actuators.at(i).effort_limit_min;
     umax(i) = robot->actuators.at(i).effort_limit_max;
+    if (std::isinf(umin(i)) || std::isnan(umin(i)))
+      umin(i) = -500;
+    if (std::isinf(umax(i)) || std::isnan(umax(i)))
+      umax(i) = 500;
+
     actuator_name_to_input_idx[robot->actuators.at(i).name] = i;
   }
 
@@ -1220,6 +1225,12 @@ int InstantaneousQPController::setupAndSolveQP(
   int n_ineq = 2 * nu + 2 * 6 * desired_body_accelerations.size();
   // add a max and min bound on the normal force per contact
   n_ineq += 2 * active_supports.size();
+  bool rebuild_ineq_names = false;
+  if (n_ineq != ineq_names.size() - 2*nparams) {
+    ineq_names.resize(n_ineq + 2*nparams);
+    rebuild_ineq_names = true;
+  }
+
   MatrixXd Ain =
       MatrixXd::Zero(n_ineq, nparams);  // note: obvious sparsity here
   VectorXd bin = VectorXd::Zero(n_ineq);
@@ -1235,6 +1246,7 @@ int InstantaneousQPController::setupAndSolveQP(
 
   Ain.block(nu, 0, nu, nparams) = -1 * Ain.block(0, 0, nu, nparams);
   bin.segment(nu, nu) = B_act.transpose() * C_act - umin;
+
 
 
   // constraints on body accelerations, using slack variables
@@ -1257,6 +1269,7 @@ int InstantaneousQPController::setupAndSolveQP(
     bin.segment(constraint_start_index, 6) =
         -Jbdotv + desired_body_accelerations[i].accel_bounds.max;
     constraint_start_index += 6;
+
     Ain.block(constraint_start_index, 0, 6, robot->num_positions) = -Jb;
     bin.segment(constraint_start_index, 6) =
         Jbdotv - desired_body_accelerations[i].accel_bounds.min;
@@ -1291,8 +1304,8 @@ int InstantaneousQPController::setupAndSolveQP(
     double upper = active_support.total_normal_force_upper_bound;
     double lower = active_support.total_normal_force_lower_bound;
 
-    if (upper >= 1.5 * robot->getMass() * 9.81 || lower < 0 || upper < lower) {
-      upper = 1.5 * robot->getMass() * 9.81;
+    if (upper >= 3 * robot->getMass() * 9.81 || lower < 0 || upper < lower) {
+      upper = 3 * robot->getMass() * 9.81;
       lower = 0;
     }
 
@@ -1305,39 +1318,10 @@ int InstantaneousQPController::setupAndSolveQP(
     bin(constraint_start_index++) = -lower;
   }
 
-  /*
-  beta_start = 0;
-  for (size_t c = 0; c < active_supports.size(); c++) {
-    const auto& active_support = active_supports[c];
-    int active_support_length = nd * active_support.contact_pts.size();
-    const auto& B_per_foot = B.middleCols(beta_start, active_support_length);
-    // TODO: this is not rotated. So really just capping Fz in the world frame
-    MatrixXd B_rotate = B_per_foot;
-
-    double upper = active_support.total_normal_force_upper_bound;
-    double lower = active_support.total_normal_force_lower_bound;
-
-    if (upper >= 1.5 * robot->getMass() * 9.81 || lower < 0 || upper < lower) {
-      upper = 1.5 * robot->getMass() * 9.81;
-      lower = 0;
-    }
-
-    // max
-    Ain.block(constraint_start_index, nq + beta_start, 1, active_support_length) = B_rotate.row(2);
-    bin(constraint_start_index++) = upper;
-
-    // min
-    Ain.block(constraint_start_index, nq + beta_start, 1, active_support_length) = -B_rotate.row(2);
-    bin(constraint_start_index++) = -lower;
-
-    // std::cout << "foot " << c << " beta start " << beta_start << " active_support_length " << active_support_length << " [u,l] " << active_support.total_normal_force_upper_bound << " " << active_support.total_normal_force_lower_bound << std::endl;
-    beta_start += active_support_length;
-  }
-  */
-
   for (int i = 0; i < n_ineq; i++) {
     // remove inf constraints---needed by gurobi
     if (std::isinf(double(bin(i)))) {
+      // max trq
       Ain.row(i) = 0 * Ain.row(i);
       bin(i) = 0;
     }
@@ -1355,16 +1339,66 @@ int InstantaneousQPController::setupAndSolveQP(
   lb.tail(neps) = -params.slack_limit * VectorXd::Ones(neps);
   ub.tail(neps) = params.slack_limit * VectorXd::Ones(neps);
 
+  // build constaint names
+  if (rebuild_ineq_names) {
+    int index = 0;
+    // trq
+    for (int i = 0; i < nu; i++) {
+      ineq_names[i] = "trq[" + robot->actuators[i].name + "]_max";
+      ineq_names[nu+i] = "trq[" + robot->actuators[i].name + "]_min";
+    }
+    index += 2 * nu;
+
+    // xdd
+    for (int i = 0; i < desired_body_accelerations.size(); i++) {
+      for (int j = 0; j < 6; j++)
+        ineq_names[index + j] = "xdd[" + qp_input.body_motion_data[i].body_or_frame_name + std::to_string(j) + "]_max";
+      index += 6;
+      for (int j = 0; j < 6; j++)
+        ineq_names[index + j] = "xdd[" + qp_input.body_motion_data[i].body_or_frame_name + std::to_string(j) + "]_min";
+      index += 6;
+    }
+
+    // Fz
+    for (size_t c = 0; c < active_supports.size(); c++) {
+      ineq_names[index++] = "Fz[" + qp_input.support_data[c].body_name + "]_Fz_max";
+      ineq_names[index++] = "Fz[" + qp_input.support_data[c].body_name + "]_Fz_min";
+    }
+
+    // lb: qdd, nf, neps
+    for (int i = 0; i < nq; i++)
+      ineq_names[index+i] = "vd[" + robot->getPositionName(i) + "]_min";
+    index += nq;
+    for (int i = 0; i < nf; i++)
+      ineq_names[index+i] = "basis[" + std::to_string(i) + "]_min";
+    index += nf;
+    for (int i = 0; i < neps; i++)
+      ineq_names[index+i] = "slack[" + std::to_string(i) + "]_min";
+    index += neps;
+
+    // ub: qdd, nf, neps
+    for (int i = 0; i < nq; i++)
+      ineq_names[index+i] = "vd[" + robot->getPositionName(i) + "]_max";
+    index += nq;
+    for (int i = 0; i < nf; i++)
+      ineq_names[index+i] = "basis[" + std::to_string(i) + "]_max";
+    index += nf;
+    for (int i = 0; i < neps; i++)
+      ineq_names[index+i] = "slack[" + std::to_string(i) + "]_max";
+    index += neps;
+
+    for (size_t i = 0; i < ineq_names.size(); i++) {
+      std::cout << ineq_names[i] << std::endl;
+    }
+  }
 
   // these will be the variables in the optimization
   VectorXd alpha(nparams);
-
 
   // just cost matrices of form nf'*Qnfdiag*nf, cost on ground reaction forces
   MatrixXd Qnfdiag(nf, 1), Qneps(neps, 1);
   std::vector<MatrixXd*> QBlkDiag(
       nc > 0 ? 3 : 1);  // nq, nf, neps   // this one is for gurobi
-
 
   // REG = 1e-8, here for numerical reasons
   VectorXd w = (w_qdd.array() + REG).matrix();
@@ -1448,7 +1482,6 @@ int InstantaneousQPController::setupAndSolveQP(
     // if (info<0)   mexPrintf("fastQP info = %d.  Calling gurobi.\n", info);
   } else {
 #endif
-
 
     if (nc > 0) {
       //Hqp = w_zmp * Jcom.transpose() * R_DQyD_ls * Jcom;
@@ -1566,6 +1599,11 @@ int InstantaneousQPController::setupAndSolveQP(
         MatrixXd::Identity(nparams, nparams);
     bin_lb_ub << bin, -lb, ub;
 
+    if (ineq_names.size() != Ain_lb_ub.rows()) {
+      std::cout << Ain_lb_ub.rows() << " " << ineq_names.size() << " " << std::endl;
+      throw std::runtime_error("wrong size of ineq_names");
+    }
+
     for (std::set<int>::iterator it = controller_state.active.begin();
          it != controller_state.active.end(); it++) {
       if (std::isnan(bin_lb_ub(*it)) || std::isinf(bin_lb_ub(*it))) {
@@ -1631,16 +1669,12 @@ int InstantaneousQPController::setupAndSolveQP(
     if (std::isnan(qp_output.u(i))) qp_output.u(i) = 0;
   }
 
-  /*
-   * sfeng aug 28, this helps reduce the torque tracking / vel integrator for the left knee.
-   * solves the pelvis lowering issue for ssl as well. going to try offset the torque offset
-   * directly in the turbo driver.
-  for (int i = 0; i < robot->actuators.size(); i++) {
-    if (robot->actuators[i].name.compare("leftKneePitch") == 0) {
-      qp_output.u[i] -= 10;
-    }
+  // set active set names
+  controller_state.active_ineq.clear();
+  VectorXd ineq_val = bin_lb_ub - Ain_lb_ub * alpha; // should be >= 0
+  for (std::set<int>::const_iterator it = controller_state.active.begin(); it != controller_state.active.end(); it++) {
+    controller_state.active_ineq.insert(std::pair<double, std::string>(ineq_val[*it], ineq_names[*it]));
   }
-  */
 
   // low pass filter the output trq
   // only if enabled in the params
@@ -1682,14 +1716,6 @@ int InstantaneousQPController::setupAndSolveQP(
 
   // reconstruct grf.
   reconstructContactWrench(*robot, cache, active_supports, B, beta, qp_output.contact_output);
-  /*
-  VectorXd grff = basisToContactWrench * beta;
-  std::cout << "grf\n" << grff << std::endl;
-  for (int i = 0; i < qp_output.contact_output.size(); i++) {
-    std::cout << "jj\n" << basisToContactWrench.row(6 * i + 2) * beta << std::endl;
-    std::cout << "bbbb\n" << qp_output.contact_output[i].wrench << std::endl;
-  }
-  */
 
   // reconstruct cartdd
   qp_output.comdd = Jcom * qp_output.qdd + Jcomdotv;

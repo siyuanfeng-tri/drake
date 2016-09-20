@@ -89,6 +89,8 @@ class InstantaneousQPController {
   Eigen::VectorXd qdd_lb;
   Eigen::VectorXd qdd_ub;
 
+  std::vector<std::string> ineq_names;
+
   // momentum controller-specific
   Eigen::MatrixXd Ag;      // centroidal momentum matrix
   Eigen::Vector6d Agdot_times_v;  // centroidal momentum velocity-dependent bias
