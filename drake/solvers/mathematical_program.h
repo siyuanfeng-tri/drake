@@ -312,6 +312,18 @@ class DRAKEOPTIMIZATION_EXPORT MathematicalProgram {
     return variable_views_.back();
   }
 
+  /**
+   * @param name of the variable
+   * @return The DecisionVariableView of first variable that matches \param name.
+   */
+  const DecisionVariableView GetVariable(const std::string& name) const {
+    for (auto it = variable_views_.begin(); it != variable_views_.end(); it++) {
+      if (name.compare(it->name()) == 0)
+        return *it;
+    }
+    throw std::runtime_error("unable to find variable: " + name);
+  }
+
   //    const DecisionVariable& AddIntegerVariables(size_t num_new_vars,
   //    std::string name);
   //  ...
