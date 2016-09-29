@@ -16,7 +16,9 @@ void test_sim() {
   DRAKE_ASSERT(context->get_num_input_ports() == 1);
   DRAKE_ASSERT(output->get_num_ports() == 1);
 
-  context.set_time(0);
+  // init state
+  context->set_time(0);
+  context->get_mutable_state()->continuous_state->get_mutable_state()->SetFromVector(sim.get_default_initial_state());
 }
 
 int main() {

@@ -64,6 +64,15 @@ class System2DummyValkyrieSim : public LeafSystem<double> {
     return std::unique_ptr<SystemOutput<double>>(output.release());
   }
 
+  inline int size_of_state() const { return robot_->number_of_positions() + robot_->number_of_velocities(); }
+  Eigen::VectorXd get_default_initial_state() const { 
+    Eigen::VectorXd x0(size_of_state());
+    HumanoidStatus rs(*robot_);
+    x0.segment(0, robot_->number_of_positions()) = rs.GetNominalPosition();
+    x0.segment(robot_->number_of_positions(), robot_->number_of_velocities()).setZero();
+    return x0;
+  }
+
  private:
   std::unique_ptr<RigidBodyTree> robot_;
   double dt_;
