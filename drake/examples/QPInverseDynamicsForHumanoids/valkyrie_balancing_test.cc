@@ -51,7 +51,9 @@ GTEST_TEST(testQPInverseDynamicsController, testStanding) {
 
   // Get an example controller that tracks a fixed point.
   input = MakeExampleQPInput(robot);
-  TrackThis(robot_status, &input);
+  VectorSetpoint joint_PDff(q, Eigen::VectorXd::Zero(q.size()), Eigen::VectorXd::Zero(q.size()), Eigen::VectorXd::Constant(q.size(), 20), Eigen::VectorXd::Constant(q.size(), 8));
+  CartesianSetpoint pelvis_PDff(robot_status.pelvis().pose(), Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero(), Eigen::Vector6d::Constant(20), Eigen::Vector6d::Constant(8));
+  CartesianSetpoint torso_PDff(robot_status.torso().pose(), Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero(), Eigen::Vector6d::Constant(20), Eigen::Vector6d::Constant(8));
 
   // Perturb initial condition.
   v[robot_status.name_to_position_index().at("torsoPitch")] += 0.3;
@@ -79,6 +81,13 @@ GTEST_TEST(testQPInverseDynamicsController, testStanding) {
       input.mutable_desired_joint_motions().mutable_weights()[idx] = -1;
     }
 
+    // Update desired accelerations.
+    input.mutable_desired_body_motions().at("pelvis").mutable_accelerations() =
+      pelvis_PDff.ComputeTargetAcceleration(robot_status.pelvis().pose(), robot_status.pelvis().velocity());
+    input.mutable_desired_body_motions().at("torso").mutable_accelerations() =
+      torso_PDff.ComputeTargetAcceleration(robot_status.torso().pose(), robot_status.torso().velocity());
+    input.mutable_desired_joint_motions().mutable_accelerations() =
+      joint_PDff.ComputeTargetAcceleration(robot_status.position(), robot_status.velocity());
     input.mutable_desired_comdd() =
       (Kp_com.array() * (desired_com - robot_status.com()).array() -
        Kd_com.array() * robot_status.comd().array()).matrix();
