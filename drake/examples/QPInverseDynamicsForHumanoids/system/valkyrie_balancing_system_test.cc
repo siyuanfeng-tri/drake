@@ -84,15 +84,15 @@ void test() {
   // Set plan eval's desired to the initial state.
   plan_eval->SetupDesired(*rs0);
   // Perturb the initial condition.
-  val_sim->PerturbVelocity("torsoPitchdot", 0.3, val_sim_context);
+  val_sim->PerturbVelocity("torsoPitchdot", 1, val_sim_context);
 
   // Simulation.
   // dt = 4e-3 is picked arbitrarily to ensure the test finishes within a
   // reasonable amount of time.
   simulator.reset_integrator<ExplicitEulerIntegrator<double>>(
-      *diagram, 4e-3, simulator.get_mutable_context());
+      *diagram, 1e-3, simulator.get_mutable_context());
   simulator.Initialize();
-  simulator.StepTo(2.0);
+  simulator.StepTo(20.0);
 
   // Check final state.
   // Since the feet have equality constraints set to 0 in the qp controller,

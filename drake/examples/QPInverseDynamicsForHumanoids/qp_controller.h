@@ -5,7 +5,8 @@
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/solvers/mathematical_program.h"
-#include "drake/solvers/snopt_solver.h"
+//#include "drake/solvers/snopt_solver.h"
+#include "drake/solvers/gurobi_solver.h"
 
 namespace drake {
 namespace examples {
@@ -259,6 +260,8 @@ class ContactInformation {
       throw std::runtime_error(
           "Number of basis per contact point must be >= 3.");
   }
+
+
 
   /**
    * Computes a matrix (Basis) that converts a vector of scalars (Beta) to
@@ -886,7 +889,8 @@ class QPController {
   drake::solvers::MathematicalProgram prog_;
   // TODO(siyuan.feng@tri.global): switch to other faster solvers when they are
   // ready: gurobi / fastQP
-  drake::solvers::SnoptSolver solver_;
+  drake::solvers::GurobiSolver solver_;
+  //drake::solvers::GurobiSolver solver_;
 
   // pointers to different cost / constraint terms inside prog_
   std::shared_ptr<drake::solvers::LinearEqualityConstraint> eq_dynamics_;

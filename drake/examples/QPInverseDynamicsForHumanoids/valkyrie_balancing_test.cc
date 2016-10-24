@@ -54,29 +54,40 @@ GTEST_TEST(testQPInverseDynamicsController, testStanding) {
   TrackThis(robot_status, &input);
 
   // Perturb initial condition.
-  q[robot_status.name_to_position_index().at("torsoPitch")] += 0.1;
+  v[robot_status.name_to_position_index().at("torsoPitch")] += 0.3;
   robot_status.Update(
       0, q, v, Eigen::VectorXd::Zero(robot_status.robot().actuators.size()),
       Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero());
 
   // dt = 4e-3 is picked arbitrarily to ensure the test finishes within a
   // reasonable amount of time.
-  double dt = 4e-3;
+  double dt = 3e-3;
   double time = 0;
 
   // Feet should be stationary.
   EXPECT_TRUE(robot_status.foot(Side::LEFT).velocity().norm() < 1e-10);
   EXPECT_TRUE(robot_status.foot(Side::RIGHT).velocity().norm() < 1e-10);
 
-  while (time < 2) {
+  int tick_ctr = 0;
+  while (time < 4) {
+    for (const std::string& joint_name : robot_status.arm_joint_names()) {
+      int idx = robot_status.name_to_position_index().at(joint_name);
+      input.mutable_desired_joint_motions().mutable_weights()[idx] = -1;
+    }
+    for (const std::string& joint_name : robot_status.neck_joint_names()) {
+      int idx = robot_status.name_to_position_index().at(joint_name);
+      input.mutable_desired_joint_motions().mutable_weights()[idx] = -1;
+    }
+
     input.mutable_desired_comdd() =
       (Kp_com.array() * (desired_com - robot_status.com()).array() -
        Kd_com.array() * robot_status.comd().array()).matrix();
+
+
     int status = con.Control(robot_status, input, &output);
 
     if (status) {
-      //std::cout << input;
-      break;
+      throw std::runtime_error("can't solve.");
     }
 
     // Dummy integration.
@@ -90,11 +101,12 @@ GTEST_TEST(testQPInverseDynamicsController, testStanding) {
     //std::cout << "rs.v: " << robot_status.velocity().transpose() << std::endl;
     //std::cout << input;
     //exit(0);
-
     robot_status.Update(time, q, v, output.joint_torque(),
                         Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero());
     //std::cout << output;
+    tick_ctr++;
   }
+  std::cout << "total ticks: " << tick_ctr << std::endl;
 
   // Check final state.
   // Since the feet have equality constraints set to 0 in the qp controller,
@@ -104,6 +116,9 @@ GTEST_TEST(testQPInverseDynamicsController, testStanding) {
   EXPECT_TRUE(robot_status.foot(Side::LEFT).velocity().norm() < 1e-6);
   EXPECT_TRUE(robot_status.foot(Side::RIGHT).velocity().norm() < 1e-6);
 
+  for (int i = 0; i < q.size(); i++) {
+    std::cout << "rs.q: " << robot.get_position_name(i) << " " << (q[i]-q_ini[i]) << std::endl;
+  }
   EXPECT_TRUE(drake::CompareMatrices(q, q_ini, 1e-4,
                                      drake::MatrixCompareType::absolute));
   EXPECT_TRUE(drake::CompareMatrices(
