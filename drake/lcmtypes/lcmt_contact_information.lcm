@@ -1,0 +1,16 @@
+package drake;
+
+struct lcmt_contact_information {
+  int64_t timestamp;
+
+  string body_name;
+  int32_t num_contact_points;
+  int32_t num_basis_per_contact_point;
+  double contact_points[3][num_contact_points];
+  double normal[3];
+  double mu;
+  double Kd;
+
+  double weight;
+  int8_t acceleration_constraint_type;
+}

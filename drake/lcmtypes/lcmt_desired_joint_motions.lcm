@@ -1,0 +1,10 @@
+package drake;
+
+struct lcmt_desired_joint_motions {
+  int64_t timestamp;
+
+  int32_t num_joints;
+  string joint_names[num_joints];
+
+  lcmt_constrained_values constrained_accelerations;
+}

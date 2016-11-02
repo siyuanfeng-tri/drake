@@ -12,6 +12,11 @@ lcm_wrap_types(
   CPP_HEADERS cpp_install_headers
   PYTHON_SOURCES python_install_sources
   ${java_args}
+  lcmt_constrained_values.lcm
+  lcmt_contact_information.lcm
+  lcmt_desired_centroidal_momentum_dot.lcm
+  lcmt_desired_joint_motions.lcm
+  lcmt_desired_body_motion.lcm
   lcmt_body_motion_data.lcm
   lcmt_body_wrench_data.lcm
   lcmt_drake_signal.lcm

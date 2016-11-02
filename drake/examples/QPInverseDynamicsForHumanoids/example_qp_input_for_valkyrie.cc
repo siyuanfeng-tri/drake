@@ -31,14 +31,14 @@ QPInput MakeExampleQPInput(const RigidBodyTree& robot) {
   pelvdd_d.SetConstraintType({0, 2}, ConstraintType::Soft);
   pelvdd_d.SetConstraintType({1}, ConstraintType::Hard);
   // Wipe out the weights for the position part.
-  input.mutable_desired_body_motions().emplace(pelvdd_d.name(), pelvdd_d);
+  input.mutable_desired_body_motions().emplace(pelvdd_d.body_name(), pelvdd_d);
 
   DesiredBodyMotion torsodd_d(*robot.FindBody("torso"));
   torsodd_d.mutable_weights().head<3>() = Eigen::Vector3d(-1, 1, 1);
   torsodd_d.SetConstraintType({1, 2}, ConstraintType::Soft);
   torsodd_d.SetConstraintType({0}, ConstraintType::Hard);
   // Wipe out the weights for the position part.
-  input.mutable_desired_body_motions().emplace(torsodd_d.name(), torsodd_d);
+  input.mutable_desired_body_motions().emplace(torsodd_d.body_name(), torsodd_d);
 
   // Weights are set arbitrarily by the control designer, these typically
   // require tuning.

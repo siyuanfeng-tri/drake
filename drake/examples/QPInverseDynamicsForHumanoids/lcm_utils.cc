@@ -12,6 +12,186 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+int8_t EncodeConstraintType(ConstraintType type) {
+  switch (type) {
+    case ConstraintType::Hard:
+      return lcmt_constrained_values::HARD;
+    case ConstraintType::Skip:
+      return lcmt_constrained_values::SKIP;
+    case ConstraintType::Soft:
+      return lcmt_constrained_values::SOFT;
+    default:
+      throw std::runtime_error("unknown constraint type");
+  }
+}
+
+ConstraintType DecodeConstraintType(int8_t type) {
+  switch (type) {
+    case lcmt_constrained_values::HARD:
+      return ConstraintType::Hard;
+    case lcmt_constrained_values::SKIP:
+      return ConstraintType::Skip;
+    case lcmt_constrained_values::SOFT:
+      return ConstraintType::Soft;
+    default:
+      throw std::runtime_error("unknown constraint type");
+  }
+}
+
+void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion) {
+  if (!body_motion) return;
+
+  *body_motion = DesiredBodyMotion(*robot.FindBody(msg.body_name));
+  body_motion->mutable_control_during_contact() = msg.control_during_contact;
+  DecodeConstrainedValues(msg.constrained_accelerations, body_motion);
+
+  if (!body_motion->is_valid()) {
+    throw std::runtime_error("invalid DesiredBodyMotion");
+  }
+}
+
+void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_body_motion* msg) {
+  if (!msg) return;
+  if (!body_motion.is_valid()) {
+    throw std::runtime_error("invalid DesiredBodyMotion");
+  }
+
+  msg->body_name = body_motion.body().get_name();
+  msg->control_during_contact = body_motion.control_during_contact();
+  EncodeConstrainedValues(body_motion, &(msg->constrained_accelerations));
+}
+
+void DecodeDesiredJointMotions(const lcmt_desired_joint_motions& msg, DesiredJointMotions* joint_motions) {
+  if (!joint_motions) return;
+
+  *joint_motions = DesiredJointMotions(msg.joint_names);
+  DecodeConstrainedValues(msg.constrained_accelerations, joint_motions);
+
+  if (!joint_motions->is_valid()) {
+    throw std::runtime_error("invalid DesiredJointMotions");
+  }
+}
+
+void EncodeDesiredJointMotions(const DesiredJointMotions& joint_motions, lcmt_desired_joint_motions* msg) {
+  if (!msg) return;
+  if (!joint_motions.is_valid()) {
+    throw std::runtime_error("invalid DesiredJointMotions");
+  }
+
+  msg->num_joints = joint_motions.size();
+  msg->joint_names = joint_motions.joint_names();
+  EncodeConstrainedValues(joint_motions, &(msg->constrained_accelerations));
+}
+
+void DecodeDesiredCentroidalMomentumDot(const lcmt_desired_centroidal_momentum_dot& msg, DesiredCentroidalMomentumDot* momdot) {
+  if (!momdot) return;
+  DecodeConstrainedValues(msg.centroidal_momentum_dot, momdot);
+  if (!momdot->is_valid()) {
+    throw std::runtime_error("invalid DesiredCentroidalMomentumDot");
+  }
+}
+
+void EncodeDesiredCentroidalMomentumDot(const DesiredCentroidalMomentumDot& momdot, lcmt_desired_centroidal_momentum_dot* msg) {
+  if (!msg) return;
+  if (!momdot.is_valid()) {
+    throw std::runtime_error("invalid DesiredCentroidalMomentumDot");
+  }
+
+  EncodeConstrainedValues(momdot, &(msg->centroidal_momentum_dot));
+}
+
+void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValues* val) {
+  if (!val) return;
+  if (msg.size != static_cast<int>(msg.types.size()) ||
+      msg.types.size() != msg.weights.size() ||
+      msg.types.size() != msg.values.size()) {
+    throw std::runtime_error("lcmt_constrained_values has inconsistent dimensions.");
+  }
+
+  *val = ConstrainedValues(msg.size);
+  for (int i = 0; i < msg.size; ++i) {
+    val->mutable_constraint_type(i) = DecodeConstraintType(msg.types[i]);
+    val->mutable_value(i) = msg.values[i];
+    val->mutable_weight(i) = msg.weights[i];
+  }
+
+  if (!val->is_valid()) {
+    throw std::runtime_error("invalid ConstrainedValues");
+  }
+}
+
+void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_values* msg) {
+  if (!msg) return;
+  if (!val.is_valid()) {
+    throw std::runtime_error("invalid ConstrainedValues");
+  }
+
+  msg->size = val.size();
+  msg->types.resize(msg->size);
+  msg->weights.resize(msg->size);
+  msg->values.resize(msg->size);
+
+  for (int i = 0; i < static_cast<int>(msg->size); ++i) {
+    msg->types[i] = EncodeConstraintType(val.constraint_type(i));
+    msg->weights[i] = val.weight(i);
+    msg->values[i] = val.value(i);
+  }
+}
+
+void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_information& msg, ContactInformation* info) {
+  if (!info) return;
+  *info = ContactInformation(*robot.FindBody(msg.body_name), msg.num_basis_per_contact_point);
+  info->mutable_contact_points().resize(msg.num_contact_points);
+  if (msg.contact_points.size() != 3) {
+    throw std::runtime_error("invalid contact_points dimensions");
+  }
+  for (int i = 0; i < msg.num_contact_points; ++i) {
+    if (static_cast<int>(msg.contact_points[i].size()) != msg.num_contact_points) {
+      throw std::runtime_error("invalid contact_points dimensions");
+    }
+    info->mutable_contact_points()[i] = Eigen::Vector3d(msg.contact_points[0][i], msg.contact_points[1][i], msg.contact_points[2][i]);
+  }
+  info->mutable_normal() = Eigen::Vector3d(msg.normal[0], msg.normal[1], msg.normal[2]);
+  info->mutable_mu() = msg.mu;
+  info->mutable_Kd() = msg.Kd;
+
+  info->mutable_acceleration_constraint_type() = DecodeConstraintType(msg.acceleration_constraint_type);
+  info->mutable_weight() = msg.weight;
+
+  if (!info->is_valid()) {
+    throw std::runtime_error("invalid ContactInformation.");
+  }
+}
+
+void EncodeContactInformation(const ContactInformation& info, lcmt_contact_information* msg) {
+  if (!msg) return;
+  if (!info.is_valid()) {
+    throw std::runtime_error("invalid ContactInformation.");
+  }
+
+  msg->body_name = info.body().get_name();
+  msg->num_contact_points = static_cast<int>(info.contact_points().size());
+  msg->num_basis_per_contact_point = info.num_basis_per_contact_point();
+  msg->contact_points.resize(3);
+  for (int i = 0; i < 3; ++i) {
+    msg->contact_points[i].resize(msg->num_contact_points);
+    for (int j = 0; j < msg->num_contact_points; ++j) {
+      msg->contact_points[i][j] = info.contact_points()[j][i];
+    }
+  }
+
+  for (int i = 0; i < 3; ++i) {
+    msg->normal[i] = info.normal()[i];
+  }
+
+  msg->mu = info.mu();
+  msg->Kd = info.Kd();
+
+  msg->acceleration_constraint_type = EncodeConstraintType(info.acceleration_constraint_type());
+  msg->weight = info.weight();
+}
+
+// TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
                             double time, const Eigen::VectorXd& q,
                             const Eigen::VectorXd& qd,
@@ -19,6 +199,7 @@ void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
                             const Vector6<double>& l_foot_wrench,
                             const Vector6<double>& r_foot_wrench,
                             bot_core::robot_state_t* msg) {
+  if (!msg) return;
   // Assuming q and qd belongs to a RPY floating based robot, and all the other
   // joints are fully actuated.
   const int floating_base_dim_q_dim = kSpaceDimension + kRpySize;
@@ -77,11 +258,13 @@ void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
   EncodeTwist(vel, msg->twist);
 }
 
+// TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 void DecodeRobotStateLcmMsg(
     const bot_core::robot_state_t& msg,
     const std::unordered_map<std::string, int>& q_name_to_index, double* time,
     Eigen::VectorXd* q, Eigen::VectorXd* qd, Eigen::VectorXd* joint_torque,
     Vector6<double>* l_foot_wrench, Vector6<double>* r_foot_wrench) {
+  if (!q || !qd || !joint_torque || !l_foot_wrench || !r_foot_wrench) return;
   const int floating_base_dim_q_dim = kSpaceDimension + kRpySize;
   if (q->size() != qd->size() ||
       q->size() != joint_torque->size() + floating_base_dim_q_dim) {

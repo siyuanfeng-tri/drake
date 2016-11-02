@@ -1,0 +1,7 @@
+package drake;
+
+struct lcmt_desired_centroidal_momentum_dot {
+  int64_t timestamp;
+
+  lcmt_constrained_values centroidal_momentum_dot;
+}

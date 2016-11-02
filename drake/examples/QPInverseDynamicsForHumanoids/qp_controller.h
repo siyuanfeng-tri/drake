@@ -95,7 +95,9 @@ class ConstrainedValues {
     }
   }
 
-  bool is_valid(int dim) const {
+  inline virtual bool is_valid() const { return is_valid(size()); }
+
+  bool virtual is_valid(int dim) const {
     bool ret = weights_.size() == values_.size();
     ret &= static_cast<int>(constraint_types_.size()) == weights_.size();
     ret &= weights_.size() == dim;
@@ -108,6 +110,20 @@ class ConstrainedValues {
     ret &= weights_.allFinite();
     ret &= values_.allFinite();
     return ret;
+  }
+
+  virtual bool operator== (const ConstrainedValues& other) const {
+    bool equal = constraint_types_.size() == other.constraint_types_.size();
+    if (!equal)
+      return equal;
+
+    for (size_t i = 0; i < constraint_types_.size(); ++i) {
+      equal &= constraint_types_[i] == other.constraint_types_[i];
+    }
+    equal &= weights_.isApprox(other.weights_);
+    equal &= values_.isApprox(other.values_);
+
+    return equal;
   }
 
   // Getters
@@ -350,6 +366,24 @@ class ContactInformation {
     return ret;
   }
 
+  bool operator== (const ContactInformation& other) const {
+    bool equal = body_ == other.body_;
+    equal &= contact_points_.size() == other.contact_points_.size();
+    if (!equal)
+      return equal;
+    for (size_t i = 0; i < contact_points_.size(); ++i) {
+      equal &= contact_points_[i].isApprox(other.contact_points_[i]);
+    }
+    equal &= normal_.isApprox(other.normal_);
+    equal &= num_basis_per_contact_point_ == other.num_basis_per_contact_point_;
+    equal &= mu_ == other.mu_;
+    equal &= Kd_ == other.Kd_;
+    equal &= weight_ == other.weight_;
+    equal &= acceleration_constraint_type_ == other.acceleration_constraint_type_;
+
+    return equal;
+  }
+
   inline const std::string& name() const { return body_->get_name(); }
   inline int num_contact_points() const {
     return static_cast<int>(contact_points_.size());
@@ -468,9 +502,18 @@ class DesiredBodyMotion : public ConstrainedValues {
     return row_name[i];
   }
 
+  virtual bool operator== (const DesiredBodyMotion& other) const {
+    bool equal = body_ == other.body_;
+    equal &= control_during_contact_ == other.control_during_contact_;
+
+    equal &= this->ConstrainedValues::operator==(other);
+
+    return equal;
+  }
+
   // Getters
   inline const RigidBody& body() const { return *body_; }
-  inline const std::string& name() const { return body_->get_name(); }
+  inline const std::string& body_name() const { return body_->get_name(); }
   inline bool control_during_contact() const { return control_during_contact_; }
 
   // Setters
@@ -488,7 +531,7 @@ class DesiredBodyMotion : public ConstrainedValues {
 inline std::ostream& operator<<(std::ostream& out,
                                 const DesiredBodyMotion& input) {
   for (int i = 0; i < kTwistSize; ++i) {
-    out << "desired " << input.name() << input.get_row_name(i)
+    out << "desired " << input.body_name() << input.get_row_name(i)
         << " acc: " << input.values()[i] << " weight: " << input.weights()[i]
         << " " << input.constraint_types()[i];
   }
@@ -508,26 +551,40 @@ class DesiredJointMotions : public ConstrainedValues {
  public:
   DesiredJointMotions() {}
   explicit DesiredJointMotions(const std::vector<std::string>& names)
-      : ConstrainedValues(static_cast<int>(names.size())), names_(names) {}
+      : ConstrainedValues(static_cast<int>(names.size())), joint_names_(names) {}
 
+  inline bool is_valid() const { return DesiredJointMotions::is_valid(size()); }
   bool is_valid(int dim) const {
-    bool ret = static_cast<int>(names_.size()) == dim;
+    bool ret = static_cast<int>(joint_names_.size()) == dim;
     ret &= ConstrainedValues::is_valid(dim);
     return ret;
   }
 
+  virtual bool operator== (const DesiredJointMotions& other) const {
+    bool equal = joint_names_.size() == other.joint_names_.size();
+    if (!equal)
+      return equal;
+    for (size_t i = 0; i < joint_names_.size(); ++i) {
+      equal &= joint_names_[i].compare(other.joint_names_[i]) == 0;
+    }
+
+    equal &= this->ConstrainedValues::operator==(other);
+
+    return equal;
+  }
+
   // Getters
-  inline const std::vector<std::string>& names() const { return names_; }
-  inline const std::string& name(int i) const { return names_.at(i); }
+  inline const std::vector<std::string>& joint_names() const { return joint_names_; }
+  inline const std::string& joint_name(int i) const { return joint_names_.at(i); }
 
  private:
-  std::vector<std::string> names_;
+  std::vector<std::string> joint_names_;
 };
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const DesiredJointMotions& input) {
   for (int i = 0; i < input.size(); ++i) {
-    out << "desired " << input.name(i) << " acc: " << input.value(i)
+    out << "desired " << input.joint_name(i) << " acc: " << input.value(i)
         << " weight: " << input.weight(i) << " " << input.constraint_type(i);
   }
   return out;
@@ -546,9 +603,9 @@ inline std::ostream& operator<<(std::ostream& out,
  *
  * TODO: (siyuan.feng) Expand this to have policies (controllers).
  */
-class DesiredCentroidalMomentumChange : public ConstrainedValues {
+class DesiredCentroidalMomentumDot : public ConstrainedValues {
  public:
-  DesiredCentroidalMomentumChange() : ConstrainedValues(kTwistSize) {}
+  DesiredCentroidalMomentumDot() : ConstrainedValues(kTwistSize) {}
 
   bool is_valid() const { return ConstrainedValues::is_valid(kTwistSize); }
 
@@ -563,7 +620,7 @@ class DesiredCentroidalMomentumChange : public ConstrainedValues {
 };
 
 inline std::ostream& operator<<(std::ostream& out,
-                                const DesiredCentroidalMomentumChange& input) {
+                                const DesiredCentroidalMomentumDot& input) {
   for (int i = 0; i < 6; ++i) {
     out << "desired " << input.get_row_name(i) << " change: " << input.value(i)
         << " weight: " << input.weight(i) << " " << input.constraint_type(i);
@@ -613,7 +670,7 @@ class QPInput {
   // Getters
   inline double w_basis_reg() const { return w_basis_reg_; }
   inline const std::string& coord_name(size_t idx) const {
-    return desired_joint_motions_.name(idx);
+    return desired_joint_motions_.joint_name(idx);
   }
   inline const std::list<ContactInformation>& contact_info() const {
     return contact_info_;
@@ -625,7 +682,7 @@ class QPInput {
   inline const DesiredJointMotions& desired_joint_motions() const {
     return desired_joint_motions_;
   }
-  inline const DesiredCentroidalMomentumChange&
+  inline const DesiredCentroidalMomentumDot&
   desired_centroidal_momentum_dot() const {
     return desired_centroidal_momentum_dot_;
   }
@@ -642,7 +699,7 @@ class QPInput {
   inline DesiredJointMotions& mutable_desired_joint_motions() {
     return desired_joint_motions_;
   }
-  inline DesiredCentroidalMomentumChange&
+  inline DesiredCentroidalMomentumDot&
   mutable_desired_centroidal_momentum_dot() {
     return desired_centroidal_momentum_dot_;
   }
@@ -659,7 +716,7 @@ class QPInput {
 
   // Desired centroidal momentum change (change of overall linear and angular
   // momentum)
-  DesiredCentroidalMomentumChange desired_centroidal_momentum_dot_;
+  DesiredCentroidalMomentumDot desired_centroidal_momentum_dot_;
 
   // Weight for regularizing basis vectors
   double w_basis_reg_;

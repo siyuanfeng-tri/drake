@@ -13,7 +13,7 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   const std::map<std::string, DesiredBodyMotion>& all_body_motions =
       input.desired_body_motions();
   const DesiredJointMotions& all_joint_motions = input.desired_joint_motions();
-  const DesiredCentroidalMomentumChange& cen_mom_change =
+  const DesiredCentroidalMomentumDot& cen_mom_change =
       input.desired_centroidal_momentum_dot();
   // Figure out dimensions.
   int num_contact_body = all_contacts.size();
@@ -436,14 +436,14 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     if (!row_idx_as_cost.empty()) {
       AddAsCosts(body_J_[body_ctr], linear_term, body_motion_d.weights(),
                  row_idx_as_cost, cost_body_motion_[cost_ctr]);
-      cost_body_motion_[cost_ctr]->set_description(body_motion_d.name() +
+      cost_body_motion_[cost_ctr]->set_description(body_motion_d.body_name() +
                                                    " cost");
       cost_ctr++;
     }
     if (!row_idx_as_eq.empty()) {
       AddAsConstraints(body_J_[body_ctr], -linear_term, row_idx_as_eq,
                        eq_body_motion_[eq_ctr]);
-      eq_body_motion_[eq_ctr]->set_description(body_motion_d.name() + " eq");
+      eq_body_motion_[eq_ctr]->set_description(body_motion_d.body_name() + " eq");
       eq_ctr++;
     }
     body_ctr++;

@@ -9,12 +9,34 @@
 #include "bot_core/robot_state_t.hpp"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 
+#include "drake/lcmt_constrained_values.hpp"
+#include "drake/lcmt_contact_information.hpp"
+#include "drake/lcmt_desired_centroidal_momentum_dot.hpp"
+#include "drake/lcmt_desired_joint_motions.hpp"
+#include "drake/lcmt_desired_body_motion.hpp"
+
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
-// TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
+ConstraintType DecodeConstraintType(int8_t type);
+int8_t EncodeConstraintType(ConstraintType type);
 
+void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValues* val);
+void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_values* msg);
+
+void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_information& msg, ContactInformation* info);
+void EncodeContactInformation(const ContactInformation& info, lcmt_contact_information* msg);
+
+void DecodeDesiredCentroidalMomentumDot(const lcmt_desired_centroidal_momentum_dot& msg, DesiredCentroidalMomentumDot* momdot);
+void EncodeDesiredCentroidalMomentumDot(const DesiredCentroidalMomentumDot& momdot, lcmt_desired_centroidal_momentum_dot* msg);
+
+void DecodeDesiredJointMotions(const lcmt_desired_joint_motions& msg, DesiredJointMotions* joint_motions);
+void EncodeDesiredJointMotions(const DesiredJointMotions& joint_motions, lcmt_desired_joint_motions* msg);
+
+void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion);
+void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_body_motion* msg);
+// TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 /**
  * Make a bot_core::robot_state_t lcm message based on given information.
  * The current implementation assumes:

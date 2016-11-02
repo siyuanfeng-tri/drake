@@ -1,0 +1,10 @@
+package drake;
+
+struct lcmt_desired_body_motion {
+  int64_t timestamp;
+
+  string body_name;
+  boolean control_during_contact;
+
+  lcmt_constrained_values constrained_accelerations;
+}
