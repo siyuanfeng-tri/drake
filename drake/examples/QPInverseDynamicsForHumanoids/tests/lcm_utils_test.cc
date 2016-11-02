@@ -210,7 +210,8 @@ GTEST_TEST(testLcmUtils, testEncodeDecodeDesiredCentroidalMomentumDot) {
 }
 
 GTEST_TEST(testLcmUtils, testEncodeDecodeQPInput) {
-  QPInput qp_input = MakeExampleQPInput(robot);
+  HumanoidStatus robot_status(robot);
+  QPInput qp_input = MakeExampleQPInput(robot_status);
 
   // Test encode.
   lcmt_qp_input msg;

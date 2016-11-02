@@ -4,6 +4,7 @@
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/example_qp_input_for_valkyrie.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -21,13 +22,16 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
    * Input: humanoid status
    * Output: qp input
    */
-  explicit PlanEvalSystem(const RigidBodyTree& robot) : robot_(robot) {
+  explicit PlanEvalSystem(const RigidBodyTree& robot) : robot_(robot), qp_input_(robot) {
     input_port_index_humanoid_status_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
     output_port_index_qp_input_ =
         DeclareAbstractOutputPort(systems::kInheritedSampling).get_index();
 
     set_name("plan_eval");
+
+    HumanoidStatus robot_status(robot_);
+    qp_input_ = MakeExampleQPInput(robot_status);
 
     // TODO(siyuan.feng): Move these to some param / config file eventually.
     // Set up gains.
@@ -52,40 +56,29 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
         context, input_port_index_humanoid_status_);
 
     // output: qp input
-    QPInput& result = output->GetMutableData(output_port_index_qp_input_)
-                          ->GetMutableValue<QPInput>();
-
-    // Update weights.
-    for (const std::string& joint_name : robot_status->arm_joint_names()) {
-      int idx = robot_status->name_to_position_index().at(joint_name);
-      result.mutable_desired_joint_motions().mutable_weight(idx) = -1;
-      result.mutable_desired_joint_motions().mutable_constraint_type(idx) =
-          ConstraintType::Hard;
-    }
-    for (const std::string& joint_name : robot_status->neck_joint_names()) {
-      int idx = robot_status->name_to_position_index().at(joint_name);
-      result.mutable_desired_joint_motions().mutable_weight(idx) = -1;
-      result.mutable_desired_joint_motions().mutable_constraint_type(idx) =
-          ConstraintType::Hard;
-    }
+    lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
+                               ->GetMutableValue<lcmt_qp_input>();
 
     // Update desired accelerations.
-    result.mutable_desired_centroidal_momentum_dot()
+    qp_input_.mutable_desired_centroidal_momentum_dot()
         .mutable_values()
         .tail<3>() =
         (Kp_com_.array() * (desired_com_ - robot_status->com()).array() -
          Kd_com_.array() * robot_status->comd().array()).matrix() *
         robot_.getMass();
 
-    result.mutable_desired_joint_motions().mutable_values() =
+    qp_input_.mutable_desired_joint_motions().mutable_values() =
         joint_PDff_.ComputeTargetAcceleration(robot_status->position(),
                                               robot_status->velocity());
-    result.mutable_desired_body_motions().at("pelvis").mutable_values() =
+    qp_input_.mutable_desired_body_motions().at("pelvis").mutable_values() =
         pelvis_PDff_.ComputeTargetAcceleration(
             robot_status->pelvis().pose(), robot_status->pelvis().velocity());
-    result.mutable_desired_body_motions().at("torso").mutable_values() =
+    qp_input_.mutable_desired_body_motions().at("torso").mutable_values() =
         torso_PDff_.ComputeTargetAcceleration(robot_status->torso().pose(),
                                               robot_status->torso().velocity());
+
+    // Encode and send.
+    EncodeQPInput(qp_input_, &msg);
   }
 
   std::unique_ptr<SystemOutput<double>> AllocateOutput(
@@ -93,7 +86,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
     std::unique_ptr<LeafSystemOutput<double>> output(
         new LeafSystemOutput<double>);
     output->add_port(std::unique_ptr<AbstractValue>(
-        new Value<QPInput>(MakeExampleQPInput(robot_))));
+        new Value<lcmt_qp_input>(lcmt_qp_input())));
     return std::move(output);
   }
 
@@ -135,6 +128,8 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
   int input_port_index_humanoid_status_;
   int output_port_index_qp_input_;
+
+  mutable QPInput qp_input_;
 
   // Gains and setpoints.
   VectorSetpoint<double> joint_PDff_;

@@ -30,7 +30,7 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
   HumanoidStatus robot_status(robot);
 
   QPController con;
-  QPInput input(robot);
+  QPInput input = MakeExampleQPInput(robot_status);
   QPOutput output(robot);
 
   // Set up initial condition.
@@ -50,8 +50,6 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
 
   Eigen::Vector3d desired_com = robot_status.com();
 
-  // Get an example controller that tracks a fixed point.
-  input = MakeExampleQPInput(robot);
   Eigen::VectorXd Kp_q(Eigen::VectorXd::Constant(q.size(), 20));
   Eigen::VectorXd Kd_q(Eigen::VectorXd::Constant(q.size(), 8));
   Kp_q.head<6>().setZero();
@@ -81,20 +79,6 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
   // Feet should be stationary.
   EXPECT_TRUE(robot_status.foot(Side::LEFT).velocity().norm() < 1e-10);
   EXPECT_TRUE(robot_status.foot(Side::RIGHT).velocity().norm() < 1e-10);
-
-  // Update weights.
-  for (const std::string& joint_name : robot_status.arm_joint_names()) {
-    int idx = robot_status.name_to_position_index().at(joint_name);
-    input.mutable_desired_joint_motions().mutable_weight(idx) = -1;
-    input.mutable_desired_joint_motions().mutable_constraint_type(idx) =
-        ConstraintType::Hard;
-  }
-  for (const std::string& joint_name : robot_status.neck_joint_names()) {
-    int idx = robot_status.name_to_position_index().at(joint_name);
-    input.mutable_desired_joint_motions().mutable_weight(idx) = -1;
-    input.mutable_desired_joint_motions().mutable_constraint_type(idx) =
-        ConstraintType::Hard;
-  }
 
   int tick_ctr = 0;
   while (time < 4) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -13,7 +14,7 @@ class QPControllerSystem : public systems::LeafSystem<double> {
    * Input: humanoid status, qp input
    * Output: qp outout
    */
-  explicit QPControllerSystem(const RigidBodyTree& robot) : robot_(robot) {
+  explicit QPControllerSystem(const RigidBodyTree& robot) : robot_(robot), qp_input_(robot) {
     input_port_index_humanoid_status_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
     input_port_index_qp_input_ =
@@ -34,13 +35,14 @@ class QPControllerSystem : public systems::LeafSystem<double> {
         context, input_port_index_humanoid_status_);
 
     // Get qp input.
-    const QPInput* qp_input =
-        EvalInputValue<QPInput>(context, input_port_index_qp_input_);
+    const lcmt_qp_input* qp_input_msg =
+        EvalInputValue<lcmt_qp_input>(context, input_port_index_qp_input_);
+    DecodeQPInput(robot_, *qp_input_msg, &qp_input_);
 
     QPOutput& qp_output = output->GetMutableData(output_port_index_qp_input_)
-                              ->GetMutableValue<QPOutput>();
+                                ->GetMutableValue<QPOutput>();
 
-    if (qp_controller_.Control(*rs, *qp_input, &qp_output) < 0) {
+    if (qp_controller_.Control(*rs, qp_input_, &qp_output) < 0) {
       throw std::runtime_error("System2QP: QP canot solve\n");
     }
   }
@@ -85,6 +87,7 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   // and I want to avoid allocating these repeatedly.
   // This should be taken care of with the new system2 cache.
   mutable QPController qp_controller_;
+  mutable QPInput qp_input_;
 
   int input_port_index_humanoid_status_;
   int input_port_index_qp_input_;

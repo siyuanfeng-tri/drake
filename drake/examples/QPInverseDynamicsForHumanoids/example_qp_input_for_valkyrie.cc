@@ -4,7 +4,9 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
-QPInput MakeExampleQPInput(const RigidBodyTree& robot) {
+QPInput MakeExampleQPInput(const HumanoidStatus& robot_status) {
+  const RigidBodyTree& robot = robot_status.robot();
+
   int dim = robot.get_num_velocities();
   QPInput input(robot);
 
@@ -72,6 +74,19 @@ QPInput MakeExampleQPInput(const RigidBodyTree& robot) {
   input.mutable_contact_information().emplace(left_foot_contact.body_name(), left_foot_contact);
   input.mutable_contact_information().emplace(right_foot_contact.body_name(), right_foot_contact);
 
+  // Set arm and neck joint accelerations to hard constraints.
+  for (const std::string& joint_name : robot_status.arm_joint_names()) {
+    int idx = robot_status.name_to_position_index().at(joint_name);
+    input.mutable_desired_joint_motions().mutable_weight(idx) = -1;
+    input.mutable_desired_joint_motions().mutable_constraint_type(idx) =
+      ConstraintType::Hard;
+  }
+  for (const std::string& joint_name : robot_status.neck_joint_names()) {
+    int idx = robot_status.name_to_position_index().at(joint_name);
+    input.mutable_desired_joint_motions().mutable_weight(idx) = -1;
+    input.mutable_desired_joint_motions().mutable_constraint_type(idx) =
+      ConstraintType::Hard;
+  }
   return input;
 }
 
