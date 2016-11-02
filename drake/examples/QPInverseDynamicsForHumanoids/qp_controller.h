@@ -592,37 +592,37 @@ inline std::ostream& operator<<(std::ostream& out,
 }
 
 /**
- * A wrapper class specifying desired joint motion (acceleration) and their
- * corresponding weights for the QP.
+ * A wrapper class specifying desired DoF (degree of freedom)
+ * motions (acceleration) and their corresponding weights for the QP.
  *
  * The desired acceleration can be skipped, enforced as equality constraints
  * or optimized as a cost term depending on the constraint type.
  *
  * TODO: (siyuan.feng) Expand this to have policies (controllers).
  */
-class DesiredJointMotions : public ConstrainedValues {
+class DesiredDoFMotions : public ConstrainedValues {
  public:
-  DesiredJointMotions() {}
-  explicit DesiredJointMotions(const std::vector<std::string>& names)
-      : ConstrainedValues(static_cast<int>(names.size())), joint_names_(names) {}
+  DesiredDoFMotions() {}
+  explicit DesiredDoFMotions(const std::vector<std::string>& names)
+      : ConstrainedValues(static_cast<int>(names.size())), dof_names_(names) {}
 
   inline bool is_valid() const {
-    return this->DesiredJointMotions::is_valid(size());
+    return this->DesiredDoFMotions::is_valid(size());
   }
 
   bool is_valid(int dim) const {
-    if (static_cast<int>(joint_names_.size()) != dim) {
+    if (static_cast<int>(dof_names_.size()) != dim) {
       return false;
     }
     return this->ConstrainedValues::is_valid(dim);
   }
 
-  virtual bool operator== (const DesiredJointMotions& other) const {
-    if (joint_names_.size() != other.joint_names_.size()) {
+  virtual bool operator== (const DesiredDoFMotions& other) const {
+    if (dof_names_.size() != other.dof_names_.size()) {
       return false;
     }
-    for (size_t i = 0; i < joint_names_.size(); ++i) {
-      if (joint_names_[i].compare(other.joint_names_[i]) != 0) {
+    for (size_t i = 0; i < dof_names_.size(); ++i) {
+      if (dof_names_[i].compare(other.dof_names_[i]) != 0) {
         return false;
       }
     }
@@ -630,22 +630,22 @@ class DesiredJointMotions : public ConstrainedValues {
     return this->ConstrainedValues::operator==(other);
   }
 
-  inline virtual bool operator!= (const DesiredJointMotions& other) const {
+  inline virtual bool operator!= (const DesiredDoFMotions& other) const {
     return !(this->operator==(other));
   }
 
   // Getters
-  inline const std::vector<std::string>& joint_names() const { return joint_names_; }
-  inline const std::string& joint_name(int i) const { return joint_names_.at(i); }
+  inline const std::vector<std::string>& dof_names() const { return dof_names_; }
+  inline const std::string& dof_name(int i) const { return dof_names_.at(i); }
 
  private:
-  std::vector<std::string> joint_names_;
+  std::vector<std::string> dof_names_;
 };
 
 inline std::ostream& operator<<(std::ostream& out,
-                                const DesiredJointMotions& input) {
+                                const DesiredDoFMotions& input) {
   for (int i = 0; i < input.size(); ++i) {
-    out << "desired " << input.joint_name(i) << " acc: " << input.value(i)
+    out << "desired " << input.dof_name(i) << " acc: " << input.value(i)
         << " weight: " << input.weight(i) << " " << input.constraint_type(i);
   }
   return out;
@@ -702,11 +702,11 @@ class QPInput {
     for (int i = 0; i < r.get_num_velocities(); ++i)
       names[i] =
           r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
-    desired_joint_motions_ = DesiredJointMotions(names);
+    desired_dof_motions_ = DesiredDoFMotions(names);
   }
 
   inline bool is_valid() const {
-    return is_valid(desired_joint_motions_.size());
+    return is_valid(desired_dof_motions_.size());
   }
 
   /**
@@ -715,10 +715,10 @@ class QPInput {
    * @return true if this is valid.
    */
   bool is_valid(int num_vd) const {
-    if (num_vd != desired_joint_motions_.size()) {
+    if (num_vd != desired_dof_motions_.size()) {
       return false;
     }
-    if (!desired_joint_motions_.is_valid(num_vd)) {
+    if (!desired_dof_motions_.is_valid(num_vd)) {
       return false;
     }
 
@@ -772,7 +772,7 @@ class QPInput {
       }
     }
 
-    if (!(desired_joint_motions_ == other.desired_joint_motions_)) {
+    if (!(desired_dof_motions_ == other.desired_dof_motions_)) {
       return false;
     }
 
@@ -794,8 +794,8 @@ class QPInput {
 
   // Getters
   inline double w_basis_reg() const { return w_basis_reg_; }
-  inline const std::string& coord_name(size_t idx) const {
-    return desired_joint_motions_.joint_name(idx);
+  inline const std::string& dof_name(size_t idx) const {
+    return desired_dof_motions_.dof_name(idx);
   }
   inline const std::map<std::string, ContactInformation>& contact_information() const {
     return contact_info_;
@@ -804,8 +804,8 @@ class QPInput {
       const {
     return desired_body_motions_;
   }
-  inline const DesiredJointMotions& desired_joint_motions() const {
-    return desired_joint_motions_;
+  inline const DesiredDoFMotions& desired_dof_motions() const {
+    return desired_dof_motions_;
   }
   inline const DesiredCentroidalMomentumDot&
   desired_centroidal_momentum_dot() const {
@@ -821,8 +821,8 @@ class QPInput {
   mutable_desired_body_motions() {
     return desired_body_motions_;
   }
-  inline DesiredJointMotions& mutable_desired_joint_motions() {
-    return desired_joint_motions_;
+  inline DesiredDoFMotions& mutable_desired_dof_motions() {
+    return desired_dof_motions_;
   }
   inline DesiredCentroidalMomentumDot&
   mutable_desired_centroidal_momentum_dot() {
@@ -837,7 +837,7 @@ class QPInput {
   std::map<std::string, DesiredBodyMotion> desired_body_motions_;
 
   // Desired joint accelerations
-  DesiredJointMotions desired_joint_motions_;
+  DesiredDoFMotions desired_dof_motions_;
 
   // Desired centroidal momentum change (change of overall linear and angular
   // momentum)
@@ -983,10 +983,10 @@ class BodyAcceleration {
 class QPOutput {
  public:
   explicit QPOutput(const RigidBodyTree& r) {
-    coord_names_.resize(r.get_num_velocities());
+    dof_names_.resize(r.get_num_velocities());
     for (int i = 0; i < r.get_num_velocities(); ++i) {
       // strip out the "dot" part from name
-      coord_names_[i] =
+      dof_names_[i] =
           r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
     }
     vd_.resize(r.get_num_velocities());
@@ -994,7 +994,7 @@ class QPOutput {
   }
 
   bool is_valid(int num_vd, int num_actuators) const {
-    if (static_cast<int>(coord_names_.size()) != vd_.size() ||
+    if (static_cast<int>(dof_names_.size()) != vd_.size() ||
         vd_.size() != num_vd ||
         joint_torque_.size() != num_actuators) {
       return false;
@@ -1022,8 +1022,8 @@ class QPOutput {
   }
 
   // Getters
-  inline const std::string& coord_name(int idx) const {
-    return coord_names_.at(idx);
+  inline const std::string& dof_name(int idx) const {
+    return dof_names_.at(idx);
   }
   inline const Eigen::Vector3d& comdd() const { return comdd_; }
   inline const Eigen::Vector6d& centroidal_momentum_dot() const {
@@ -1081,7 +1081,7 @@ class QPOutput {
 
  private:
   // Names for each generalized coordinate.
-  std::vector<std::string> coord_names_;
+  std::vector<std::string> dof_names_;
 
   // Tracked body motion
   std::vector<BodyAcceleration> body_accelerations_;
@@ -1181,8 +1181,8 @@ class QPController {
   int num_body_motion_as_cost_;
   int num_body_motion_as_eq_;
   // Same as for body_motiom, replace J with the identity matrix.
-  int num_joint_motion_as_cost_;
-  int num_joint_motion_as_eq_;
+  int num_dof_motion_as_cost_;
+  int num_dof_motion_as_eq_;
   int num_cen_mom_dot_as_cost_;
   int num_cen_mom_dot_as_eq_;
   int num_contact_as_cost_;
@@ -1198,7 +1198,7 @@ class QPController {
   // TODO(siyuan.feng): Switch to cost for contact_constraints
   std::vector<drake::solvers::LinearEqualityConstraint*> eq_contacts_;
   std::vector<drake::solvers::LinearEqualityConstraint*> eq_body_motion_;
-  drake::solvers::LinearEqualityConstraint* eq_joint_motion_{nullptr};
+  drake::solvers::LinearEqualityConstraint* eq_dof_motion_{nullptr};
   drake::solvers::LinearEqualityConstraint* eq_cen_mom_dot_{nullptr};
 
   drake::solvers::LinearConstraint* ineq_contact_wrench_{nullptr};
@@ -1207,7 +1207,7 @@ class QPController {
   std::vector<drake::solvers::QuadraticConstraint*> cost_contacts_;
   drake::solvers::QuadraticConstraint* cost_cen_mom_dot_{nullptr};
   std::vector<drake::solvers::QuadraticConstraint*> cost_body_motion_;
-  drake::solvers::QuadraticConstraint* cost_joint_motion_{nullptr};
+  drake::solvers::QuadraticConstraint* cost_dof_motion_{nullptr};
 
   drake::solvers::QuadraticConstraint* cost_basis_reg_{nullptr};
 

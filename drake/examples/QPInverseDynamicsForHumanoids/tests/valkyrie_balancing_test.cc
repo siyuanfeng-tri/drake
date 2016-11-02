@@ -89,7 +89,7 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
     input.mutable_desired_body_motions().at("torso").mutable_values() =
         torso_PDff.ComputeTargetAcceleration(robot_status.torso().pose(),
                                              robot_status.torso().velocity());
-    input.mutable_desired_joint_motions().mutable_values() =
+    input.mutable_desired_dof_motions().mutable_values() =
         joint_PDff.ComputeTargetAcceleration(robot_status.position(),
                                              robot_status.velocity());
     input.mutable_desired_centroidal_momentum_dot().mutable_values().tail<3>() =

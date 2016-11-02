@@ -67,7 +67,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
          Kd_com_.array() * robot_status->comd().array()).matrix() *
         robot_.getMass();
 
-    qp_input_.mutable_desired_joint_motions().mutable_values() =
+    qp_input_.mutable_desired_dof_motions().mutable_values() =
         joint_PDff_.ComputeTargetAcceleration(robot_status->position(),
                                               robot_status->velocity());
     qp_input_.mutable_desired_body_motions().at("pelvis").mutable_values() =

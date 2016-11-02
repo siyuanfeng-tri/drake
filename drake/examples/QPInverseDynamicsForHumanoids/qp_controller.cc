@@ -12,7 +12,7 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   const std::map<std::string, ContactInformation>& all_contacts = input.contact_information();
   const std::map<std::string, DesiredBodyMotion>& all_body_motions =
       input.desired_body_motions();
-  const DesiredJointMotions& all_joint_motions = input.desired_joint_motions();
+  const DesiredDoFMotions& all_dof_motions = input.desired_dof_motions();
   const DesiredCentroidalMomentumDot& cen_mom_change =
       input.desired_centroidal_momentum_dot();
   // Figure out dimensions.
@@ -49,14 +49,13 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
     body_ctr++;
   }
 
-  // Figure out size of the constrained dimensions of desired joint motions.
+  // Figure out size of the constrained dimensions of desired dof motions.
   std::list<int> cost_row_idx;
   std::list<int> eq_row_idx;
-  cost_row_idx =
-      all_joint_motions.GetConstraintTypeIndices(ConstraintType::Soft);
-  eq_row_idx = all_joint_motions.GetConstraintTypeIndices(ConstraintType::Hard);
-  int num_joint_motion_as_cost = (cost_row_idx.size() > 0) ? 1 : 0;
-  int num_joint_motion_as_eq = (eq_row_idx.size() > 0) ? 1 : 0;
+  cost_row_idx = all_dof_motions.GetConstraintTypeIndices(ConstraintType::Soft);
+  eq_row_idx = all_dof_motions.GetConstraintTypeIndices(ConstraintType::Hard);
+  int num_dof_motion_as_cost = (cost_row_idx.size() > 0) ? 1 : 0;
+  int num_dof_motion_as_eq = (eq_row_idx.size() > 0) ? 1 : 0;
 
   // Figure out size of the constrained dimensions of centroidal momentum
   // change.
@@ -82,10 +81,10 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
       num_torque == num_torque_ && num_variable == num_variable_ &&
       num_body_motion_as_cost == num_body_motion_as_cost_ &&
       num_body_motion_as_eq == num_body_motion_as_eq_ &&
-      num_joint_motion_as_cost == num_joint_motion_as_cost_ &&
-      num_joint_motion_as_eq == num_joint_motion_as_eq_ &&
-      num_joint_motion_as_eq == num_joint_motion_as_eq_ &&
-      num_joint_motion_as_cost == num_joint_motion_as_cost_ &&
+      num_dof_motion_as_cost == num_dof_motion_as_cost_ &&
+      num_dof_motion_as_eq == num_dof_motion_as_eq_ &&
+      num_dof_motion_as_eq == num_dof_motion_as_eq_ &&
+      num_dof_motion_as_cost == num_dof_motion_as_cost_ &&
       num_contact_as_cost == num_contact_as_cost_ &&
       num_contact_as_eq == num_contact_as_eq_) {
     return;
@@ -99,8 +98,8 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   num_variable_ = num_variable;
   num_body_motion_as_cost_ = num_body_motion_as_cost;
   num_body_motion_as_eq_ = num_body_motion_as_eq;
-  num_joint_motion_as_cost_ = num_joint_motion_as_cost;
-  num_joint_motion_as_eq_ = num_joint_motion_as_eq;
+  num_dof_motion_as_cost_ = num_dof_motion_as_cost;
+  num_dof_motion_as_eq_ = num_dof_motion_as_eq;
   num_cen_mom_dot_as_cost_ = num_cen_mom_dot_as_cost;
   num_cen_mom_dot_as_eq_ = num_cen_mom_dot_as_eq;
   num_contact_as_cost_ = num_contact_as_cost;
@@ -215,21 +214,21 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   DRAKE_ASSERT(cost_ctr == num_body_motion_as_cost_);
   DRAKE_ASSERT(eq_ctr == num_body_motion_as_eq_);
 
-  // Set up cost / eq constraints for joint motion.
-  if (num_joint_motion_as_cost_ > 0) {
-    cost_joint_motion_ =
+  // Set up cost / eq constraints for dof motion.
+  if (num_dof_motion_as_cost_ > 0) {
+    cost_dof_motion_ =
         prog_.AddQuadraticCost(tmp_vd_mat_, tmp_vd_vec_, {vd}).get();
-    cost_joint_motion_->set_description("vd cost");
+    cost_dof_motion_->set_description("vd cost");
   } else {
-    cost_joint_motion_ = nullptr;
+    cost_dof_motion_ = nullptr;
   }
-  if (num_joint_motion_as_eq_ > 0) {
+  if (num_dof_motion_as_eq_ > 0) {
     // Dimension doesn't matter, will be reset when updating the constaint.
-    eq_joint_motion_ =
+    eq_dof_motion_ =
         prog_.AddLinearEqualityConstraint(tmp_vd_mat_, tmp_vd_vec_, {vd}).get();
-    eq_joint_motion_->set_description("vd eq");
+    eq_dof_motion_->set_description("vd eq");
   } else {
-    eq_joint_motion_ = nullptr;
+    eq_dof_motion_ = nullptr;
   }
 
   // Regularize basis.
@@ -453,9 +452,9 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   }
 
   // Joint motion
-  row_idx_as_cost = input.desired_joint_motions().GetConstraintTypeIndices(
+  row_idx_as_cost = input.desired_dof_motions().GetConstraintTypeIndices(
       ConstraintType::Soft);
-  row_idx_as_eq = input.desired_joint_motions().GetConstraintTypeIndices(
+  row_idx_as_eq = input.desired_dof_motions().GetConstraintTypeIndices(
       ConstraintType::Hard);
   // Process eq constraints.
   if (row_idx_as_eq.size() > 0) {
@@ -463,10 +462,10 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     for (int d : row_idx_as_eq) {
       tmp_vd_mat_.row(row_ctr).setZero();
       tmp_vd_mat_(row_ctr, d) = 1;
-      tmp_vd_vec_[row_ctr] = input.desired_joint_motions().value(d);
+      tmp_vd_vec_[row_ctr] = input.desired_dof_motions().value(d);
       row_ctr++;
     }
-    eq_joint_motion_->UpdateConstraint(tmp_vd_mat_.topRows(row_ctr),
+    eq_dof_motion_->UpdateConstraint(tmp_vd_mat_.topRows(row_ctr),
                                        tmp_vd_vec_.head(row_ctr));
   }
   // Procecss cost terms.
@@ -475,11 +474,11 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     tmp_vd_vec_.setZero();
 
     for (int d : row_idx_as_cost) {
-      double weight = input.desired_joint_motions().weight(d);
+      double weight = input.desired_dof_motions().weight(d);
       tmp_vd_mat_(d, d) = weight;
-      tmp_vd_vec_[d] = -weight * input.desired_joint_motions().value(d);
+      tmp_vd_vec_[d] = -weight * input.desired_dof_motions().value(d);
     }
-    cost_joint_motion_->UpdateQuadraticAndLinearTerms(tmp_vd_mat_, tmp_vd_vec_);
+    cost_dof_motion_->UpdateQuadraticAndLinearTerms(tmp_vd_mat_, tmp_vd_vec_);
   }
 
   // Regularize basis to zero.
@@ -636,7 +635,7 @@ std::ostream& operator<<(std::ostream& out, const QPInput& input) {
     out << pair.second << std::endl;
   }
 
-  out << input.desired_joint_motions() << std::endl;
+  out << input.desired_dof_motions() << std::endl;
 
   out << "weight_basis_reg: " << input.w_basis_reg() << std::endl;
 
@@ -652,7 +651,7 @@ std::ostream& operator<<(std::ostream& out, const QPOutput& output) {
   out << "QPOutput:\n";
   out << "accelerations:\n";
   for (int i = 0; i < output.vd().size(); ++i) {
-    out << output.coord_name(i) << ": " << output.vd()[i] << std::endl;
+    out << output.dof_name(i) << ": " << output.vd()[i] << std::endl;
   }
 
   out << "com acc: ";
@@ -678,7 +677,7 @@ std::ostream& operator<<(std::ostream& out, const QPOutput& output) {
   out << "===============================================\n";
   out << "torque:\n";
   for (int i = 0; i < output.joint_torque().size(); ++i) {
-    out << output.coord_name(i + 6) << ": " << output.joint_torque()[i]
+    out << output.dof_name(i + 6) << ": " << output.joint_torque()[i]
         << std::endl;
   }
   out << "===============================================\n";

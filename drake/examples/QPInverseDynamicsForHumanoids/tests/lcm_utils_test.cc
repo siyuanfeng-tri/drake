@@ -88,11 +88,11 @@ static void TestEncodeDesiredBodyMotion(const DesiredBodyMotion& mot, const lcmt
   TestConstrainedValuesMsg(mot, msg.constrained_accelerations);
 }
 
-static void TestEncodeDesiredJointMotions(const DesiredJointMotions& mot, const lcmt_desired_joint_motions& msg) {
-  EXPECT_TRUE(msg.num_joints == mot.size());
-  EXPECT_TRUE(static_cast<int>(msg.joint_names.size()) == mot.size());
+static void TestEncodeDesiredDoFMotions(const DesiredDoFMotions& mot, const lcmt_desired_dof_motions& msg) {
+  EXPECT_TRUE(msg.num_dof == mot.size());
+  EXPECT_TRUE(static_cast<int>(msg.dof_names.size()) == mot.size());
   for (int i = 0; i < mot.size(); ++i) {
-    EXPECT_TRUE(msg.joint_names[i].compare(mot.joint_name(i)) == 0);
+    EXPECT_TRUE(msg.dof_names[i].compare(mot.dof_name(i)) == 0);
   }
   TestConstrainedValuesMsg(mot, msg.constrained_accelerations);
 }
@@ -114,8 +114,8 @@ static void TestEncodeQPInput(const QPInput& qp_input, const lcmt_qp_input& msg)
     EXPECT_TRUE(it != qp_input.desired_body_motions().end());
     TestEncodeDesiredBodyMotion(it->second, msg_mot);
   }
-  // joint motions
-  TestEncodeDesiredJointMotions(qp_input.desired_joint_motions(), msg.desired_joint_motions);
+  // dof motions
+  TestEncodeDesiredDoFMotions(qp_input.desired_dof_motions(), msg.desired_dof_motions);
 
   // centroidal momentum
   TestConstrainedValuesMsg(qp_input.desired_centroidal_momentum_dot(), msg.desired_centroidal_momentum_dot.centroidal_momentum_dot);
@@ -177,19 +177,19 @@ GTEST_TEST(testLcmUtils, testEncodeDecodeDesiredBodyMotion) {
   EXPECT_TRUE(decoded_mot == mot);
 }
 
-// Test encode / decode of DesiredJointMotions
-GTEST_TEST(testLcmUtils, testEncodeDecodeDesiredJointMotions) {
-  DesiredJointMotions mot({"a", "b", "c", "d"});
+// Test encode / decode of DesiredDoFMotions
+GTEST_TEST(testLcmUtils, testEncodeDecodeDesiredDoFMotions) {
+  DesiredDoFMotions mot({"a", "b", "c", "d"});
   SetConstrainedValues(&mot, mot.size());
 
   // Test encode.
-  lcmt_desired_joint_motions msg;
-  EncodeDesiredJointMotions(mot, &msg);
-  TestEncodeDesiredJointMotions(mot, msg);
+  lcmt_desired_dof_motions msg;
+  EncodeDesiredDoFMotions(mot, &msg);
+  TestEncodeDesiredDoFMotions(mot, msg);
 
   // Test decode.
-  DesiredJointMotions decoded_mot;
-  DecodeDesiredJointMotions(msg, &decoded_mot);
+  DesiredDoFMotions decoded_mot;
+  DecodeDesiredDoFMotions(msg, &decoded_mot);
   EXPECT_TRUE(decoded_mot == mot);
 }
 

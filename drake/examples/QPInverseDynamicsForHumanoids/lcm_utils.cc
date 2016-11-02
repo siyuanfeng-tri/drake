@@ -29,7 +29,7 @@ void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput
     qp_input->mutable_desired_body_motions().emplace(mot.body_name(), mot);
   }
 
-  DecodeDesiredJointMotions(msg.desired_joint_motions, &(qp_input->mutable_desired_joint_motions()));
+  DecodeDesiredDoFMotions(msg.desired_dof_motions, &(qp_input->mutable_desired_dof_motions()));
   DecodeDesiredCentroidalMomentumDot(msg.desired_centroidal_momentum_dot, &(qp_input->mutable_desired_centroidal_momentum_dot()));
   qp_input->mutable_w_basis_reg() = msg.w_basis_reg;
 
@@ -61,7 +61,7 @@ void EncodeQPInput(const QPInput& qp_input, lcmt_qp_input* msg) {
     desired_body_motion_ctr++;
   }
 
-  EncodeDesiredJointMotions(qp_input.desired_joint_motions(), &(msg->desired_joint_motions));
+  EncodeDesiredDoFMotions(qp_input.desired_dof_motions(), &(msg->desired_dof_motions));
 
   EncodeDesiredCentroidalMomentumDot(qp_input.desired_centroidal_momentum_dot(), &(msg->desired_centroidal_momentum_dot));
 
@@ -117,26 +117,26 @@ void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_
   EncodeConstrainedValues(body_motion, &(msg->constrained_accelerations));
 }
 
-void DecodeDesiredJointMotions(const lcmt_desired_joint_motions& msg, DesiredJointMotions* joint_motions) {
-  if (!joint_motions) return;
+void DecodeDesiredDoFMotions(const lcmt_desired_dof_motions& msg, DesiredDoFMotions* dof_motions) {
+  if (!dof_motions) return;
 
-  *joint_motions = DesiredJointMotions(msg.joint_names);
-  DecodeConstrainedValues(msg.constrained_accelerations, joint_motions);
+  *dof_motions = DesiredDoFMotions(msg.dof_names);
+  DecodeConstrainedValues(msg.constrained_accelerations, dof_motions);
 
-  if (!joint_motions->is_valid()) {
-    throw std::runtime_error("invalid DesiredJointMotions");
+  if (!dof_motions->is_valid()) {
+    throw std::runtime_error("invalid DesiredDoFMotions");
   }
 }
 
-void EncodeDesiredJointMotions(const DesiredJointMotions& joint_motions, lcmt_desired_joint_motions* msg) {
+void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions, lcmt_desired_dof_motions* msg) {
   if (!msg) return;
-  if (!joint_motions.is_valid()) {
-    throw std::runtime_error("invalid DesiredJointMotions");
+  if (!dof_motions.is_valid()) {
+    throw std::runtime_error("invalid DesiredDoFMotions");
   }
 
-  msg->num_joints = joint_motions.size();
-  msg->joint_names = joint_motions.joint_names();
-  EncodeConstrainedValues(joint_motions, &(msg->constrained_accelerations));
+  msg->num_dof = dof_motions.size();
+  msg->dof_names = dof_motions.dof_names();
+  EncodeConstrainedValues(dof_motions, &(msg->constrained_accelerations));
 }
 
 void DecodeDesiredCentroidalMomentumDot(const lcmt_desired_centroidal_momentum_dot& msg, DesiredCentroidalMomentumDot* momdot) {

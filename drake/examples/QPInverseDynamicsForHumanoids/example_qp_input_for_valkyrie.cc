@@ -22,9 +22,9 @@ QPInput MakeExampleQPInput(const HumanoidStatus& robot_status) {
       {3, 4, 5}, ConstraintType::Soft);
 
   // Minimize acceleration in the generalized coordinates.
-  input.mutable_desired_joint_motions().mutable_weights() =
+  input.mutable_desired_dof_motions().mutable_weights() =
       Eigen::VectorXd::Constant(dim, 1e-2);
-  input.mutable_desired_joint_motions().SetAllConstraintType(
+  input.mutable_desired_dof_motions().SetAllConstraintType(
       ConstraintType::Soft);
 
   // Set up tracking for various body parts.
@@ -77,14 +77,14 @@ QPInput MakeExampleQPInput(const HumanoidStatus& robot_status) {
   // Set arm and neck joint accelerations to hard constraints.
   for (const std::string& joint_name : robot_status.arm_joint_names()) {
     int idx = robot_status.name_to_position_index().at(joint_name);
-    input.mutable_desired_joint_motions().mutable_weight(idx) = -1;
-    input.mutable_desired_joint_motions().mutable_constraint_type(idx) =
+    input.mutable_desired_dof_motions().mutable_weight(idx) = -1;
+    input.mutable_desired_dof_motions().mutable_constraint_type(idx) =
       ConstraintType::Hard;
   }
   for (const std::string& joint_name : robot_status.neck_joint_names()) {
     int idx = robot_status.name_to_position_index().at(joint_name);
-    input.mutable_desired_joint_motions().mutable_weight(idx) = -1;
-    input.mutable_desired_joint_motions().mutable_constraint_type(idx) =
+    input.mutable_desired_dof_motions().mutable_weight(idx) = -1;
+    input.mutable_desired_dof_motions().mutable_constraint_type(idx) =
       ConstraintType::Hard;
   }
   return input;

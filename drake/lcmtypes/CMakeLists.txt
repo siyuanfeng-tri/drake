@@ -15,7 +15,7 @@ lcm_wrap_types(
   lcmt_constrained_values.lcm
   lcmt_contact_information.lcm
   lcmt_desired_centroidal_momentum_dot.lcm
-  lcmt_desired_joint_motions.lcm
+  lcmt_desired_dof_motions.lcm
   lcmt_desired_body_motion.lcm
   lcmt_qp_input.lcm
   lcmt_body_motion_data.lcm
