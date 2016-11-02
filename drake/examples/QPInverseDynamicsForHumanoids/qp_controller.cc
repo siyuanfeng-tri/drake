@@ -9,7 +9,7 @@ namespace qp_inverse_dynamics {
 const double QPController::kUpperBoundForContactBasis = 1000;
 
 void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
-  const std::list<ContactInformation>& all_contacts = input.contact_info();
+  const std::map<std::string, ContactInformation>& all_contacts = input.contact_information();
   const std::map<std::string, DesiredBodyMotion>& all_body_motions =
       input.desired_body_motions();
   const DesiredJointMotions& all_joint_motions = input.desired_joint_motions();
@@ -20,9 +20,9 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   int num_vd = robot.get_num_velocities();
   int num_basis = 0;
   int num_point_force = 0;
-  for (const ContactInformation& contact : all_contacts) {
-    num_point_force += contact.contact_points().size();
-    num_basis += contact.num_basis();
+  for (const auto& contact_pair : all_contacts) {
+    num_point_force += contact_pair.second.contact_points().size();
+    num_basis += contact_pair.second.num_basis();
   }
   int num_torque = robot.actuators.size();
   int num_variable = num_vd + num_basis;
@@ -67,9 +67,9 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
 
   int num_contact_as_cost = 0;
   int num_contact_as_eq = 0;
-  for (const ContactInformation& contact : all_contacts) {
+  for (const auto& contact_pair : all_contacts) {
     // Cost term
-    if (contact.acceleration_constraint_type() == ConstraintType::Soft)
+    if (contact_pair.second.acceleration_constraint_type() == ConstraintType::Soft)
       num_contact_as_cost++;
     else
       num_contact_as_eq++;
@@ -139,7 +139,8 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   eq_contacts_.resize(num_contact_as_eq_);
   cost_contacts_.resize(num_contact_as_cost_);
   int cost_ctr = 0, eq_ctr = 0;
-  for (const ContactInformation& contact : all_contacts) {
+  for (const auto& contact_pair : all_contacts) {
+    const ContactInformation& contact = contact_pair.second;
     if (contact.acceleration_constraint_type() == ConstraintType::Soft) {
       cost_contacts_[cost_ctr++] =
           prog_.AddQuadraticCost(tmp_vd_mat_, tmp_vd_vec_, {vd}).get();
@@ -304,7 +305,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   // Stack the contact Jacobians and basis matrices for each contact link.
   int rowIdx = 0;
   int colIdx = 0;
-  for (const ContactInformation& contact : input.contact_info()) {
+  for (const auto& contact_pair : input.contact_information()) {
+    const ContactInformation& contact = contact_pair.second;
     int force_dim = 3 * contact.contact_points().size();
     int basis_dim = contact.num_basis();
     basis_to_force_matrix_.block(rowIdx, colIdx, force_dim, basis_dim) =
@@ -342,7 +344,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   // Contact constraints, 3 rows per contact point
   rowIdx = 0;
   int cost_ctr = 0, eq_ctr = 0;
-  for (const ContactInformation& contact : input.contact_info()) {
+  for (const auto& contact_pair : input.contact_information()) {
+    const ContactInformation& contact = contact_pair.second;
     int force_dim = 3 * contact.contact_points().size();
     // As cost
     if (contact.acceleration_constraint_type() == ConstraintType::Soft) {
@@ -358,7 +361,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
                                                               force_dim) +
                contact.Kd() *
                    stacked_contact_velocities_.segment(rowIdx, force_dim)));
-      cost_contacts_[cost_ctr++]->set_description(contact.name() +
+      cost_contacts_[cost_ctr++]->set_description(contact.body_name() +
                                                   " contact cost");
     } else {
       eq_contacts_[eq_ctr]->UpdateConstraint(
@@ -366,7 +369,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
           -(stacked_contact_jacobians_dot_times_v_.segment(rowIdx, force_dim) +
             contact.Kd() *
                 stacked_contact_velocities_.segment(rowIdx, force_dim)));
-      eq_contacts_[eq_ctr++]->set_description(contact.name() + " contact eq");
+      eq_contacts_[eq_ctr++]->set_description(contact.body_name() + " contact eq");
     }
     rowIdx += force_dim;
   }
@@ -536,7 +539,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   point_forces_ = basis_to_force_matrix_ * basis.value();
 
   output->mutable_resolved_contacts().clear();
-  for (const ContactInformation& contact : input.contact_info()) {
+  for (const auto& contact_pair : input.contact_information()) {
+    const ContactInformation& contact = contact_pair.second;
     ResolvedContact resolved_contact(contact.body());
 
     // Copy basis.
@@ -636,8 +640,8 @@ std::ostream& operator<<(std::ostream& out, const QPInput& input) {
 
   out << "weight_basis_reg: " << input.w_basis_reg() << std::endl;
 
-  for (const ContactInformation& contact : input.contact_info()) {
-    out << contact << std::endl;
+  for (const auto& contact_pair : input.contact_information()) {
+    out << contact_pair.second << std::endl;
   }
 
   return out;

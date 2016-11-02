@@ -17,6 +17,7 @@ lcm_wrap_types(
   lcmt_desired_centroidal_momentum_dot.lcm
   lcmt_desired_joint_motions.lcm
   lcmt_desired_body_motion.lcm
+  lcmt_qp_input.lcm
   lcmt_body_motion_data.lcm
   lcmt_body_wrench_data.lcm
   lcmt_drake_signal.lcm

@@ -12,6 +12,62 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput* qp_input) {
+  if (!qp_input) return;
+
+  ContactInformation info(*robot.FindBody("world"));
+  qp_input->mutable_contact_information().clear();
+  for (const auto& contact_msg : msg.contact_information) {
+    DecodeContactInformation(robot, contact_msg, &info);
+    qp_input->mutable_contact_information().emplace(info.body_name(), info);
+  }
+
+  DesiredBodyMotion mot(*robot.FindBody("world"));
+  qp_input->mutable_desired_body_motions().clear();
+  for (const auto& mot_msg : msg.desired_body_motions) {
+    DecodeDesiredBodyMotion(robot, mot_msg, &mot);
+    qp_input->mutable_desired_body_motions().emplace(mot.body_name(), mot);
+  }
+
+  DecodeDesiredJointMotions(msg.desired_joint_motions, &(qp_input->mutable_desired_joint_motions()));
+  DecodeDesiredCentroidalMomentumDot(msg.desired_centroidal_momentum_dot, &(qp_input->mutable_desired_centroidal_momentum_dot()));
+  qp_input->mutable_w_basis_reg() = msg.w_basis_reg;
+
+  if (!qp_input->is_valid(robot.get_num_velocities())) {
+    throw std::runtime_error("invalid QPInput");
+  }
+}
+
+void EncodeQPInput(const QPInput& qp_input, lcmt_qp_input* msg) {
+  if (!msg) return;
+
+  if (!qp_input.is_valid()) {
+    throw std::runtime_error("invalid QPInput");
+  }
+
+  msg->num_contacts = static_cast<int>(qp_input.contact_information().size());
+  msg->contact_information.resize(msg->num_contacts);
+  int contact_ctr = 0;
+  for (const auto& contact_pair : qp_input.contact_information()) {
+    EncodeContactInformation(contact_pair.second, &(msg->contact_information[contact_ctr]));
+    contact_ctr++;
+  }
+
+  msg->num_desired_body_motions = static_cast<int>(qp_input.desired_body_motions().size());
+  msg->desired_body_motions.resize(msg->num_desired_body_motions);
+  int desired_body_motion_ctr = 0;
+  for (const auto& mot_pair : qp_input.desired_body_motions()) {
+    EncodeDesiredBodyMotion(mot_pair.second, &(msg->desired_body_motions[desired_body_motion_ctr]));
+    desired_body_motion_ctr++;
+  }
+
+  EncodeDesiredJointMotions(qp_input.desired_joint_motions(), &(msg->desired_joint_motions));
+
+  EncodeDesiredCentroidalMomentumDot(qp_input.desired_centroidal_momentum_dot(), &(msg->desired_centroidal_momentum_dot));
+
+  msg->w_basis_reg = qp_input.w_basis_reg();
+}
+
 int8_t EncodeConstraintType(ConstraintType type) {
   switch (type) {
     case ConstraintType::Hard:
@@ -142,13 +198,17 @@ void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_inf
   if (!info) return;
   *info = ContactInformation(*robot.FindBody(msg.body_name), msg.num_basis_per_contact_point);
   info->mutable_contact_points().resize(msg.num_contact_points);
+  // Check dimension of contact_points.
   if (msg.contact_points.size() != 3) {
-    throw std::runtime_error("invalid contact_points dimensions");
+    throw std::runtime_error("invalid contact_points row dimensions");
   }
-  for (int i = 0; i < msg.num_contact_points; ++i) {
-    if (static_cast<int>(msg.contact_points[i].size()) != msg.num_contact_points) {
-      throw std::runtime_error("invalid contact_points dimensions");
+  for (const auto& row : msg.contact_points) {
+    if (static_cast<int>(row.size()) != msg.num_contact_points) {
+      throw std::runtime_error("invalid contact_points col dimensions");
     }
+  }
+  // Parse contact points.
+  for (int i = 0; i < msg.num_contact_points; ++i) {
     info->mutable_contact_points()[i] = Eigen::Vector3d(msg.contact_points[0][i], msg.contact_points[1][i], msg.contact_points[2][i]);
   }
   info->mutable_normal() = Eigen::Vector3d(msg.normal[0], msg.normal[1], msg.normal[2]);
@@ -173,7 +233,7 @@ void EncodeContactInformation(const ContactInformation& info, lcmt_contact_infor
   msg->num_contact_points = static_cast<int>(info.contact_points().size());
   msg->num_basis_per_contact_point = info.num_basis_per_contact_point();
   msg->contact_points.resize(3);
-  for (int i = 0; i < 3; ++i) {
+  for (size_t i = 0; i < msg->contact_points.size(); ++i) {
     msg->contact_points[i].resize(msg->num_contact_points);
     for (int j = 0; j < msg->num_contact_points; ++j) {
       msg->contact_points[i][j] = info.contact_points()[j][i];

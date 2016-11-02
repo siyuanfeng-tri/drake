@@ -97,33 +97,47 @@ class ConstrainedValues {
 
   inline virtual bool is_valid() const { return is_valid(size()); }
 
-  bool virtual is_valid(int dim) const {
-    bool ret = weights_.size() == values_.size();
-    ret &= static_cast<int>(constraint_types_.size()) == weights_.size();
-    ret &= weights_.size() == dim;
-    if (ret) {
-      for (int i = 0; i < dim; ++i) {
-        if (constraint_types_[i] == ConstraintType::Soft)
-          ret &= weights_[i] > 0;
+  virtual bool is_valid(int dim) const {
+    if (weights_.size() != dim ||
+        weights_.size() != values_.size() ||
+        weights_.size() != static_cast<int>(constraint_types_.size())) {
+      return false;
+    }
+    for (int i = 0; i < dim; ++i) {
+      if (constraint_types_[i] == ConstraintType::Soft && weights_[i] <= 0) {
+        return false;
       }
     }
-    ret &= weights_.allFinite();
-    ret &= values_.allFinite();
-    return ret;
+    if (!weights_.allFinite()) {
+      return false;
+    }
+    if (!values_.allFinite()) {
+      return false;
+    }
+    return true;
   }
 
   virtual bool operator== (const ConstrainedValues& other) const {
-    bool equal = constraint_types_.size() == other.constraint_types_.size();
-    if (!equal)
-      return equal;
+    if (constraint_types_.size() != other.constraint_types_.size()) {
+      return false;
+    }
 
     for (size_t i = 0; i < constraint_types_.size(); ++i) {
-      equal &= constraint_types_[i] == other.constraint_types_[i];
+      if (constraint_types_[i] != other.constraint_types_[i]) {
+        return false;
+      }
     }
-    equal &= weights_.isApprox(other.weights_);
-    equal &= values_.isApprox(other.values_);
+    if (!weights_.isApprox(other.weights_)) {
+      return false;
+    }
+    if (!values_.isApprox(other.values_)) {
+      return false;
+    }
+    return true;
+  }
 
-    return equal;
+  inline virtual bool operator!= (const ConstrainedValues& other) const {
+    return !(this->operator==(other));
   }
 
   // Getters
@@ -352,39 +366,72 @@ class ContactInformation {
   }
 
   bool is_valid() const {
-    bool ret =
-        std::abs(normal_.norm() - 1) < Eigen::NumTraits<double>::epsilon();
-    for (const Eigen::Vector3d& pt : contact_points_) ret &= pt.allFinite();
-    ret &= mu_ >= 0;
-    ret &= num_basis_per_contact_point_ >= 3;
-    if (acceleration_constraint_type_ == ConstraintType::Soft)
-      ret &= weight_ > 0;
+    if (std::abs(normal_.norm() - 1) >= Eigen::NumTraits<double>::epsilon()) {
+      return false;
+    }
+    for (const Eigen::Vector3d& pt : contact_points_) {
+      if (!pt.allFinite()) {
+        return false;
+      }
+    }
+    if (mu_ < 0) {
+      return false;
+    }
+    if (num_basis_per_contact_point_ < 3) {
+      return false;
+    }
+    if (acceleration_constraint_type_ == ConstraintType::Soft && weight_ <= 0) {
+      return false;
+    }
     // Can't skip contact constraints
-    ret &= acceleration_constraint_type_ != ConstraintType::Skip;
+    if (acceleration_constraint_type_ == ConstraintType::Skip) {
+      return false;
+    }
     // Can't have a minus stabilizing velocity gain.
-    ret &= Kd_ >= 0;
-    return ret;
+    if (Kd_ < 0) {
+      return false;
+    }
+    return true;
   }
 
   bool operator== (const ContactInformation& other) const {
-    bool equal = body_ == other.body_;
-    equal &= contact_points_.size() == other.contact_points_.size();
-    if (!equal)
-      return equal;
-    for (size_t i = 0; i < contact_points_.size(); ++i) {
-      equal &= contact_points_[i].isApprox(other.contact_points_[i]);
+    if (body_ != other.body_) {
+      return false;
     }
-    equal &= normal_.isApprox(other.normal_);
-    equal &= num_basis_per_contact_point_ == other.num_basis_per_contact_point_;
-    equal &= mu_ == other.mu_;
-    equal &= Kd_ == other.Kd_;
-    equal &= weight_ == other.weight_;
-    equal &= acceleration_constraint_type_ == other.acceleration_constraint_type_;
-
-    return equal;
+    if (contact_points_.size() != other.contact_points_.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < contact_points_.size(); ++i) {
+      if (!contact_points_[i].isApprox(other.contact_points_[i])) {
+        return false;
+      }
+    }
+    if (!normal_.isApprox(other.normal_)) {
+      return false;
+    }
+    if (num_basis_per_contact_point_ != other.num_basis_per_contact_point_) {
+      return false;
+    }
+    if (mu_ != other.mu_) {
+      return false;
+    }
+    if (Kd_ != other.Kd_) {
+      return false;
+    }
+    if (weight_ != other.weight_) {
+      return false;
+    }
+    if (acceleration_constraint_type_ != other.acceleration_constraint_type_) {
+      return false;
+    }
+    return true;
   }
 
-  inline const std::string& name() const { return body_->get_name(); }
+  inline bool operator!= (const ContactInformation& other) const {
+    return !(this->operator==(other));
+  }
+
+  inline const std::string& body_name() const { return body_->get_name(); }
   inline int num_contact_points() const {
     return static_cast<int>(contact_points_.size());
   }
@@ -455,7 +502,7 @@ class ContactInformation {
 
 inline std::ostream& operator<<(std::ostream& out,
                                 const ContactInformation& contact) {
-  out << "contact: " << contact.name() << std::endl;
+  out << "contact: " << contact.body_name() << std::endl;
   out << "contact points in body frame: " << std::endl;
   for (size_t j = 0; j < contact.contact_points().size(); ++j)
     out << contact.contact_points()[j].transpose() << std::endl;
@@ -491,7 +538,7 @@ class DesiredBodyMotion : public ConstrainedValues {
       : ConstrainedValues(6), body_(&body), control_during_contact_(false) {}
 
   inline bool is_valid() const {
-    return ConstrainedValues::is_valid(kTwistSize);
+    return this->ConstrainedValues::is_valid(kTwistSize);
   }
 
   inline std::string get_row_name(int i) const {
@@ -503,12 +550,18 @@ class DesiredBodyMotion : public ConstrainedValues {
   }
 
   virtual bool operator== (const DesiredBodyMotion& other) const {
-    bool equal = body_ == other.body_;
-    equal &= control_during_contact_ == other.control_during_contact_;
+    if (body_ != other.body_) {
+      return false;
+    }
+    if (control_during_contact_ != other.control_during_contact_) {
+      return false;
+    }
 
-    equal &= this->ConstrainedValues::operator==(other);
+    return this->ConstrainedValues::operator==(other);
+  }
 
-    return equal;
+  inline virtual bool operator!= (const DesiredBodyMotion& other) const {
+    return !(this->operator==(other));
   }
 
   // Getters
@@ -553,24 +606,32 @@ class DesiredJointMotions : public ConstrainedValues {
   explicit DesiredJointMotions(const std::vector<std::string>& names)
       : ConstrainedValues(static_cast<int>(names.size())), joint_names_(names) {}
 
-  inline bool is_valid() const { return DesiredJointMotions::is_valid(size()); }
+  inline bool is_valid() const {
+    return this->DesiredJointMotions::is_valid(size());
+  }
+
   bool is_valid(int dim) const {
-    bool ret = static_cast<int>(joint_names_.size()) == dim;
-    ret &= ConstrainedValues::is_valid(dim);
-    return ret;
+    if (static_cast<int>(joint_names_.size()) != dim) {
+      return false;
+    }
+    return this->ConstrainedValues::is_valid(dim);
   }
 
   virtual bool operator== (const DesiredJointMotions& other) const {
-    bool equal = joint_names_.size() == other.joint_names_.size();
-    if (!equal)
-      return equal;
+    if (joint_names_.size() != other.joint_names_.size()) {
+      return false;
+    }
     for (size_t i = 0; i < joint_names_.size(); ++i) {
-      equal &= joint_names_[i].compare(other.joint_names_[i]) == 0;
+      if (joint_names_[i].compare(other.joint_names_[i]) != 0) {
+        return false;
+      }
     }
 
-    equal &= this->ConstrainedValues::operator==(other);
+    return this->ConstrainedValues::operator==(other);
+  }
 
-    return equal;
+  inline virtual bool operator!= (const DesiredJointMotions& other) const {
+    return !(this->operator==(other));
   }
 
   // Getters
@@ -607,7 +668,9 @@ class DesiredCentroidalMomentumDot : public ConstrainedValues {
  public:
   DesiredCentroidalMomentumDot() : ConstrainedValues(kTwistSize) {}
 
-  bool is_valid() const { return ConstrainedValues::is_valid(kTwistSize); }
+  inline bool is_valid() const {
+    return this->ConstrainedValues::is_valid(kTwistSize);
+  }
 
   inline std::string get_row_name(int i) const {
     static const std::string row_name[6] = {"AngMom[X]", "AngMom[Y]",
@@ -642,29 +705,91 @@ class QPInput {
     desired_joint_motions_ = DesiredJointMotions(names);
   }
 
+  inline bool is_valid() const {
+    return is_valid(desired_joint_motions_.size());
+  }
+
   /**
    * Checks validity of this QPInput.
    * @param num_vd Dimension of acceleration in the generalized coordinates.
    * @return true if this is valid.
    */
   bool is_valid(int num_vd) const {
-    int valid = num_vd == desired_joint_motions_.size();
-    valid &= desired_joint_motions_.is_valid(num_vd);
-    for (auto it = desired_body_motions_.begin();
-         it != desired_body_motions_.end(); ++it) {
-      valid &= it->second.is_valid();
+    if (num_vd != desired_joint_motions_.size()) {
+      return false;
+    }
+    if (!desired_joint_motions_.is_valid(num_vd)) {
+      return false;
     }
 
-    for (const ContactInformation& contact : contact_info_)
-      valid &= contact.is_valid();
+    for (const auto& body_motion_pair : desired_body_motions_) {
+      if (!body_motion_pair.second.is_valid()) {
+        return false;
+      }
+    }
 
-    valid &= desired_centroidal_momentum_dot_.is_valid();
+    for (const auto& contact_pair : contact_info_) {
+      if (!contact_pair.second.is_valid()) {
+        return false;
+      }
+    }
 
-    valid &= std::isfinite(w_basis_reg_);
+    if (!desired_centroidal_momentum_dot_.is_valid()) {
+      return false;
+    }
+
     // Regularization weight needs to be positive.
-    valid &= w_basis_reg_ > 0;
+    if (!std::isfinite(w_basis_reg_) || w_basis_reg_ <= 0) {
+      return false;
+    }
 
-    return valid;
+    return true;
+  }
+
+  bool operator== (const QPInput& other) const {
+    if (contact_info_.size() != other.contact_info_.size() ||
+        desired_body_motions_.size() != other.desired_body_motions_.size()) {
+      return false;
+    }
+
+    for (const auto& contact_pair : contact_info_) {
+      auto it = other.contact_info_.find(contact_pair.first);
+      if (it == other.contact_info_.end()) {
+        return false;
+      }
+      if (!(contact_pair.second == it->second)) {
+        return false;
+      }
+    }
+
+    for (const auto& body_motion_pair : desired_body_motions_) {
+      auto it = other.desired_body_motions_.find(body_motion_pair.first);
+      if (it == other.desired_body_motions_.end()) {
+        return false;
+      }
+      if (!(body_motion_pair.second == it->second)) {
+        return false;
+      }
+    }
+
+    if (!(desired_joint_motions_ == other.desired_joint_motions_)) {
+      return false;
+    }
+
+    if (!(desired_centroidal_momentum_dot_ == other.desired_centroidal_momentum_dot_)) {
+      return false;
+    }
+
+    if (w_basis_reg_ != other.w_basis_reg_) {
+      std::cout << w_basis_reg_ << " " << other.w_basis_reg_;
+      return false;
+    }
+
+    return true;
+  }
+
+  inline bool operator!= (const QPInput& other) const {
+    return !(this->operator==(other));
   }
 
   // Getters
@@ -672,7 +797,7 @@ class QPInput {
   inline const std::string& coord_name(size_t idx) const {
     return desired_joint_motions_.joint_name(idx);
   }
-  inline const std::list<ContactInformation>& contact_info() const {
+  inline const std::map<std::string, ContactInformation>& contact_information() const {
     return contact_info_;
   }
   inline const std::map<std::string, DesiredBodyMotion>& desired_body_motions()
@@ -689,7 +814,7 @@ class QPInput {
 
   // Setters
   inline double& mutable_w_basis_reg() { return w_basis_reg_; }
-  inline std::list<ContactInformation>& mutable_contact_info() {
+  inline std::map<std::string, ContactInformation>& mutable_contact_information() {
     return contact_info_;
   }
   inline std::map<std::string, DesiredBodyMotion>&
@@ -706,7 +831,7 @@ class QPInput {
 
  private:
   // Contact information
-  std::list<ContactInformation> contact_info_;
+  std::map<std::string, ContactInformation> contact_info_;
 
   // Desired task space accelerations for specific bodies
   std::map<std::string, DesiredBodyMotion> desired_body_motions_;
@@ -737,12 +862,26 @@ class ResolvedContact {
   explicit ResolvedContact(const RigidBody& body) : body_(&body) {}
 
   bool is_valid() const {
-    bool ret = basis_.allFinite() && basis_.minCoeff() >= 0;
-    for (const Eigen::Vector3d& ptf : point_forces_) ret &= ptf.allFinite();
-    for (const Eigen::Vector3d& pt : contact_points_) ret &= pt.allFinite();
-    ret &= equivalent_wrench_.allFinite();
-    ret &= reference_point_.allFinite();
-    return ret;
+    if (!basis_.allFinite() || basis_.minCoeff() < 0) {
+      return false;
+    }
+    for (const Eigen::Vector3d& ptf : point_forces_) {
+      if (!ptf.allFinite()) {
+        return false;
+      }
+    }
+    for (const Eigen::Vector3d& pt : contact_points_) {
+      if (!pt.allFinite()) {
+        return false;
+      }
+    }
+    if (!equivalent_wrench_.allFinite()) {
+      return false;
+    }
+    if (!reference_point_.allFinite()) {
+      return false;
+    }
+    return true;
   }
 
   // Getters
@@ -855,24 +994,31 @@ class QPOutput {
   }
 
   bool is_valid(int num_vd, int num_actuators) const {
-    bool ret = static_cast<int>(coord_names_.size()) == vd_.size();
-    ret &= vd_.size() == num_vd;
-    ret &= joint_torque_.size() == num_actuators;
+    if (static_cast<int>(coord_names_.size()) != vd_.size() ||
+        vd_.size() != num_vd ||
+        joint_torque_.size() != num_actuators) {
+      return false;
+    }
 
-    ret &= comdd_.allFinite();
-    ret &= centroidal_momentum_dot_.allFinite();
-    ret &= vd_.allFinite();
-    ret &= joint_torque_.allFinite();
+    if (!comdd_.allFinite() ||
+        !centroidal_momentum_dot_.allFinite() ||
+        !vd_.allFinite()) {
+      return false;
+    }
 
     for (const BodyAcceleration& body_acceleration : body_accelerations_) {
-      ret &= body_acceleration.is_valid();
+      if (!body_acceleration.is_valid()) {
+        return false;
+      }
     }
 
     for (const ResolvedContact& contact : resolved_contacts_) {
-      ret &= contact.is_valid();
+      if (!contact.is_valid()) {
+        return false;
+      }
     }
 
-    return ret;
+    return true;
   }
 
   // Getters

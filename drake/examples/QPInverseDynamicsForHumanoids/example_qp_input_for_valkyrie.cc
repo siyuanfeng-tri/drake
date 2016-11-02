@@ -69,8 +69,8 @@ QPInput MakeExampleQPInput(const RigidBodyTree& robot) {
   right_foot_contact.mutable_weight() = -1;
   right_foot_contact.mutable_Kd() = 8;
 
-  input.mutable_contact_info().push_back(left_foot_contact);
-  input.mutable_contact_info().push_back(right_foot_contact);
+  input.mutable_contact_information().emplace(left_foot_contact.body_name(), left_foot_contact);
+  input.mutable_contact_information().emplace(right_foot_contact.body_name(), right_foot_contact);
 
   return input;
 }

@@ -14,6 +14,7 @@
 #include "drake/lcmt_desired_centroidal_momentum_dot.hpp"
 #include "drake/lcmt_desired_joint_motions.hpp"
 #include "drake/lcmt_desired_body_motion.hpp"
+#include "drake/lcmt_qp_input.hpp"
 
 namespace drake {
 namespace examples {
@@ -21,6 +22,9 @@ namespace qp_inverse_dynamics {
 
 ConstraintType DecodeConstraintType(int8_t type);
 int8_t EncodeConstraintType(ConstraintType type);
+
+void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput* qp_input);
+void EncodeQPInput(const QPInput& qp_input, lcmt_qp_input* msg);
 
 void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValues* val);
 void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_values* msg);
@@ -36,6 +40,7 @@ void EncodeDesiredJointMotions(const DesiredJointMotions& joint_motions, lcmt_de
 
 void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion);
 void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_body_motion* msg);
+
 // TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 /**
  * Make a bot_core::robot_state_t lcm message based on given information.
