@@ -45,7 +45,7 @@ class ValkyrieSystem : public LeafSystem<double> {
             robot_.get_num_positions() + robot_.get_num_velocities(),
             systems::kInheritedSampling).get_index();
 
-    zero_torque_ = Eigen::VectorXd::Zero(robot_.actuators.size());
+    zero_torque_ = VectorX<double>::Zero(robot_.actuators.size());
 
     DRAKE_ASSERT(this->get_num_input_ports() == 1);
     DRAKE_ASSERT(this->get_num_output_ports() == 2);
@@ -86,14 +86,14 @@ class ValkyrieSystem : public LeafSystem<double> {
                   SystemOutput<double>* output) const override {
     const ContinuousState<double>& state =
         *context.get_state().get_continuous_state();
-    Eigen::VectorXd q = state.get_generalized_position().CopyToVector();
-    Eigen::VectorXd v = state.get_generalized_velocity().CopyToVector();
+    VectorX<double> q = state.get_generalized_position().CopyToVector();
+    VectorX<double> v = state.get_generalized_velocity().CopyToVector();
 
     bot_core::robot_state_t& msg =
         output->GetMutableData(output_port_index_robot_state_msg_)
             ->GetMutableValue<bot_core::robot_state_t>();
     EncodeRobotStateLcmMsg(joint_names_, context.get_time(), q, v, zero_torque_,
-                           Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero(),
+                           Vector6<double>::Zero(), Vector6<double>::Zero(),
                            &msg);
 
     // Set state output.
@@ -113,7 +113,7 @@ class ValkyrieSystem : public LeafSystem<double> {
     // Get the acceleration from qpouput.
     const QPOutput* qpout =
         EvalInputValue<QPOutput>(context, input_port_index_qp_output_);
-    const Eigen::VectorXd& vd = qpout->vd();
+    const VectorX<double>& vd = qpout->vd();
 
     // Get the current state.
     const ContinuousState<double>& state =
@@ -161,7 +161,7 @@ class ValkyrieSystem : public LeafSystem<double> {
     }
 
     rs->Update(context->get_time(), q->CopyToVector(), v->CopyToVector(),
-               zero_torque_, Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero());
+               zero_torque_, Vector6<double>::Zero(), Vector6<double>::Zero());
     return rs;
   }
 
@@ -217,7 +217,7 @@ class ValkyrieSystem : public LeafSystem<double> {
 
     std::unique_ptr<HumanoidStatus> rs(new HumanoidStatus(robot_));
     rs->Update(context.get_time(), q.CopyToVector(), v.CopyToVector(),
-               zero_torque_, Eigen::Vector6d::Zero(), Eigen::Vector6d::Zero());
+               zero_torque_, Vector6<double>::Zero(), Vector6<double>::Zero());
     return rs;
   }
 
@@ -249,7 +249,7 @@ class ValkyrieSystem : public LeafSystem<double> {
   int output_port_index_robot_state_msg_;
   int output_port_index_raw_state_;
 
-  Eigen::VectorXd zero_torque_;
+  VectorX<double> zero_torque_;
 };
 
 }  // namespace qp_inverse_dynamics

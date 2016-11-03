@@ -20,13 +20,39 @@ static std::string urdf =
           "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf");
 static RigidBodyTree robot(urdf, drake::systems::plants::joints::kRollPitchYaw);
 
+template <typename Derived, typename Scalar>
+void TestEigenVectorAndStdVector(const Eigen::MatrixBase<Derived>& eigvec, const std::vector<Scalar>& stdvec) {
+  EXPECT_TRUE(eigvec.rows() == 1 || eigvec.cols() == 1);
+  EXPECT_TRUE(static_cast<size_t>(eigvec.size()) == stdvec.size());
+  for (size_t i = 0; i < stdvec.size(); ++i) {
+    EXPECT_TRUE(static_cast<Scalar>(eigvec(i)) == stdvec[i]);
+  }
+}
+
+template <typename Derived, typename Scalar, size_t Size>
+void TestEigenVectorAndCArray(const Eigen::MatrixBase<Derived>& eigvec, const Scalar (&array)[Size]) {
+  EXPECT_TRUE(eigvec.rows() == 1 || eigvec.cols() == 1);
+  EXPECT_TRUE(static_cast<size_t>(eigvec.size()) == Size);
+  for (size_t i = 0; i < Size; ++i) {
+    EXPECT_TRUE(static_cast<Scalar>(eigvec(i)) == array[i]);
+  }
+}
+
+template <typename Derived, typename Scalar>
+void TestEigenMatrixAndStdVectorOfStdVector(const Eigen::MatrixBase<Derived>& eigmat, const std::vector<std::vector<Scalar>>& stdvecvec) {
+  EXPECT_TRUE(static_cast<size_t>(eigmat.rows()) == stdvecvec.size());
+  for (int row = 0; row < eigmat.rows(); ++row) {
+    TestEigenVectorAndStdVector(eigmat.row(row), stdvecvec[row]);
+  }
+}
+
 // Resize val to the given dimension, then set value and weight to alternating
 // positive and negative values, finally set the constraint type based on the
 // weight's sign.
 static void SetConstrainedValues(ConstrainedValues* val, int dim) {
   if (!val) return;
-  val->mutable_values() = Eigen::VectorXd::Random(dim);
-  val->mutable_weights() = Eigen::VectorXd::Random(dim);
+  val->mutable_values() = VectorX<double>::Random(dim);
+  val->mutable_weights() = VectorX<double>::Random(dim);
   val->mutable_constraint_types().resize(dim);
   for (int i = 0; i < dim; ++i) {
     val->mutable_value(i) = i * M_PI;
@@ -54,9 +80,9 @@ static void TestConstrainedValuesMsg(const ConstrainedValues& val, const lcmt_co
   EXPECT_TRUE(static_cast<int>(msg.types.size()) == msg.size);
   for (int i = 0; i < val.size(); i++) {
     EXPECT_TRUE(msg.types[i] == EncodeConstraintType(val.constraint_type(i)));
-    EXPECT_TRUE(msg.weights[i] == val.weight(i));
-    EXPECT_TRUE(msg.values[i] == val.value(i));
   }
+  TestEigenVectorAndStdVector(val.weights(), msg.weights);
+  TestEigenVectorAndStdVector(val.values(), msg.values);
 
   ConstrainedValues decoded_val;
   DecodeConstrainedValues(msg, &decoded_val);
@@ -65,17 +91,10 @@ static void TestConstrainedValuesMsg(const ConstrainedValues& val, const lcmt_co
 
 static void TestEncodeContactInformation(const ContactInformation& info, const lcmt_contact_information& msg) {
   EXPECT_TRUE(msg.body_name.compare(info.body_name()) == 0);
-  EXPECT_TRUE(msg.num_contact_points == static_cast<int>(info.contact_points().size()));
+  EXPECT_TRUE(msg.num_contact_points == info.num_contact_points());
   EXPECT_TRUE(msg.num_basis_per_contact_point == info.num_basis_per_contact_point());
-  for (int i = 0; i < 3; ++i) {
-    EXPECT_TRUE(static_cast<int>(msg.contact_points[i].size()) == msg.num_contact_points);
-    for (int j = 0; j < msg.num_contact_points; ++j) {
-      EXPECT_TRUE(msg.contact_points[i][j] == info.contact_points()[j][i]);
-    }
-  }
-  for (int i = 0; i < 3; ++i) {
-    EXPECT_TRUE(msg.normal[i] == info.normal()[i]);
-  }
+  TestEigenMatrixAndStdVectorOfStdVector(info.contact_points(), msg.contact_points);
+  TestEigenVectorAndCArray(info.normal(), msg.normal);
   EXPECT_TRUE(msg.mu == info.mu());
   EXPECT_TRUE(msg.Kd == info.Kd());
   EXPECT_TRUE(msg.weight == info.weight());
@@ -124,6 +143,56 @@ static void TestEncodeQPInput(const QPInput& qp_input, const lcmt_qp_input& msg)
   EXPECT_TRUE(msg.w_basis_reg == qp_input.w_basis_reg());
 }
 
+static void TestResolvedContact(const ResolvedContact& contact, const lcmt_resolved_contact& msg) {
+  EXPECT_TRUE(contact.body_name().compare(msg.body_name) == 0);
+  EXPECT_TRUE(contact.basis().size() == msg.num_all_basis);
+  EXPECT_TRUE(contact.num_basis_per_contact_point() == msg.num_basis_per_contact_point);
+  TestEigenVectorAndStdVector(contact.basis(), msg.basis);
+  TestEigenMatrixAndStdVectorOfStdVector(contact.point_forces(), msg.point_forces);
+  TestEigenMatrixAndStdVectorOfStdVector(contact.contact_points(), msg.contact_points);
+  TestEigenVectorAndCArray(contact.equivalent_wrench(), msg.equivalent_wrench);
+  TestEigenVectorAndCArray(contact.reference_point(), msg.reference_point);
+}
+
+static void TestBodyAcceleration(const BodyAcceleration& acc, const lcmt_body_acceleration& msg) {
+  EXPECT_TRUE(acc.body_name().compare(msg.body_name) == 0);
+  TestEigenVectorAndCArray(acc.accelerations(), msg.accelerations);
+}
+
+GTEST_TEST(testLcmUtils, testEncodeDecodeResolvedContact) {
+  ResolvedContact contact(*robot.FindBody("leftFoot"));
+  contact.mutable_num_basis_per_contact_point() = 4;
+  contact.mutable_basis().resize(4);
+  contact.mutable_basis() << 0.1, 0.0, 0.2, 0.3;
+  contact.mutable_point_forces().resize(3, 1);
+  contact.mutable_point_forces() << 0.1, 0.2, 0.3;
+  contact.mutable_contact_points().resize(3, 1);
+  contact.mutable_contact_points() << -0.1, -0.2, -0.3;
+  contact.mutable_equivalent_wrench() << 1, 2, 3, 4, 5, 6;
+  contact.mutable_reference_point() << -1, -2, -3;
+
+  lcmt_resolved_contact msg;
+  EncodeResolvedContact(contact, &msg);
+  TestResolvedContact(contact, msg);
+
+  ResolvedContact decoded_contact(*robot.FindBody("world"));
+  DecodeResolvedContact(robot, msg, &decoded_contact);
+  EXPECT_TRUE(decoded_contact == contact);
+}
+
+GTEST_TEST(testLcmUtils, testEncodeDecodeBodyAcceleration) {
+  BodyAcceleration acc(*robot.FindBody("leftFoot"));
+  acc.mutable_accelerations() << 1, 2, 3, 4, 5, 6;
+
+  lcmt_body_acceleration msg;
+  EncodeBodyAcceleration(acc, &msg);
+  TestBodyAcceleration(acc, msg);
+
+  BodyAcceleration decoded_acc(*robot.FindBody("world"));
+  DecodeBodyAcceleration(robot, msg, &decoded_acc);
+  EXPECT_TRUE(decoded_acc == acc);
+}
+
 // Test encode / decode of ConstrainedValues.
 GTEST_TEST(testLcmUtils, testEncodeDecodeConstrainedValues) {
   ConstrainedValues val;
@@ -143,8 +212,9 @@ GTEST_TEST(testLcmUtils, testEncodeDecodeConstrainedValues) {
 // Test encode / decode of ContactInformation.
 GTEST_TEST(testLcmUtils, testEncodeDecodeContactInformation) {
   ContactInformation info(*robot.FindBody("leftFoot"), 5);
-  info.mutable_contact_points().push_back(Eigen::Vector3d(0.3, -0.1, 1));
-  info.mutable_contact_points().push_back(Eigen::Vector3d(-0.3, 0.1, -1));
+  info.mutable_contact_points().resize(3, 2);
+  info.mutable_contact_points().col(0) = Vector3<double>(0.3, -0.1, 1);
+  info.mutable_contact_points().col(1) = Vector3<double>(-0.3, 0.1, -1);
   info.mutable_acceleration_constraint_type() = ConstraintType::Soft;
   info.mutable_weight() = M_PI;
   info.mutable_Kd() = 0.3;

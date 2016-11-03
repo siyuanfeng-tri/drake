@@ -4,9 +4,8 @@
 #include <vector>
 #include <unordered_map>
 
-#include <Eigen/Dense>
-
 #include "bot_core/robot_state_t.hpp"
+#include "drake/common/eigen_types.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 
 #include "drake/lcmt_constrained_values.hpp"
@@ -15,6 +14,8 @@
 #include "drake/lcmt_desired_dof_motions.hpp"
 #include "drake/lcmt_desired_body_motion.hpp"
 #include "drake/lcmt_qp_input.hpp"
+#include "drake/lcmt_resolved_contact.hpp"
+#include "drake/lcmt_body_acceleration.hpp"
 
 namespace drake {
 namespace examples {
@@ -41,6 +42,12 @@ void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions, lcmt_desired_
 void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion);
 void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_body_motion* msg);
 
+void DecodeBodyAcceleration(const RigidBodyTree& robot, const lcmt_body_acceleration& msg, BodyAcceleration* acc);
+void EncodeBodyAcceleration(const BodyAcceleration& acc, lcmt_body_acceleration* msg);
+
+void DecodeResolvedContact(const RigidBodyTree& robot, const lcmt_resolved_contact& msg, ResolvedContact* contact);
+void EncodeResolvedContact(const ResolvedContact& contact, lcmt_resolved_contact* msg);
+
 // TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 /**
  * Make a bot_core::robot_state_t lcm message based on given information.
@@ -59,9 +66,9 @@ void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_
  * @param msg Output lcm message
  */
 void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
-                            double time, const Eigen::VectorXd& q,
-                            const Eigen::VectorXd& qd,
-                            const Eigen::VectorXd& joint_torque,
+                            double time, const VectorX<double>& q,
+                            const VectorX<double>& qd,
+                            const VectorX<double>& joint_torque,
                             const Vector6<double>& l_foot_wrench,
                             const Vector6<double>& r_foot_wrench,
                             bot_core::robot_state_t* msg);
@@ -88,7 +95,7 @@ void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
 void DecodeRobotStateLcmMsg(
     const bot_core::robot_state_t& msg,
     const std::unordered_map<std::string, int>& q_name_to_index, double* time,
-    Eigen::VectorXd* q, Eigen::VectorXd* qd, Eigen::VectorXd* joint_torque,
+    VectorX<double>* q, VectorX<double>* qd, VectorX<double>* joint_torque,
     Vector6<double>* l_foot_wrench, Vector6<double>* r_foot_wrench);
 
 }  // namespace qp_inverse_dynamics

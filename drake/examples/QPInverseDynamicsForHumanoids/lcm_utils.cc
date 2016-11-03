@@ -6,11 +6,69 @@
 #include "drake/math/quaternion.h"
 #include "drake/math/roll_pitch_yaw.h"
 #include "drake/util/drakeGeometryUtil.h"
+#include "drake/util/drakeUtil.h"
 #include "drake/util/lcmUtil.h"
 
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
+
+void DecodeBodyAcceleration(const RigidBodyTree& robot, const lcmt_body_acceleration& msg, BodyAcceleration* acc) {
+  if (!acc) return;
+  acc->set_body(*robot.FindBody(msg.body_name));
+  cArrayToEigenVector(msg.accelerations, acc->mutable_accelerations());
+
+  if (!acc->is_valid()) {
+    throw std::runtime_error("invalid ResolvedContact");
+  }
+}
+
+void EncodeBodyAcceleration(const BodyAcceleration& acc, lcmt_body_acceleration* msg) {
+  if (!msg) return;
+  if (!acc.is_valid()) {
+    throw std::runtime_error("invalid ResolvedContact");
+  }
+  msg->body_name = acc.body_name();
+  eigenVectorToCArray(acc.accelerations(), msg->accelerations);
+}
+
+void DecodeResolvedContact(const RigidBodyTree& robot, const lcmt_resolved_contact& msg, ResolvedContact* contact) {
+  if (!contact) return;
+  contact->set_body(*robot.FindBody(msg.body_name));
+  contact->mutable_basis().resize(msg.num_all_basis);
+  contact->mutable_num_basis_per_contact_point() = msg.num_basis_per_contact_point;
+  stdVectorToEigenVector(msg.basis, contact->mutable_basis());
+
+  contact->mutable_point_forces().resize(3, msg.num_contact_points);
+  stdVectorOfStdVectorsToEigen(msg.point_forces, contact->mutable_point_forces());
+  contact->mutable_contact_points().resize(3, msg.num_contact_points);
+  stdVectorOfStdVectorsToEigen(msg.contact_points, contact->mutable_contact_points());
+
+  cArrayToEigenVector(msg.equivalent_wrench, contact->mutable_equivalent_wrench());
+  cArrayToEigenVector(msg.reference_point, contact->mutable_reference_point());
+
+  if (!contact->is_valid()) {
+    throw std::runtime_error("invalid ResolvedContact");
+  }
+}
+
+void EncodeResolvedContact(const ResolvedContact& contact, lcmt_resolved_contact* msg) {
+  if (!msg) return;
+  if (!contact.is_valid()) {
+    throw std::runtime_error("invalid ResolvedContact");
+  }
+  msg->body_name = contact.body_name();
+  msg->num_all_basis = contact.basis().size();
+  msg->num_basis_per_contact_point = contact.num_basis_per_contact_point();
+  eigenVectorToStdVector(contact.basis(), msg->basis);
+
+  msg->num_contact_points = contact.num_contact_points();
+  eigenToStdVectorOfStdVectors(contact.point_forces(), msg->point_forces);
+  eigenToStdVectorOfStdVectors(contact.contact_points(), msg->contact_points);
+
+  eigenVectorToCArray(contact.equivalent_wrench(), msg->equivalent_wrench);
+  eigenVectorToCArray(contact.reference_point(), msg->reference_point);
+}
 
 void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput* qp_input) {
   if (!qp_input) return;
@@ -97,7 +155,7 @@ ConstraintType DecodeConstraintType(int8_t type) {
 void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion) {
   if (!body_motion) return;
 
-  *body_motion = DesiredBodyMotion(*robot.FindBody(msg.body_name));
+  body_motion->set_body(*robot.FindBody(msg.body_name));
   body_motion->mutable_control_during_contact() = msg.control_during_contact;
   DecodeConstrainedValues(msg.constrained_accelerations, body_motion);
 
@@ -164,12 +222,12 @@ void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValu
     throw std::runtime_error("lcmt_constrained_values has inconsistent dimensions.");
   }
 
-  *val = ConstrainedValues(msg.size);
+  val->resize(msg.size);
   for (int i = 0; i < msg.size; ++i) {
     val->mutable_constraint_type(i) = DecodeConstraintType(msg.types[i]);
-    val->mutable_value(i) = msg.values[i];
-    val->mutable_weight(i) = msg.weights[i];
   }
+  stdVectorToEigenVector(msg.values, val->mutable_values());
+  stdVectorToEigenVector(msg.weights, val->mutable_weights());
 
   if (!val->is_valid()) {
     throw std::runtime_error("invalid ConstrainedValues");
@@ -189,29 +247,18 @@ void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_valu
 
   for (int i = 0; i < static_cast<int>(msg->size); ++i) {
     msg->types[i] = EncodeConstraintType(val.constraint_type(i));
-    msg->weights[i] = val.weight(i);
-    msg->values[i] = val.value(i);
   }
+  eigenVectorToStdVector(val.values(), msg->values);
+  eigenVectorToStdVector(val.weights(), msg->weights);
 }
 
 void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_information& msg, ContactInformation* info) {
   if (!info) return;
-  *info = ContactInformation(*robot.FindBody(msg.body_name), msg.num_basis_per_contact_point);
-  info->mutable_contact_points().resize(msg.num_contact_points);
-  // Check dimension of contact_points.
-  if (msg.contact_points.size() != 3) {
-    throw std::runtime_error("invalid contact_points row dimensions");
-  }
-  for (const auto& row : msg.contact_points) {
-    if (static_cast<int>(row.size()) != msg.num_contact_points) {
-      throw std::runtime_error("invalid contact_points col dimensions");
-    }
-  }
-  // Parse contact points.
-  for (int i = 0; i < msg.num_contact_points; ++i) {
-    info->mutable_contact_points()[i] = Eigen::Vector3d(msg.contact_points[0][i], msg.contact_points[1][i], msg.contact_points[2][i]);
-  }
-  info->mutable_normal() = Eigen::Vector3d(msg.normal[0], msg.normal[1], msg.normal[2]);
+  info->set_body(*robot.FindBody(msg.body_name));
+  info->mutable_num_basis_per_contact_point() = msg.num_basis_per_contact_point;
+  info->mutable_contact_points().resize(3, msg.num_contact_points);
+  stdVectorOfStdVectorsToEigen(msg.contact_points, info->mutable_contact_points());
+  cArrayToEigenVector(msg.normal, info->mutable_normal());
   info->mutable_mu() = msg.mu;
   info->mutable_Kd() = msg.Kd;
 
@@ -230,19 +277,10 @@ void EncodeContactInformation(const ContactInformation& info, lcmt_contact_infor
   }
 
   msg->body_name = info.body().get_name();
-  msg->num_contact_points = static_cast<int>(info.contact_points().size());
+  msg->num_contact_points = info.num_contact_points();
   msg->num_basis_per_contact_point = info.num_basis_per_contact_point();
-  msg->contact_points.resize(3);
-  for (size_t i = 0; i < msg->contact_points.size(); ++i) {
-    msg->contact_points[i].resize(msg->num_contact_points);
-    for (int j = 0; j < msg->num_contact_points; ++j) {
-      msg->contact_points[i][j] = info.contact_points()[j][i];
-    }
-  }
-
-  for (int i = 0; i < 3; ++i) {
-    msg->normal[i] = info.normal()[i];
-  }
+  eigenToStdVectorOfStdVectors(info.contact_points(), msg->contact_points);
+  eigenVectorToCArray(info.normal(), msg->normal);
 
   msg->mu = info.mu();
   msg->Kd = info.Kd();
@@ -253,9 +291,9 @@ void EncodeContactInformation(const ContactInformation& info, lcmt_contact_infor
 
 // TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
-                            double time, const Eigen::VectorXd& q,
-                            const Eigen::VectorXd& qd,
-                            const Eigen::VectorXd& joint_torque,
+                            double time, const VectorX<double>& q,
+                            const VectorX<double>& qd,
+                            const VectorX<double>& joint_torque,
                             const Vector6<double>& l_foot_wrench,
                             const Vector6<double>& r_foot_wrench,
                             bot_core::robot_state_t* msg) {
@@ -301,16 +339,16 @@ void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
   }
 
   // Set base
-  Eigen::Isometry3d pose;
+  Isometry3<double> pose;
   pose.translation() = q.head<3>();
   pose.linear() = math::rpy2rotmat(q.segment<3>(3));
   EncodePose(pose, msg->pose);
 
-  Eigen::Vector3d rpy = q.segment<3>(3);
-  Eigen::Vector3d rpydot = qd.segment<3>(3);
-  Eigen::Matrix3d phi = Eigen::Matrix3d::Zero();
-  angularvel2rpydotMatrix(rpy, phi, (Eigen::MatrixXd*)nullptr,
-                          (Eigen::MatrixXd*)nullptr);
+  Vector3<double> rpy = q.segment<3>(3);
+  Vector3<double> rpydot = qd.segment<3>(3);
+  Matrix3<double> phi = Matrix3<double>::Zero();
+  angularvel2rpydotMatrix(rpy, phi, (Matrix3<double>*)nullptr,
+                          (Matrix3<double>*)nullptr);
 
   Vector6<double> vel;
   vel.head<3>() = phi.inverse() * rpydot;
@@ -322,7 +360,7 @@ void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
 void DecodeRobotStateLcmMsg(
     const bot_core::robot_state_t& msg,
     const std::unordered_map<std::string, int>& q_name_to_index, double* time,
-    Eigen::VectorXd* q, Eigen::VectorXd* qd, Eigen::VectorXd* joint_torque,
+    VectorX<double>* q, VectorX<double>* qd, VectorX<double>* joint_torque,
     Vector6<double>* l_foot_wrench, Vector6<double>* r_foot_wrench) {
   if (!q || !qd || !joint_torque || !l_foot_wrench || !r_foot_wrench) return;
   const int floating_base_dim_q_dim = kSpaceDimension + kRpySize;
@@ -356,13 +394,13 @@ void DecodeRobotStateLcmMsg(
   }
 
   // Set floating base joint state.
-  Eigen::Isometry3d pose = DecodePose(msg.pose);
+  Isometry3<double> pose = DecodePose(msg.pose);
   Vector6<double> vel = DecodeTwist(msg.twist);
-  Eigen::Vector3d rpy = math::rotmat2rpy(pose.linear());
-  Eigen::Matrix3d phi = Eigen::Matrix3d::Zero();
-  angularvel2rpydotMatrix(rpy, phi, (Eigen::MatrixXd*)nullptr,
-                          (Eigen::MatrixXd*)nullptr);
-  Eigen::Vector3d rpydot = phi * vel.head<3>();
+  Vector3<double> rpy = math::rotmat2rpy(pose.linear());
+  Matrix3<double> phi = Matrix3<double>::Zero();
+  angularvel2rpydotMatrix(rpy, phi, (Matrix3<double>*)nullptr,
+                          (Matrix3<double>*)nullptr);
+  Vector3<double> rpydot = phi * vel.head<3>();
 
   (*q)[q_name_to_index.at("base_x")] = pose.translation()[0];
   (*q)[q_name_to_index.at("base_y")] = pose.translation()[1];

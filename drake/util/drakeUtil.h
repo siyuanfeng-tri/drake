@@ -73,10 +73,22 @@ void eigenToCArrayOfArrays(const Eigen::MatrixBase<Derived>& source,
 template <typename DestScalar, size_t Size, typename Derived>
 void eigenVectorToCArray(const Eigen::MatrixBase<Derived>& source,
                          DestScalar (&destination)[Size]) {
+  DRAKE_ASSERT(source.rows() == 1 || source.cols() == 1);
   if (Size != source.size())
     throw std::runtime_error("Size of source doesn't match destination");
   for (size_t i = 0; i < Size; ++i) {
     destination[i] = static_cast<DestScalar>(source(i));
+  }
+}
+
+template <typename SourceScalar, size_t Size, typename Derived>
+void cArrayToEigenVector(const SourceScalar (&source)[Size],
+                         Eigen::MatrixBase<Derived>& destination) {
+  DRAKE_ASSERT(destination.rows() == 1 || destination.cols() == 1);
+  if (Size != destination.size())
+    throw std::runtime_error("Size of source doesn't match destination");
+  for (size_t i = 0; i < Size; ++i) {
+    destination(i) = static_cast<typename Derived::Scalar>(source[i]);
   }
 }
 
@@ -102,18 +114,44 @@ void eigenVectorToStdVector(const Eigen::MatrixBase<Derived>& source,
   }
 }
 
+template <typename SourceScalar, typename Derived>
+void stdVectorToEigenVector(const std::vector<SourceScalar>& source,
+                            Eigen::MatrixBase<Derived>& destination) {
+  DRAKE_ASSERT(destination.rows() == 1 || destination.cols() == 1);
+  if (static_cast<size_t>(destination.size()) != source.size())
+    throw std::runtime_error("Size of source doesn't match destination");
+  for (size_t i = 0; i < source.size(); ++i) {
+    destination(i) = static_cast<typename Derived::Scalar>(source[i]);
+  }
+}
+
 // note for if/when we split off all Matlab related stuff into a different file:
 // this function is not Matlab related
-template <typename Derived>
+template <typename DestScalar, typename Derived>
 void eigenToStdVectorOfStdVectors(
     const Eigen::MatrixBase<Derived>& source,
-    std::vector<std::vector<typename Derived::Scalar> >& destination) {
+    std::vector<std::vector<DestScalar> >& destination) {
   destination.resize(source.rows());
   for (Eigen::Index row = 0; row < source.rows(); ++row) {
     auto& destination_row = destination[row];
     destination_row.resize(source.cols());
     for (Eigen::Index col = 0; col < source.cols(); ++col) {
-      destination_row[col] = source(row, col);
+      destination_row[col] = static_cast<DestScalar>(source(row, col));
+    }
+  }
+}
+
+template <typename SourceScalar, typename Derived>
+void stdVectorOfStdVectorsToEigen(
+    const std::vector<std::vector<SourceScalar>>& source,
+    Eigen::MatrixBase<Derived>& destination) {
+  if (source.size() != static_cast<size_t>(destination.rows()))
+    throw std::runtime_error("Size of source doesn't match destination");
+  for (size_t row = 0; row < source.size(); ++row) {
+    if (source[row].size() != static_cast<size_t>(destination.cols()))
+      throw std::runtime_error("Size of source doesn't match destination");
+    for (size_t col = 0; col < source[row].size(); ++col) {
+      destination(row, col) = static_cast<typename Derived::Scalar>(source[row][col]);
     }
   }
 }

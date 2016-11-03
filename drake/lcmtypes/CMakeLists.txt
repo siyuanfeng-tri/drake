@@ -12,6 +12,8 @@ lcm_wrap_types(
   CPP_HEADERS cpp_install_headers
   PYTHON_SOURCES python_install_sources
   ${java_args}
+  lcmt_body_acceleration.lcm
+  lcmt_resolved_contact.lcm
   lcmt_constrained_values.lcm
   lcmt_contact_information.lcm
   lcmt_desired_centroidal_momentum_dot.lcm

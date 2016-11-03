@@ -36,14 +36,14 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
     // TODO(siyuan.feng): Move these to some param / config file eventually.
     // Set up gains.
     int dim = robot_.get_num_positions();
-    Kp_com_ = Eigen::Vector3d::Constant(40);
-    Kd_com_ = Eigen::Vector3d::Constant(12);
-    Kp_pelvis_ = Eigen::Vector6d::Constant(20);
-    Kd_pelvis_ = Eigen::Vector6d::Constant(8);
-    Kp_torso_ = Eigen::Vector6d::Constant(20);
-    Kd_torso_ = Eigen::Vector6d::Constant(8);
-    Kp_joints_ = Eigen::VectorXd::Constant(dim, 20);
-    Kd_joints_ = Eigen::VectorXd::Constant(dim, 8);
+    Kp_com_ = Vector3<double>::Constant(40);
+    Kd_com_ = Vector3<double>::Constant(12);
+    Kp_pelvis_ = Vector6<double>::Constant(20);
+    Kd_pelvis_ = Vector6<double>::Constant(8);
+    Kp_torso_ = Vector6<double>::Constant(20);
+    Kd_torso_ = Vector6<double>::Constant(8);
+    Kp_joints_ = VectorX<double>::Constant(dim, 20);
+    Kd_joints_ = VectorX<double>::Constant(dim, 8);
     // Don't do feedback on pelvis pose.
     Kp_joints_.head<6>().setZero();
     Kd_joints_.head<6>().setZero();
@@ -97,15 +97,15 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   void SetDesired(const HumanoidStatus& robot_status) {
     desired_com_ = robot_status.com();
     pelvis_PDff_ = CartesianSetpoint<double>(
-        robot_status.pelvis().pose(), Eigen::Vector6d::Zero(),
-        Eigen::Vector6d::Zero(), Kp_pelvis_, Kd_pelvis_);
+        robot_status.pelvis().pose(), Vector6<double>::Zero(),
+        Vector6<double>::Zero(), Kp_pelvis_, Kd_pelvis_);
     torso_PDff_ = CartesianSetpoint<double>(
-        robot_status.torso().pose(), Eigen::Vector6d::Zero(),
-        Eigen::Vector6d::Zero(), Kp_torso_, Kd_torso_);
+        robot_status.torso().pose(), Vector6<double>::Zero(),
+        Vector6<double>::Zero(), Kp_torso_, Kd_torso_);
     int dim = robot_status.position().size();
     joint_PDff_ = VectorSetpoint<double>(
-        robot_status.position(), Eigen::VectorXd::Zero(dim),
-        Eigen::VectorXd::Zero(dim), Kp_joints_, Kd_joints_);
+        robot_status.position(), VectorX<double>::Zero(dim),
+        VectorX<double>::Zero(dim), Kp_joints_, Kd_joints_);
   }
 
   /**
@@ -136,16 +136,16 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   CartesianSetpoint<double> pelvis_PDff_;
   CartesianSetpoint<double> torso_PDff_;
 
-  Eigen::Vector3d desired_com_;
-  Eigen::Vector3d Kp_com_;
-  Eigen::Vector3d Kd_com_;
+  Vector3<double> desired_com_;
+  Vector3<double> Kp_com_;
+  Vector3<double> Kd_com_;
 
-  Eigen::Vector6d Kp_pelvis_;
-  Eigen::Vector6d Kd_pelvis_;
-  Eigen::Vector6d Kp_torso_;
-  Eigen::Vector6d Kd_torso_;
-  Eigen::VectorXd Kp_joints_;
-  Eigen::VectorXd Kd_joints_;
+  Vector6<double> Kp_pelvis_;
+  Vector6<double> Kd_pelvis_;
+  Vector6<double> Kp_torso_;
+  Vector6<double> Kd_torso_;
+  VectorX<double> Kp_joints_;
+  VectorX<double> Kd_joints_;
 };
 
 }  // namespace qp_inverse_dynamics

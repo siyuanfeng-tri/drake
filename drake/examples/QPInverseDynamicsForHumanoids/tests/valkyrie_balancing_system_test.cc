@@ -113,7 +113,7 @@ GTEST_TEST(testQPInverseDynamicsController, testValkyrieBalancingSystem) {
   EXPECT_TRUE(CompareMatrices(rs1->position(), rs1->GetNominalPosition(), 1e-4,
                               MatrixCompareType::absolute));
   EXPECT_TRUE(CompareMatrices(
-      rs1->velocity(), Eigen::VectorXd::Zero(rs1->robot().get_num_velocities()),
+      rs1->velocity(), VectorX<double>::Zero(rs1->robot().get_num_velocities()),
       1e-4, MatrixCompareType::absolute));
 }
 

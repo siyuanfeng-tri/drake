@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "drake/common/eigen_types.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/solvers/mathematical_program.h"
 #include "drake/solvers/gurobi_solver.h"
@@ -23,21 +24,7 @@ namespace qp_inverse_dynamics {
  */
 enum class ConstraintType { Hard = -1, Skip = 0, Soft = 1 };
 
-inline std::ostream& operator<<(std::ostream& out, const ConstraintType& type) {
-  out << "constraint type: ";
-  switch (type) {
-    case ConstraintType::Hard:
-      out << "Hard\n";
-      break;
-    case ConstraintType::Skip:
-      out << "Skip\n";
-      break;
-    case ConstraintType::Soft:
-      out << "Soft\n";
-      break;
-  }
-  return out;
-}
+std::ostream& operator<< (std::ostream& out, const ConstraintType& type);
 
 /**
  * Base class for specifying various desired objectives.
@@ -48,16 +35,22 @@ inline std::ostream& operator<<(std::ostream& out, const ConstraintType& type) {
 class ConstrainedValues {
  private:
   std::vector<ConstraintType> constraint_types_;
-  Eigen::VectorXd weights_;
-  Eigen::VectorXd values_;
+  VectorX<double> weights_;
+  VectorX<double> values_;
 
  public:
   ConstrainedValues() {}
 
   explicit ConstrainedValues(int dim)
       : constraint_types_(dim, ConstraintType::Skip),
-        weights_(Eigen::VectorXd::Zero(dim)),
-        values_(Eigen::VectorXd::Zero(dim)) {}
+        weights_(VectorX<double>::Zero(dim)),
+        values_(VectorX<double>::Zero(dim)) {}
+
+  void resize(int dim) {
+    constraint_types_.resize(dim);
+    weights_.resize(dim);
+    values_.resize(dim);
+  }
 
   /**
    * Get all the indices that has the specified constraint type.
@@ -142,8 +135,8 @@ class ConstrainedValues {
 
   // Getters
   inline int size() const { return values_.size(); }
-  inline const Eigen::VectorXd& weights() const { return weights_; }
-  inline const Eigen::VectorXd& values() const { return values_; }
+  inline const VectorX<double>& weights() const { return weights_; }
+  inline const VectorX<double>& values() const { return values_; }
   inline const std::vector<ConstraintType>& constraint_types() const {
     return constraint_types_;
   }
@@ -155,8 +148,8 @@ class ConstrainedValues {
   }
 
   // Setters
-  inline Eigen::VectorXd& mutable_weights() { return weights_; }
-  inline Eigen::VectorXd& mutable_values() { return values_; }
+  inline VectorX<double>& mutable_weights() { return weights_; }
+  inline VectorX<double>& mutable_values() { return values_; }
   inline std::vector<ConstraintType>& mutable_constraint_types() {
     return constraint_types_;
   }
@@ -197,7 +190,7 @@ class ContactInformation {
       : body_(&body),
         num_basis_per_contact_point_(num_basis),
         acceleration_constraint_type_(ConstraintType::Hard) {
-    normal_ = Eigen::Vector3d(0, 0, 1);
+    normal_ = Vector3<double>(0, 0, 1);
     mu_ = 1;
     if (num_basis_per_contact_point_ < 3)
       throw std::runtime_error(
@@ -216,16 +209,16 @@ class ContactInformation {
    * initialized first.
    * @return Basis matrix
    */
-  Eigen::MatrixXd ComputeBasisMatrix(
+  MatrixX<double> ComputeBasisMatrix(
       const RigidBodyTree& robot, const KinematicsCache<double>& cache) const {
-    Eigen::MatrixXd basis(
-        3 * contact_points_.size(),
-        num_basis_per_contact_point_ * contact_points_.size());
-    Eigen::Matrix3d body_rot =
+    MatrixX<double> basis(
+        3 * contact_points_.cols(),
+        num_basis_per_contact_point_ * contact_points_.cols());
+    Matrix3<double> body_rot =
         robot.relativeTransform(cache, 0, body_->get_body_index()).linear();
     basis.setZero();
 
-    Eigen::Vector3d t1, t2, tangent_vec, base;
+    Vector3<double> t1, t2, tangent_vec, base;
     double theta;
 
     // Computes the tangent vectors that are perpendicular to normal_.
@@ -240,7 +233,7 @@ class ContactInformation {
     }
     t2 = t1.cross(normal_);
 
-    for (int i = 0; i < static_cast<int>(contact_points_.size()); ++i) {
+    for (int i = 0; i < contact_points_.cols(); ++i) {
       for (int k = 0; k < num_basis_per_contact_point_; ++k) {
         theta = k * 2 * M_PI / num_basis_per_contact_point_;
         tangent_vec = cos(theta) * t1 + sin(theta) * t2;
@@ -267,14 +260,14 @@ class ContactInformation {
    */
   void ComputeContactPointsAndWrenchReferencePoint(
       const RigidBodyTree& robot, const KinematicsCache<double>& cache,
-      const Eigen::Vector3d& offset,
-      std::vector<Eigen::Vector3d>* contact_points,
-      Eigen::Vector3d* reference_point) const {
+      const Vector3<double>& offset,
+      drake::Matrix3X<double>* contact_points,
+      Vector3<double>* reference_point) const {
     *reference_point =
         robot.transformPoints(cache, offset, body_->get_body_index(), 0);
-    contact_points->resize(contact_points_.size());
-    for (size_t i = 0; i < contact_points_.size(); ++i) {
-      (*contact_points)[i] = robot.transformPoints(cache, contact_points_[i],
+    contact_points->resize(3, contact_points_.cols());
+    for (int i = 0; i < contact_points_.cols(); ++i) {
+      contact_points->col(i) = robot.transformPoints(cache, contact_points_.col(i),
                                                    body_->get_body_index(), 0);
     }
   }
@@ -289,21 +282,21 @@ class ContactInformation {
    * @param referece_point the reference point for the equivalent wrench.
    * @return The matrix that converts point forces to an equivalent wrench.
    */
-  Eigen::MatrixXd ComputeWrenchMatrix(
-      const std::vector<Eigen::Vector3d>& contact_points,
-      const Eigen::Vector3d& reference_point) const {
-    if (contact_points.size() != contact_points_.size())
+  MatrixX<double> ComputeWrenchMatrix(
+      const Matrix3X<double>& contact_points,
+      const Vector3<double>& reference_point) const {
+    if (contact_points.cols() != contact_points_.cols())
       throw std::runtime_error("contact points size mismatch");
 
-    Eigen::MatrixXd force_to_wrench =
-        Eigen::MatrixXd::Zero(6, 3 * contact_points.size());
+    MatrixX<double> force_to_wrench =
+        MatrixX<double>::Zero(6, 3 * contact_points.cols());
     int col_idx = 0;
-    for (const Eigen::Vector3d& contact_point : contact_points) {
+    for (int i = 0; i < contact_points.cols(); ++i) {
       // Force part: just sum up all the point forces, so these are I
       force_to_wrench.block<3, 3>(3, col_idx).setIdentity();
       // Torque part:
       force_to_wrench.block<3, 3>(0, col_idx) =
-          drake::math::VectorToSkewSymmetric(contact_point - reference_point);
+          drake::math::VectorToSkewSymmetric(contact_points.col(i) - reference_point);
       col_idx += 3;
     }
     return force_to_wrench;
@@ -317,12 +310,12 @@ class ContactInformation {
    * first.
    * @return The stacked Jacobian matrix
    */
-  Eigen::MatrixXd ComputeJacobianAtContactPoints(
+  MatrixX<double> ComputeJacobianAtContactPoints(
       const RigidBodyTree& robot, const KinematicsCache<double>& cache) const {
-    Eigen::MatrixXd J(3 * contact_points_.size(), robot.get_num_velocities());
-    for (size_t i = 0; i < contact_points_.size(); ++i) {
+    MatrixX<double> J(3 * contact_points_.cols(), robot.get_num_velocities());
+    for (int i = 0; i < contact_points_.cols(); ++i) {
       J.block(3 * i, 0, 3, robot.get_num_velocities()) =
-          GetTaskSpaceJacobian(robot, cache, *body_, contact_points_[i])
+          GetTaskSpaceJacobian(robot, cache, *body_, contact_points_.col(i))
               .bottomRows<3>();
     }
     return J;
@@ -336,13 +329,13 @@ class ContactInformation {
    * first.
    * @return The stacked Jacobian dot times v vector
    */
-  Eigen::VectorXd ComputeJacobianDotTimesVAtContactPoints(
+  VectorX<double> ComputeJacobianDotTimesVAtContactPoints(
       const RigidBodyTree& robot, const KinematicsCache<double>& cache) const {
-    Eigen::VectorXd Jdv(3 * contact_points_.size());
-    for (size_t i = 0; i < contact_points_.size(); ++i) {
+    VectorX<double> Jdv(3 * contact_points_.cols());
+    for (int i = 0; i < contact_points_.cols(); ++i) {
       Jdv.segment<3>(3 * i) =
           GetTaskSpaceJacobianDotTimesV(robot, cache, *body_,
-                                        contact_points_[i]).bottomRows<3>();
+                                        contact_points_.col(i)).bottomRows<3>();
     }
     return Jdv;
   }
@@ -354,12 +347,12 @@ class ContactInformation {
    * first.
    * @return Stacked velocities.
    */
-  Eigen::VectorXd ComputeLinearVelocityAtContactPoints(
+  VectorX<double> ComputeLinearVelocityAtContactPoints(
       const RigidBodyTree& robot, const KinematicsCache<double>& cache) const {
-    Eigen::VectorXd vel(3 * contact_points_.size());
-    for (size_t i = 0; i < contact_points_.size(); ++i) {
+    VectorX<double> vel(3 * contact_points_.cols());
+    for (int i = 0; i < contact_points_.cols(); ++i) {
       vel.segment<3>(3 * i) =
-          GetTaskSpaceVel(robot, cache, *body_, contact_points_[i])
+          GetTaskSpaceVel(robot, cache, *body_, contact_points_.col(i))
               .bottomRows<3>();
     }
     return vel;
@@ -369,10 +362,8 @@ class ContactInformation {
     if (std::abs(normal_.norm() - 1) >= Eigen::NumTraits<double>::epsilon()) {
       return false;
     }
-    for (const Eigen::Vector3d& pt : contact_points_) {
-      if (!pt.allFinite()) {
-        return false;
-      }
+    if (!contact_points_.allFinite()) {
+      return false;
     }
     if (mu_ < 0) {
       return false;
@@ -398,13 +389,8 @@ class ContactInformation {
     if (body_ != other.body_) {
       return false;
     }
-    if (contact_points_.size() != other.contact_points_.size()) {
+    if (!contact_points_.isApprox(other.contact_points_)) {
       return false;
-    }
-    for (size_t i = 0; i < contact_points_.size(); ++i) {
-      if (!contact_points_[i].isApprox(other.contact_points_[i])) {
-        return false;
-      }
     }
     if (!normal_.isApprox(other.normal_)) {
       return false;
@@ -433,7 +419,7 @@ class ContactInformation {
 
   inline const std::string& body_name() const { return body_->get_name(); }
   inline int num_contact_points() const {
-    return static_cast<int>(contact_points_.size());
+    return contact_points_.cols();
   }
   inline int num_basis() const {
     return num_contact_points() * num_basis_per_contact_point_;
@@ -446,17 +432,17 @@ class ContactInformation {
   inline ConstraintType acceleration_constraint_type() const {
     return acceleration_constraint_type_;
   }
-  inline const std::vector<Eigen::Vector3d>& contact_points() const {
+  inline const Matrix3X<double>& contact_points() const {
     return contact_points_;
   }
-  inline const Eigen::Vector3d& normal() const { return normal_; }
+  inline const Vector3<double>& normal() const { return normal_; }
   inline const RigidBody& body() const { return *body_; }
   inline int num_basis_per_contact_point() const {
     return num_basis_per_contact_point_;
   }
 
   // Setters
-  inline std::vector<Eigen::Vector3d>& mutable_contact_points() {
+  inline Matrix3X<double>& mutable_contact_points() {
     return contact_points_;
   }
   inline double& mutable_mu() { return mu_; }
@@ -465,22 +451,23 @@ class ContactInformation {
   inline ConstraintType& mutable_acceleration_constraint_type() {
     return acceleration_constraint_type_;
   }
-  inline Eigen::Vector3d& mutable_normal() { return normal_; }
+  inline Vector3<double>& mutable_normal() { return normal_; }
   inline int& mutable_num_basis_per_contact_point() {
     return num_basis_per_contact_point_;
   }
+  inline void set_body(const RigidBody& body) { body_ = &body; }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
   const RigidBody* body_;
   // Offsets of the contact point specified in the body frame.
-  std::vector<Eigen::Vector3d> contact_points_;
+  Matrix3X<double> contact_points_;
 
   // TODO(siyuan.feng): Normal is currently assumed to be the same for all
   // the contact points.
   // Contact normal specified in the body frame.
-  Eigen::Vector3d normal_;
+  Vector3<double> normal_;
 
   int num_basis_per_contact_point_;
 
@@ -500,19 +487,7 @@ class ContactInformation {
   ConstraintType acceleration_constraint_type_;
 };
 
-inline std::ostream& operator<<(std::ostream& out,
-                                const ContactInformation& contact) {
-  out << "contact: " << contact.body_name() << std::endl;
-  out << "contact points in body frame: " << std::endl;
-  for (size_t j = 0; j < contact.contact_points().size(); ++j)
-    out << contact.contact_points()[j].transpose() << std::endl;
-  out << "normal in body frame: " << contact.normal().transpose() << std::endl;
-  out << "mu: " << contact.mu() << std::endl;
-  out << contact.acceleration_constraint_type();
-  out << "weight: " << contact.weight() << std::endl;
-  out << "Kd: " << contact.Kd() << std::endl;
-  return out;
-}
+std::ostream& operator<< (std::ostream& out, const ContactInformation& contact);
 
 /**
  * A wrapper class specifying desired body motion (acceleration) for a rigid
@@ -573,6 +548,7 @@ class DesiredBodyMotion : public ConstrainedValues {
   inline bool& mutable_control_during_contact() {
     return control_during_contact_;
   }
+  inline void set_body(const RigidBody& body) { body_ = &body; }
 
  private:
   const RigidBody* body_;
@@ -581,15 +557,7 @@ class DesiredBodyMotion : public ConstrainedValues {
   bool control_during_contact_;
 };
 
-inline std::ostream& operator<<(std::ostream& out,
-                                const DesiredBodyMotion& input) {
-  for (int i = 0; i < kTwistSize; ++i) {
-    out << "desired " << input.body_name() << input.get_row_name(i)
-        << " acc: " << input.values()[i] << " weight: " << input.weights()[i]
-        << " " << input.constraint_types()[i];
-  }
-  return out;
-}
+std::ostream& operator<< (std::ostream& out, const DesiredBodyMotion& input);
 
 /**
  * A wrapper class specifying desired DoF (degree of freedom)
@@ -642,14 +610,7 @@ class DesiredDoFMotions : public ConstrainedValues {
   std::vector<std::string> dof_names_;
 };
 
-inline std::ostream& operator<<(std::ostream& out,
-                                const DesiredDoFMotions& input) {
-  for (int i = 0; i < input.size(); ++i) {
-    out << "desired " << input.dof_name(i) << " acc: " << input.value(i)
-        << " weight: " << input.weight(i) << " " << input.constraint_type(i);
-  }
-  return out;
-}
+std::ostream& operator<< (std::ostream& out, const DesiredDoFMotions& input);
 
 /**
  * A wrapper class specifying desired centroidal momentum change and their
@@ -682,14 +643,7 @@ class DesiredCentroidalMomentumDot : public ConstrainedValues {
   }
 };
 
-inline std::ostream& operator<<(std::ostream& out,
-                                const DesiredCentroidalMomentumDot& input) {
-  for (int i = 0; i < 6; ++i) {
-    out << "desired " << input.get_row_name(i) << " change: " << input.value(i)
-        << " weight: " << input.weight(i) << " " << input.constraint_type(i);
-  }
-  return out;
-}
+std::ostream& operator<< (std::ostream& out, const DesiredCentroidalMomentumDot& input);
 
 /**
  * Input to the QP inverse dynamics controller
@@ -847,7 +801,7 @@ class QPInput {
   double w_basis_reg_;
 };
 
-std::ostream& operator<<(std::ostream& out, const QPInput& input);
+std::ostream& operator<< (std::ostream& out, const QPInput& input);
 
 /**
  * This class holds the contact force / wrench related information, and works
@@ -865,15 +819,17 @@ class ResolvedContact {
     if (!basis_.allFinite() || basis_.minCoeff() < 0) {
       return false;
     }
-    for (const Eigen::Vector3d& ptf : point_forces_) {
-      if (!ptf.allFinite()) {
-        return false;
-      }
+    if (basis_.size() != num_basis_per_contact_point_ * num_contact_points()) {
+      return false;
     }
-    for (const Eigen::Vector3d& pt : contact_points_) {
-      if (!pt.allFinite()) {
-        return false;
-      }
+    if (!point_forces_.allFinite()) {
+      return false;
+    }
+    if (!contact_points_.allFinite()) {
+      return false;
+    }
+    if (point_forces_.cols() != contact_points_.cols()) {
+      return false;
     }
     if (!equivalent_wrench_.allFinite()) {
       return false;
@@ -884,68 +840,96 @@ class ResolvedContact {
     return true;
   }
 
+  bool operator==(const ResolvedContact& other) const {
+    if (body_ != other.body_) {
+      return false;
+    }
+    if (num_basis_per_contact_point_ != other.num_basis_per_contact_point_) {
+      return false;
+    }
+    if (!basis_.isApprox(other.basis_)) {
+      return false;
+    }
+    if (!point_forces_.isApprox(other.point_forces_)) {
+      return false;
+    }
+    if (!contact_points_.isApprox(other.contact_points_)) {
+      return false;
+    }
+    if (!equivalent_wrench_.isApprox(other.equivalent_wrench_)) {
+      return false;
+    }
+    if (!reference_point_.isApprox(other.reference_point_)) {
+      return false;
+    }
+    return true;
+  }
+
   // Getters
   inline const RigidBody& body() const { return *body_; }
-  inline const std::string& name() const { return body_->get_name(); }
-  inline const Eigen::VectorXd& basis() const { return basis_; }
-  inline const std::vector<Eigen::Vector3d>& point_forces() const {
+  inline const std::string& body_name() const { return body_->get_name(); }
+  inline const VectorX<double>& basis() const { return basis_; }
+  inline const Matrix3X<double>& point_forces() const {
     return point_forces_;
   }
-  inline const Eigen::Vector3d& point_force(size_t i) const {
-    return point_forces_.at(i);
-  }
-  inline const std::vector<Eigen::Vector3d>& contact_points() const {
+  inline const Matrix3X<double>& contact_points() const {
     return contact_points_;
   }
-  inline const Eigen::Vector3d& contact_point(size_t i) const {
-    return contact_points_.at(i);
-  }
-  inline const Eigen::Vector6d& equivalent_wrench() const {
+  inline const Vector6<double>& equivalent_wrench() const {
     return equivalent_wrench_;
   }
-  inline const Eigen::Vector3d& reference_point() const {
+  inline const Vector3<double>& reference_point() const {
     return reference_point_;
+  }
+  inline int num_contact_points() const {
+    return contact_points_.cols();
+  }
+  inline int num_basis_per_contact_point() const {
+    return num_basis_per_contact_point_;
   }
 
   // Setters
-  inline Eigen::VectorXd& mutable_basis() { return basis_; }
-  inline std::vector<Eigen::Vector3d>& mutable_point_forces() {
+  inline void set_body(const RigidBody& body) { body_ = &body; }
+  inline VectorX<double>& mutable_basis() { return basis_; }
+  inline Matrix3X<double>& mutable_point_forces() {
     return point_forces_;
   }
-  inline Eigen::Vector3d& mutable_point_force(size_t i) {
-    return point_forces_.at(i);
-  }
-  inline std::vector<Eigen::Vector3d>& mutable_contact_points() {
+  inline Matrix3X<double>& mutable_contact_points() {
     return contact_points_;
   }
-  inline Eigen::Vector3d& mutable_contact_point(size_t i) {
-    return contact_points_.at(i);
-  }
-  inline Eigen::Vector6d& mutable_equivalent_wrench() {
+  inline Vector6<double>& mutable_equivalent_wrench() {
     return equivalent_wrench_;
   }
-  inline Eigen::Vector3d& mutable_reference_point() { return reference_point_; }
+  inline Vector3<double>& mutable_reference_point() { return reference_point_; }
+  inline int& mutable_num_basis_per_contact_point() {
+    return num_basis_per_contact_point_;
+  }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
   const RigidBody* body_;
+
+  int num_basis_per_contact_point_;
+
   // Stacked scalars for all the basis vectors.
-  Eigen::VectorXd basis_;
+  VectorX<double> basis_;
 
   // Point contact forces in the world frame.
-  std::vector<Eigen::Vector3d> point_forces_;
+  Matrix3X<double> point_forces_;
 
   // Contact points in the world frame.
-  std::vector<Eigen::Vector3d> contact_points_;
+  Matrix3X<double> contact_points_;
 
   // The equivalent wrench of all the point forces, w.r.t a frame that has
   // the same orientation as the world frame, but located at reference_point.
-  Eigen::Vector6d equivalent_wrench_;
+  Vector6<double> equivalent_wrench_;
 
   // Reference point in the world frame for the equivalent wrench.
-  Eigen::Vector3d reference_point_;
+  Vector3<double> reference_point_;
 };
+
+std::ostream& operator<< (std::ostream& out, const ResolvedContact& contact);
 
 /**
  * This class holds task space acceleration for a rigid body. The first three
@@ -958,24 +942,37 @@ class BodyAcceleration {
    * lifespan of this obejct.
    */
   explicit BodyAcceleration(const RigidBody& body)
-      : body_(&body), acceleration_(Eigen::Vector6d::Zero()) {}
+      : body_(&body), accelerations_(Vector6<double>::Zero()) {}
 
-  inline bool is_valid() const { return acceleration_.allFinite(); }
+  inline bool is_valid() const { return accelerations_.allFinite(); }
+
+  bool operator==(const BodyAcceleration& other) const {
+    if (body_ != other.body_) {
+      return false;
+    }
+    if (!accelerations_.isApprox(other.accelerations_)) {
+      return false;
+    }
+    return true;
+  }
 
   // Getters
   inline const RigidBody& body() const { return *body_; }
-  inline const std::string& name() const { return body_->get_name(); }
-  inline const Eigen::Vector6d& acceleration() const { return acceleration_; }
+  inline const std::string& body_name() const { return body_->get_name(); }
+  inline const Vector6<double>& accelerations() const { return accelerations_; }
 
   // Setter
-  inline Eigen::Vector6d& mutable_acceleration() { return acceleration_; }
+  inline Vector6<double>& mutable_accelerations() { return accelerations_; }
+  inline void set_body(const RigidBody& body) { body_ = &body; }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  protected:
   const RigidBody* body_;
-  Eigen::Vector6d acceleration_;
+  Vector6<double> accelerations_;
 };
+
+std::ostream& operator<< (std::ostream& out, const BodyAcceleration& acc);
 
 /**
  * Output of the QP inverse dynamics controller
@@ -1006,14 +1003,14 @@ class QPOutput {
       return false;
     }
 
-    for (const BodyAcceleration& body_acceleration : body_accelerations_) {
-      if (!body_acceleration.is_valid()) {
+    for (const auto& body_acceleration_pair : body_accelerations_) {
+      if (!body_acceleration_pair.second.is_valid()) {
         return false;
       }
     }
 
-    for (const ResolvedContact& contact : resolved_contacts_) {
-      if (!contact.is_valid()) {
+    for (const auto& contact_pair : resolved_contacts_) {
+      if (!contact_pair.second.is_valid()) {
         return false;
       }
     }
@@ -1025,23 +1022,17 @@ class QPOutput {
   inline const std::string& dof_name(int idx) const {
     return dof_names_.at(idx);
   }
-  inline const Eigen::Vector3d& comdd() const { return comdd_; }
-  inline const Eigen::Vector6d& centroidal_momentum_dot() const {
+  inline const Vector3<double>& comdd() const { return comdd_; }
+  inline const Vector6<double>& centroidal_momentum_dot() const {
     return centroidal_momentum_dot_;
   }
-  inline const Eigen::VectorXd& vd() const { return vd_; }
-  inline const std::vector<BodyAcceleration>& body_accelerations() const {
+  inline const VectorX<double>& vd() const { return vd_; }
+  inline const std::map<std::string, BodyAcceleration>& body_accelerations() const {
     return body_accelerations_;
   }
-  inline const BodyAcceleration& body_acceleration(size_t i) const {
-    return body_accelerations_.at(i);
-  }
-  inline const Eigen::VectorXd& joint_torque() const { return joint_torque_; }
-  inline const std::vector<ResolvedContact>& resolved_contacts() const {
+  inline const VectorX<double>& joint_torque() const { return joint_torque_; }
+  inline const std::map<std::string, ResolvedContact>& resolved_contacts() const {
     return resolved_contacts_;
-  }
-  inline const ResolvedContact& resolved_contact(size_t i) const {
-    return resolved_contacts_.at(i);
   }
   inline const std::vector<std::pair<std::string, double>>& costs() const {
     return costs_;
@@ -1051,24 +1042,18 @@ class QPOutput {
   }
 
   // Setters
-  inline Eigen::Vector3d& mutable_comdd() { return comdd_; }
-  inline Eigen::Vector6d& mutable_centroidal_momentum_dot() {
+  inline Vector3<double>& mutable_comdd() { return comdd_; }
+  inline Vector6<double>& mutable_centroidal_momentum_dot() {
     return centroidal_momentum_dot_;
   }
-  inline Eigen::VectorXd& mutable_vd() { return vd_; }
-  inline std::vector<BodyAcceleration>& mutable_body_accelerations() {
+  inline VectorX<double>& mutable_vd() { return vd_; }
+  inline std::map<std::string, BodyAcceleration>& mutable_body_accelerations() {
     return body_accelerations_;
   }
-  inline BodyAcceleration& mutable_body_acceleration(size_t i) {
-    return body_accelerations_.at(i);
-  }
-  inline std::vector<ResolvedContact>& mutable_resolved_contacts() {
+  inline std::map<std::string, ResolvedContact>& mutable_resolved_contacts() {
     return resolved_contacts_;
   }
-  inline ResolvedContact& mutable_resolved_contact(size_t i) {
-    return resolved_contacts_.at(i);
-  }
-  inline Eigen::VectorXd& mutable_joint_torque() { return joint_torque_; }
+  inline VectorX<double>& mutable_joint_torque() { return joint_torque_; }
 
   inline std::vector<std::pair<std::string, double>>& mutable_costs() {
     return costs_;
@@ -1083,28 +1068,28 @@ class QPOutput {
   // Names for each generalized coordinate.
   std::vector<std::string> dof_names_;
 
-  // Tracked body motion
-  std::vector<BodyAcceleration> body_accelerations_;
-
   // Computed accelerations for the center of mass in the world frame
-  Eigen::Vector3d comdd_;
+  Vector3<double> comdd_;
   // Computed centroidal momentum dot in the world frame: [angular; linear]
   // The linear part equals comdd_ * mass.
-  Eigen::Vector6d centroidal_momentum_dot_;
+  Vector6<double> centroidal_momentum_dot_;
   // Computed generalized coordinate accelerations
-  Eigen::VectorXd vd_;
+  VectorX<double> vd_;
   // Computed joint torque
-  Eigen::VectorXd joint_torque_;
+  VectorX<double> joint_torque_;
 
   // Computed contact related information such as point contact forces
-  std::vector<ResolvedContact> resolved_contacts_;
+  std::map<std::string, ResolvedContact> resolved_contacts_;
+
+  // Tracked body motion
+  std::map<std::string, BodyAcceleration> body_accelerations_;
 
   // Pair of the name of cost term and cost value (only the quadratic and linear
   // term, no constant term).
   std::vector<std::pair<std::string, double>> costs_;
 };
 
-std::ostream& operator<<(std::ostream& out, const QPOutput& output);
+std::ostream& operator<< (std::ostream& out, const QPOutput& output);
 
 class QPController {
  public:
@@ -1124,40 +1109,40 @@ class QPController {
 
  private:
   // These are temporary matrices and vectors used by the controller.
-  Eigen::MatrixXd tmp_vd_mat_;
-  Eigen::VectorXd tmp_vd_vec_;
-  Eigen::MatrixXd basis_reg_mat_;
-  Eigen::VectorXd basis_reg_vec_;
+  MatrixX<double> tmp_vd_mat_;
+  VectorX<double> tmp_vd_vec_;
+  MatrixX<double> basis_reg_mat_;
+  VectorX<double> basis_reg_vec_;
 
-  Eigen::MatrixXd stacked_contact_jacobians_;
-  Eigen::VectorXd stacked_contact_jacobians_dot_times_v_;
-  Eigen::VectorXd stacked_contact_velocities_;
-  Eigen::MatrixXd basis_to_force_matrix_;
+  MatrixX<double> stacked_contact_jacobians_;
+  VectorX<double> stacked_contact_jacobians_dot_times_v_;
+  VectorX<double> stacked_contact_velocities_;
+  MatrixX<double> basis_to_force_matrix_;
 
-  Eigen::MatrixXd torque_linear_;
-  Eigen::VectorXd torque_constant_;
-  Eigen::MatrixXd dynamics_linear_;
-  Eigen::VectorXd dynamics_constant_;
+  MatrixX<double> torque_linear_;
+  VectorX<double> torque_constant_;
+  MatrixX<double> dynamics_linear_;
+  VectorX<double> dynamics_constant_;
 
-  Eigen::MatrixXd inequality_linear_;
-  Eigen::VectorXd inequality_upper_bound_;
-  Eigen::VectorXd inequality_lower_bound_;
+  MatrixX<double> inequality_linear_;
+  VectorX<double> inequality_upper_bound_;
+  VectorX<double> inequality_lower_bound_;
 
-  Eigen::MatrixXd JB_;
-  Eigen::VectorXd point_forces_;
+  MatrixX<double> JB_;
+  VectorX<double> point_forces_;
 
-  Eigen::MatrixXd mass_matrix_;
-  Eigen::VectorXd dynamics_bias_;
+  MatrixX<double> mass_matrix_;
+  VectorX<double> dynamics_bias_;
 
-  Eigen::MatrixXd J_com_;
-  Eigen::VectorXd J_dot_times_v_com_;
-  Eigen::MatrixXd centroidal_momentum_matrix_;
-  Eigen::VectorXd centroidal_momentum_matrix_dot_times_v_;
+  MatrixX<double> J_com_;
+  VectorX<double> J_dot_times_v_com_;
+  MatrixX<double> centroidal_momentum_matrix_;
+  VectorX<double> centroidal_momentum_matrix_dot_times_v_;
 
-  Eigen::VectorXd solution_;
+  VectorX<double> solution_;
 
-  std::vector<Eigen::MatrixXd> body_J_;
-  std::vector<Eigen::VectorXd> body_Jdv_;
+  std::vector<MatrixX<double>> body_J_;
+  std::vector<VectorX<double>> body_Jdv_;
 
   // These determines the size of the QP. These are set in ResizeQP
   int num_contact_body_;
