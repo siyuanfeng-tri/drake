@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "bot_core/robot_state_t.hpp"
+#include "bot_core/atlas_command_t.hpp"
 #include "drake/common/eigen_types.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 

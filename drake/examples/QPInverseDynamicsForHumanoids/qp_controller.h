@@ -987,13 +987,13 @@ class QPOutput {
           r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
     }
     vd_.resize(r.get_num_velocities());
-    joint_torque_.resize(r.actuators.size());
+    dof_torques_.resize(r.get_num_velocities());
   }
 
-  bool is_valid(int num_vd, int num_actuators) const {
-    if (static_cast<int>(dof_names_.size()) != vd_.size() ||
+  bool is_valid(int num_vd) const {
+    if (vd_.size() != static_cast<int>(dof_names_.size()) ||
         vd_.size() != num_vd ||
-        joint_torque_.size() != num_actuators) {
+        vd_.size() != dof_torques_.size()) {
       return false;
     }
 
@@ -1030,7 +1030,7 @@ class QPOutput {
   inline const std::map<std::string, BodyAcceleration>& body_accelerations() const {
     return body_accelerations_;
   }
-  inline const VectorX<double>& joint_torque() const { return joint_torque_; }
+  inline const VectorX<double>& dof_torques() const { return dof_torques_; }
   inline const std::map<std::string, ResolvedContact>& resolved_contacts() const {
     return resolved_contacts_;
   }
@@ -1053,7 +1053,7 @@ class QPOutput {
   inline std::map<std::string, ResolvedContact>& mutable_resolved_contacts() {
     return resolved_contacts_;
   }
-  inline VectorX<double>& mutable_joint_torque() { return joint_torque_; }
+  inline VectorX<double>& mutable_dof_torques() { return dof_torques_; }
 
   inline std::vector<std::pair<std::string, double>>& mutable_costs() {
     return costs_;
@@ -1075,8 +1075,8 @@ class QPOutput {
   Vector6<double> centroidal_momentum_dot_;
   // Computed generalized coordinate accelerations
   VectorX<double> vd_;
-  // Computed joint torque
-  VectorX<double> joint_torque_;
+  // Computed joint torque, in dof's order, not robot.actuator's order.
+  VectorX<double> dof_torques_;
 
   // Computed contact related information such as point contact forces
   std::map<std::string, ResolvedContact> resolved_contacts_;

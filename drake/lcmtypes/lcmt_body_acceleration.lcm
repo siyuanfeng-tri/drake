@@ -1,0 +1,8 @@
+package drake;
+
+struct lcmt_body_acceleration {
+  int64_t timestamp;
+
+  string body_name;
+  double accelerations[6];
+}

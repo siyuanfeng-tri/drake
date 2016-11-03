@@ -324,6 +324,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   DRAKE_ASSERT(rowIdx == num_point_force_ * 3);
   DRAKE_ASSERT(colIdx == num_basis_);
 
+  // TODO(siyuan.feng): This is assuming all the unactuated joints are at the
+  // top. Need to lift the assumption.
   // tau = M_l * vd + h_l - (J^T * basis)_l * Beta
   // tau = torque_linear_ * X + torque_constant_
   torque_linear_.block(0, vd_start, num_torque_, num_vd_) =
@@ -595,7 +597,10 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   }
 
   // Set output joint torques.
-  output->mutable_joint_torque() =
+  // TODO(siyuan.feng): This is assuming all the unactuated joints are at the
+  // top. Need to lift the assumption.
+  output->mutable_dof_torques().topRows(num_vd_ - num_torque_).setZero();
+  output->mutable_dof_torques().bottomRows(num_torque_) =
       torque_linear_ * solution_ + torque_constant_;
 
   ////////////////////////////////////////////////////////////////////
@@ -618,8 +623,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     return -1;
   }
 
-  if (!output->is_valid(rs.robot().get_num_velocities(),
-                        rs.robot().actuators.size())) {
+  if (!output->is_valid(rs.robot().get_num_velocities())) {
     std::cerr << "output is invalid\n";
     return -1;
   }
@@ -744,8 +748,8 @@ std::ostream& operator<<(std::ostream& out, const QPOutput& output) {
 
   out << "===============================================\n";
   out << "torque:\n";
-  for (int i = 0; i < output.joint_torque().size(); ++i) {
-    out << output.dof_name(i + 6) << ": " << output.joint_torque()[i]
+  for (int i = 0; i < output.dof_torques().size(); ++i) {
+    out << output.dof_name(i) << ": " << output.dof_torques()[i]
         << std::endl;
   }
   out << "===============================================\n";
