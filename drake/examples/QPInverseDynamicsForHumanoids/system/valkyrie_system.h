@@ -25,15 +25,17 @@ using systems::VectorBase;
 namespace examples {
 namespace qp_inverse_dynamics {
 
+/**
+ * A dummy simulator for Valkyrie. This does not perform forward dynamics
+ * computation. Instead, it uses the computed acceleration from the qp
+ * controller.
+ *
+ * Input: QPOutput (only using the computed accelerations)
+ * Output: bot_core::robot_state_t
+ * Output: vector based raw robot state (q, v)
+ */
 class ValkyrieSystem : public LeafSystem<double> {
  public:
-  /**
-   * A dummy simulator for Valkyrie. This does not perform forward dynamics
-   * computation. Instead, it uses the computed acceleration from the qp
-   * controller.
-   * Input: qp output
-   * Output: humanoid status
-   */
   explicit ValkyrieSystem(const RigidBodyTree& robot) : robot_(robot) {
     input_port_index_qp_output_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
@@ -89,6 +91,7 @@ class ValkyrieSystem : public LeafSystem<double> {
     VectorX<double> q = state.get_generalized_position().CopyToVector();
     VectorX<double> v = state.get_generalized_velocity().CopyToVector();
 
+    // Set lcm message output.
     bot_core::robot_state_t& msg =
         output->GetMutableData(output_port_index_robot_state_msg_)
             ->GetMutableValue<bot_core::robot_state_t>();
@@ -96,7 +99,7 @@ class ValkyrieSystem : public LeafSystem<double> {
                            Vector6<double>::Zero(), Vector6<double>::Zero(),
                            &msg);
 
-    // Set state output.
+    // Set raw state output.
     BasicVector<double>* output_x =
         output->GetMutableVectorData(output_port_index_raw_state_);
     for (int i = 0; i < robot_.get_num_positions(); ++i) {
@@ -222,20 +225,23 @@ class ValkyrieSystem : public LeafSystem<double> {
   }
 
   /**
-   * @return the port number that corresponds to the input: qp_output.
+   * @return Port for the input: QPOutput.
    */
   inline const SystemPortDescriptor<double>& get_input_port_qp_output() const {
     return get_input_port(input_port_index_qp_output_);
   }
 
   /**
-   * @return the port number that corresponds to the output: humanoid status.
+   * @return Port for the output: bot_core::robot_state_t
    */
   inline const SystemPortDescriptor<double>& get_output_port_robot_state_msg()
       const {
     return get_output_port(output_port_index_robot_state_msg_);
   }
 
+  /**
+   * @return Port for the output: vector based state.
+   */
   inline const SystemPortDescriptor<double>& get_output_port_raw_state() const {
     return get_output_port(output_port_index_raw_state_);
   }

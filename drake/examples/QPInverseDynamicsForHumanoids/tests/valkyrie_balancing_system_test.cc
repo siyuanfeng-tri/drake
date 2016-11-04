@@ -65,7 +65,7 @@ GTEST_TEST(testQPInverseDynamicsController, testValkyrieBalancingSystem) {
       builder.template AddSystem<DrakeVisualizer>(robot, &lcm);
 
   JointLevelControllerSystem* joint_con =
-      builder.template AddSystem<JointLevelControllerSystem>(robot);
+      builder.template AddSystem<JointLevelControllerSystem>(robot, &lcm);
 
   builder.Connect(qp_con->get_output_port_qp_output(),
                   val_sim->get_input_port_qp_output());
@@ -77,11 +77,13 @@ GTEST_TEST(testQPInverseDynamicsController, testValkyrieBalancingSystem) {
                   plan_eval->get_input_port_humanoid_status());
   builder.Connect(plan_eval->get_output_port_qp_input(),
                   qp_con->get_input_port_qp_input());
+
   builder.Connect(val_sim->get_output_port_raw_state(),
                   viz_publisher->get_input_port(0));
 
   builder.Connect(rs_msg_to_rs->get_output_port_humanoid_status(),
                   joint_con->get_input_port_humanoid_status());
+
   builder.Connect(qp_con->get_output_port_qp_output(),
                   joint_con->get_input_port_qp_output());
 

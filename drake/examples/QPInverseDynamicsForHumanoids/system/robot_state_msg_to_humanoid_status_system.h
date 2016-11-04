@@ -17,6 +17,10 @@ using systems::Value;
 
 /**
  * A translator from bot_core::robot_state_t to HumanoidStatus
+ * TODO(siyuan): Hook this to lcm when switching to the real simulator.
+ *
+ * Input: lcm message bot_core::robot_state_t
+ * Output: HumanoidStatus
  */
 class RobotStateMsgToHumanoidStatusSystem : public systems::LeafSystem<double> {
  public:
@@ -60,14 +64,20 @@ class RobotStateMsgToHumanoidStatusSystem : public systems::LeafSystem<double> {
     return std::move(output);
   }
 
-  inline const SystemPortDescriptor<double>& get_output_port_humanoid_status()
-      const {
-    return get_output_port(output_port_index_humanoid_status_);
-  }
-
+  /**
+   * @return Port for the input: lcm message bot_core::robot_state_t
+   */
   inline const SystemPortDescriptor<double>& get_input_port_robot_state_msg()
       const {
     return get_input_port(input_port_index_lcm_msg_);
+  }
+
+  /**
+   * @return Port for the output: HumanoidStatus.
+   */
+  inline const SystemPortDescriptor<double>& get_output_port_humanoid_status()
+      const {
+    return get_output_port(output_port_index_humanoid_status_);
   }
 
  private:

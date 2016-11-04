@@ -12,16 +12,17 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+/**
+ * A simple PlanEval block that generates qp input for the qp inverse
+ * dynamics controller.
+ * The controller assume the robot is in double support, and the desired set
+ * point is set by SetDesired.
+ *
+ * Input: HumanoidStatus
+ * Output: QPInput
+ */
 class PlanEvalSystem : public systems::LeafSystem<double> {
  public:
-  /**
-   * A simple PlanEval block that generates qp input for the qp inverse
-   * dynamics controller.
-   * The controller assume the robot is in double support, and the desired set
-   * point is set by SetDesired.
-   * Input: humanoid status
-   * Output: qp input
-   */
   explicit PlanEvalSystem(const RigidBodyTree& robot) : robot_(robot), qp_input_(robot) {
     input_port_index_humanoid_status_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
@@ -51,11 +52,11 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
   void EvalOutput(const Context<double>& context,
                   SystemOutput<double>* output) const override {
-    // input: humanoid status
+    // Input:
     const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
         context, input_port_index_humanoid_status_);
 
-    // output: qp input
+    // Output:
     lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
                                ->GetMutableValue<lcmt_qp_input>();
 
@@ -109,7 +110,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   }
 
   /**
-   * @return the input port number that corresponds to: humanoid status.
+   * @return Port for the input: HumanoidStatus.
    */
   inline const SystemPortDescriptor<double>& get_input_port_humanoid_status()
       const {
@@ -117,7 +118,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   }
 
   /**
-   * @return the output port number that corresponds to: qp input.
+   * @return Port for the output: QPInput.
    */
   inline const SystemPortDescriptor<double>& get_output_port_qp_input() const {
     return get_output_port(output_port_index_qp_input_);

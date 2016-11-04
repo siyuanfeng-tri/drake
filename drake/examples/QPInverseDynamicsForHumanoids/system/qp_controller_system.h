@@ -8,12 +8,16 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+/**
+ * A wrapper around qp inverse dynamics controller.
+ *
+ * Input: HumanoidStatus
+ * Input: QPInput
+ * Output: QPOutput
+ */
 class QPControllerSystem : public systems::LeafSystem<double> {
  public:
-  /**
-   * Input: humanoid status, qp input
-   * Output: qp outout
-   */
+
   explicit QPControllerSystem(const RigidBodyTree& robot) : robot_(robot), qp_input_(robot) {
     input_port_index_humanoid_status_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
@@ -30,15 +34,15 @@ class QPControllerSystem : public systems::LeafSystem<double> {
 
   void EvalOutput(const Context<double>& context,
                   SystemOutput<double>* output) const override {
-    // Get robot status.
+    // Inputs:
     const HumanoidStatus* rs = EvalInputValue<HumanoidStatus>(
         context, input_port_index_humanoid_status_);
 
-    // Get qp input.
     const lcmt_qp_input* qp_input_msg =
         EvalInputValue<lcmt_qp_input>(context, input_port_index_qp_input_);
     DecodeQPInput(robot_, *qp_input_msg, &qp_input_);
 
+    // Output:
     QPOutput& qp_output = output->GetMutableData(output_port_index_qp_input_)
                                 ->GetMutableValue<QPOutput>();
 
@@ -57,7 +61,7 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   }
 
   /**
-   * @return the input port number that corresponds to: humanoid status.
+   * @return Port for the input: humanoid status.
    */
   inline const SystemPortDescriptor<double>& get_input_port_humanoid_status()
       const {
@@ -65,14 +69,14 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   }
 
   /**
-   * @return the input port number that corresponds to: qp input.
+   * @return Port for the input: qp input.
    */
   inline const SystemPortDescriptor<double>& get_input_port_qp_input() const {
     return get_input_port(input_port_index_qp_input_);
   }
 
   /**
-   * @return the output port number that corresponds to: qp output.
+   * @return Port for the output: qp output.
    */
   inline const SystemPortDescriptor<double>& get_output_port_qp_output() const {
     return get_output_port(output_port_index_qp_input_);

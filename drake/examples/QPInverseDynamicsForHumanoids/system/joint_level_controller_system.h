@@ -1,9 +1,11 @@
 #pragma once
 
-#include "drake/util/drakeUtil.h"
-#include "drake/systems/framework/leaf_system.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
+
+#include "drake/lcm/drake_lcm_interface.h"
+#include "drake/systems/framework/leaf_system.h"
+#include "drake/util/drakeUtil.h"
 
 namespace drake {
 namespace examples {
@@ -16,16 +18,29 @@ using systems::LeafSystemOutput;
 using systems::AbstractValue;
 using systems::Value;
 
+/**
+ * A stub for a more complex interface to joint level control.
+ * The idea is to separate all joint level control from the higher level
+ * full state feedback controller, e.g. qp inverse dynamics controller.
+ * This can also run at a higher rate than the full state feedback controller.
+ *
+ * Possible things to be implemented here:
+ *  set points, gains, integrators, filters
+ *
+ * Input: HumanoidStatus
+ * Input: QPOutput
+ * Output: lcm message bot_core::atlas_command_t in channel "ROBOT_COMMAND"
+ */
 class JointLevelControllerSystem : public systems::LeafSystem<double> {
  public:
-  JointLevelControllerSystem(const RigidBodyTree& robot) : robot_(robot) {
+  JointLevelControllerSystem(const RigidBodyTree& robot, drake::lcm::DrakeLcmInterface* lcm) : robot_(robot), lcm_(lcm) {
     in_port_idx_qp_output_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
     in_port_idx_humanoid_status_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
 
     int act_size = robot_.actuators.size();
-    // Load gains from some config.
+    // TODO(siyuan.fent): Load gains from some config.
     k_q_p_ = VectorX<double>::Zero(act_size);
     k_q_i_ = VectorX<double>::Zero(act_size);
     k_qd_p_ = VectorX<double>::Zero(act_size);
@@ -37,9 +52,6 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     ff_const_ = VectorX<double>::Zero(act_size);
   }
 
-  void EvalOutput(const Context<double>& context,
-                  SystemOutput<double>* output) const override {}
-
   void DoPublish(const Context<double>& context) const override {
     // Inputs
     const QPOutput* qp_output =
@@ -48,10 +60,9 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     const HumanoidStatus* rs = EvalInputValue<HumanoidStatus>(
         context, in_port_idx_humanoid_status_);
 
-    // Output
-    bot_core::atlas_command_t msg;
-
     // Make message.
+    std::vector<uint8_t> raw_bytes;
+    bot_core::atlas_command_t msg;
     msg.utime = static_cast<uint64_t>(rs->time() * 1e6);
 
     int act_size = robot_.actuators.size();
@@ -61,16 +72,15 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     msg.velocity.resize(msg.num_joints);
     msg.effort.resize(msg.num_joints);
 
-    // Set desired position, velocity and torque
+    // Compute actuator torques from dof torques.
+    VectorX<double> act_torques = robot_.B.transpose() * qp_output->dof_torques();
+
+    // Set desired position, velocity and torque for all actuators.
     for (int i = 0; i < act_size; ++i) {
       msg.joint_names[i] = robot_.actuators[i].name_;
-
       msg.position[i] = 0;
       msg.velocity[i] = 0;
-      double act_trq = robot_.B.col(i).transpose() * qp_output->dof_torques();
-      msg.effort[i] = act_trq;
-
-      std::cout << msg.joint_names[i] << ": " << msg.effort[i] << std::endl;
+      msg.effort[i] = act_torques[i];
     }
 
     eigenVectorToStdVector(k_q_p_, msg.k_q_p);
@@ -82,26 +92,29 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     eigenVectorToStdVector(ff_f_d_, msg.ff_f_d);
     eigenVectorToStdVector(ff_const_, msg.ff_const);
 
-    // This is only used for gazebo simulator. Should be deprecated.
-    msg.k_effort.resize(msg.num_joints);
-  }
+    // This is only used for the Virtural Robotics Challenge's gazebo simulator. Should be deprecated by now.
+    msg.k_effort.resize(msg.num_joints, 0);
+    // TODO(siyuan.feng): I am not sure what this does exactly. Probably also deprecated.
+    msg.desired_controller_period_ms = 0;
 
-  std::unique_ptr<SystemOutput<double>> AllocateOutput(
-      const Context<double>& context) const override {
-    std::unique_ptr<LeafSystemOutput<double>> output(
-        new LeafSystemOutput<double>);
-    output->add_port(std::unique_ptr<AbstractValue>(new Value<bot_core::atlas_command_t>(bot_core::atlas_command_t())));
-    return std::move(output);
+    // Encode and send the lcm message.
+    int msg_size = msg.getEncodedSize();
+    raw_bytes.resize(msg_size);
+    msg.encode(raw_bytes.data(), 0, msg_size);
+    lcm_->Publish("ROBOT_COMMAND", raw_bytes.data(), msg_size);
   }
 
   /**
-   * @return the input port number that corresponds to: humanoid status.
+   * @return Port for the input: HumanoidStatus.
    */
   inline const SystemPortDescriptor<double>& get_input_port_humanoid_status()
       const {
     return get_input_port(in_port_idx_humanoid_status_);
   }
 
+  /**
+   * @return Port for the input: QPOutput.
+   */
   inline const SystemPortDescriptor<double>& get_input_port_qp_output()
       const {
     return get_input_port(in_port_idx_qp_output_);
@@ -112,6 +125,9 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
 
   int in_port_idx_qp_output_;
   int in_port_idx_humanoid_status_;
+
+  // LCM publishing interface
+  drake::lcm::DrakeLcmInterface* const lcm_;
 
   // Joint level gains, these are in actuator order.
   VectorX<double> k_q_p_;
