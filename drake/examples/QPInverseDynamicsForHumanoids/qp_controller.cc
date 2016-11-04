@@ -9,7 +9,8 @@ namespace qp_inverse_dynamics {
 const double QPController::kUpperBoundForContactBasis = 1000;
 
 void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
-  const std::map<std::string, ContactInformation>& all_contacts = input.contact_information();
+  const std::map<std::string, ContactInformation>& all_contacts =
+      input.contact_information();
   const std::map<std::string, DesiredBodyMotion>& all_body_motions =
       input.desired_body_motions();
   const DesiredDoFMotions& all_dof_motions = input.desired_dof_motions();
@@ -44,8 +45,7 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
 
     if (body_motion_row_idx_as_cost[body_ctr].size() > 0)
       num_body_motion_as_cost++;
-    if (body_motion_row_idx_as_eq[body_ctr].size() > 0)
-      num_body_motion_as_eq++;
+    if (body_motion_row_idx_as_eq[body_ctr].size() > 0) num_body_motion_as_eq++;
     body_ctr++;
   }
 
@@ -68,7 +68,8 @@ void QPController::ResizeQP(const RigidBodyTree& robot, const QPInput& input) {
   int num_contact_as_eq = 0;
   for (const auto& contact_pair : all_contacts) {
     // Cost term
-    if (contact_pair.second.acceleration_constraint_type() == ConstraintType::Soft)
+    if (contact_pair.second.acceleration_constraint_type() ==
+        ConstraintType::Soft)
       num_contact_as_cost++;
     else
       num_contact_as_eq++;
@@ -370,7 +371,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
           -(stacked_contact_jacobians_dot_times_v_.segment(rowIdx, force_dim) +
             contact.Kd() *
                 stacked_contact_velocities_.segment(rowIdx, force_dim)));
-      eq_contacts_[eq_ctr++]->set_description(contact.body_name() + " contact eq");
+      eq_contacts_[eq_ctr++]->set_description(contact.body_name() +
+                                              " contact eq");
     }
     rowIdx += force_dim;
   }
@@ -447,7 +449,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
     if (!row_idx_as_eq.empty()) {
       AddAsConstraints(body_J_[body_ctr], -linear_term, row_idx_as_eq,
                        eq_body_motion_[eq_ctr]);
-      eq_body_motion_[eq_ctr]->set_description(body_motion_d.body_name() + " eq");
+      eq_body_motion_[eq_ctr]->set_description(body_motion_d.body_name() +
+                                               " eq");
       eq_ctr++;
     }
     body_ctr++;
@@ -468,7 +471,7 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
       row_ctr++;
     }
     eq_dof_motion_->UpdateConstraint(tmp_vd_mat_.topRows(row_ctr),
-                                       tmp_vd_vec_.head(row_ctr));
+                                     tmp_vd_vec_.head(row_ctr));
   }
   // Procecss cost terms.
   if (row_idx_as_cost.size() > 0) {
@@ -539,19 +542,23 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   int point_force_index = 0;
   point_forces_ = basis_to_force_matrix_ * basis.value();
 
-  //output->mutable_resolved_contacts().clear();
+  // output->mutable_resolved_contacts().clear();
   for (const auto& contact_pair : input.contact_information()) {
     const ContactInformation& contact = contact_pair.second;
-    if (output->mutable_resolved_contacts().find(contact.body_name()) == output->mutable_resolved_contacts().end()) {
-      output->mutable_resolved_contacts().emplace(contact.body_name(), ResolvedContact(contact.body()));
+    if (output->mutable_resolved_contacts().find(contact.body_name()) ==
+        output->mutable_resolved_contacts().end()) {
+      output->mutable_resolved_contacts().emplace(
+          contact.body_name(), ResolvedContact(contact.body()));
     }
-    ResolvedContact& resolved_contact = output->mutable_resolved_contacts().at(contact.body_name());
+    ResolvedContact& resolved_contact =
+        output->mutable_resolved_contacts().at(contact.body_name());
     resolved_contact.set_body(contact.body());
     // Copy basis.
     resolved_contact.mutable_basis() =
         basis.value().segment(basis_index, contact.num_basis());
     basis_index += contact.num_basis();
-    resolved_contact.mutable_num_basis_per_contact_point() = contact.num_basis_per_contact_point();
+    resolved_contact.mutable_num_basis_per_contact_point() =
+        contact.num_basis_per_contact_point();
 
     // Compute contact points and reference point in the world frame.
     contact.ComputeContactPointsAndWrenchReferencePoint(
@@ -568,9 +575,11 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
                               3 * contact.num_contact_points());
 
     // Copy point forces.
-    resolved_contact.mutable_point_forces().resize(3, contact.num_contact_points());
+    resolved_contact.mutable_point_forces().resize(
+        3, contact.num_contact_points());
     for (int i = 0; i < contact.num_contact_points(); ++i) {
-      resolved_contact.mutable_point_forces().col(i) = point_forces_.segment<3>(point_force_index);
+      resolved_contact.mutable_point_forces().col(i) =
+          point_forces_.segment<3>(point_force_index);
       point_force_index += 3;
     }
   }
@@ -585,10 +594,13 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   int body_motion_ctr = 0;
   for (const auto& pair : input.desired_body_motions()) {
     const DesiredBodyMotion& body_motion_d = pair.second;
-    if (output->mutable_body_accelerations().find(body_motion_d.body_name()) == output->mutable_body_accelerations().end()) {
-      output->mutable_body_accelerations().emplace(body_motion_d.body_name(), BodyAcceleration(body_motion_d.body()));
+    if (output->mutable_body_accelerations().find(body_motion_d.body_name()) ==
+        output->mutable_body_accelerations().end()) {
+      output->mutable_body_accelerations().emplace(
+          body_motion_d.body_name(), BodyAcceleration(body_motion_d.body()));
     }
-    BodyAcceleration& body_acceleration = output->mutable_body_accelerations().at(body_motion_d.body_name());
+    BodyAcceleration& body_acceleration =
+        output->mutable_body_accelerations().at(body_motion_d.body_name());
     body_acceleration.set_body(body_motion_d.body());
     // Compute accelerations.
     body_acceleration.mutable_accelerations() =
@@ -631,9 +643,8 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
   return 0;
 }
 
-
 // Print statements.
-std::ostream& operator<< (std::ostream& out, const ConstraintType& type) {
+std::ostream& operator<<(std::ostream& out, const ConstraintType& type) {
   out << "constraint type: ";
   switch (type) {
     case ConstraintType::Hard:
@@ -649,7 +660,7 @@ std::ostream& operator<< (std::ostream& out, const ConstraintType& type) {
   return out;
 }
 
-std::ostream& operator<< (std::ostream& out, const DesiredBodyMotion& input) {
+std::ostream& operator<<(std::ostream& out, const DesiredBodyMotion& input) {
   for (int i = 0; i < kTwistSize; ++i) {
     out << "desired " << input.body_name() << input.get_row_name(i)
         << " acc: " << input.values()[i] << " weight: " << input.weights()[i]
@@ -658,7 +669,7 @@ std::ostream& operator<< (std::ostream& out, const DesiredBodyMotion& input) {
   return out;
 }
 
-std::ostream& operator<< (std::ostream& out, const ContactInformation& contact) {
+std::ostream& operator<<(std::ostream& out, const ContactInformation& contact) {
   out << "contact: " << contact.body_name() << std::endl;
   out << "contact points in body frame: " << std::endl;
   for (int j = 0; j < contact.contact_points().cols(); ++j)
@@ -679,7 +690,8 @@ std::ostream& operator<<(std::ostream& out, const DesiredDoFMotions& input) {
   return out;
 }
 
-std::ostream& operator<<(std::ostream& out, const DesiredCentroidalMomentumDot& input) {
+std::ostream& operator<<(std::ostream& out,
+                         const DesiredCentroidalMomentumDot& input) {
   for (int i = 0; i < 6; ++i) {
     out << "desired " << input.get_row_name(i) << " change: " << input.value(i)
         << " weight: " << input.weight(i) << " " << input.constraint_type(i);
@@ -687,7 +699,7 @@ std::ostream& operator<<(std::ostream& out, const DesiredCentroidalMomentumDot& 
   return out;
 }
 
-std::ostream& operator<< (std::ostream& out, const QPInput& input) {
+std::ostream& operator<<(std::ostream& out, const QPInput& input) {
   out << "===============================================\n";
   out << "QPInput:\n";
   out << input.desired_centroidal_momentum_dot() << std::endl;
@@ -707,7 +719,7 @@ std::ostream& operator<< (std::ostream& out, const QPInput& input) {
   return out;
 }
 
-std::ostream& operator<< (std::ostream& out, const ResolvedContact& contact) {
+std::ostream& operator<<(std::ostream& out, const ResolvedContact& contact) {
   out << "contact: " << contact.body_name() << std::endl;
   out << "contact points in world frame: " << std::endl;
   for (int j = 0; j < contact.contact_points().cols(); ++j)
@@ -715,14 +727,16 @@ std::ostream& operator<< (std::ostream& out, const ResolvedContact& contact) {
   out << "point forces in world frame: " << std::endl;
   for (int j = 0; j < contact.point_forces().cols(); ++j)
     out << contact.point_forces().col(j).transpose() << std::endl;
-  out << "equivalent wrench in world aligned body frame: " << contact.equivalent_wrench().transpose() << std::endl;
-  out << "reference point in world frame: " << contact.reference_point() << std::endl;
+  out << "equivalent wrench in world aligned body frame: "
+      << contact.equivalent_wrench().transpose() << std::endl;
+  out << "reference point in world frame: " << contact.reference_point()
+      << std::endl;
   return out;
 }
 
 std::ostream& operator<<(std::ostream& out, const BodyAcceleration& acc) {
-  out << acc.body_name() << " acc: "
-      << acc.accelerations().transpose() << std::endl;
+  out << acc.body_name() << " acc: " << acc.accelerations().transpose()
+      << std::endl;
   return out;
 }
 
@@ -749,8 +763,7 @@ std::ostream& operator<<(std::ostream& out, const QPOutput& output) {
   out << "===============================================\n";
   out << "torque:\n";
   for (int i = 0; i < output.dof_torques().size(); ++i) {
-    out << output.dof_name(i) << ": " << output.dof_torques()[i]
-        << std::endl;
+    out << output.dof_name(i) << ": " << output.dof_torques()[i] << std::endl;
   }
   out << "===============================================\n";
   out << "costs:\n";

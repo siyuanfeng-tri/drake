@@ -33,7 +33,9 @@ using systems::Value;
  */
 class JointLevelControllerSystem : public systems::LeafSystem<double> {
  public:
-  JointLevelControllerSystem(const RigidBodyTree& robot, drake::lcm::DrakeLcmInterface* lcm) : robot_(robot), lcm_(lcm) {
+  JointLevelControllerSystem(const RigidBodyTree& robot,
+                             drake::lcm::DrakeLcmInterface* lcm)
+      : robot_(robot), lcm_(lcm) {
     in_port_idx_qp_output_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
     in_port_idx_humanoid_status_ =
@@ -52,13 +54,16 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     ff_const_ = VectorX<double>::Zero(act_size);
   }
 
+  void EvalOutput(const Context<double>& context,
+                  SystemOutput<double>* output) const override {}
+
   void DoPublish(const Context<double>& context) const override {
     // Inputs
     const QPOutput* qp_output =
         EvalInputValue<QPOutput>(context, in_port_idx_qp_output_);
 
-    const HumanoidStatus* rs = EvalInputValue<HumanoidStatus>(
-        context, in_port_idx_humanoid_status_);
+    const HumanoidStatus* rs =
+        EvalInputValue<HumanoidStatus>(context, in_port_idx_humanoid_status_);
 
     // Make message.
     std::vector<uint8_t> raw_bytes;
@@ -73,7 +78,8 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     msg.effort.resize(msg.num_joints);
 
     // Compute actuator torques from dof torques.
-    VectorX<double> act_torques = robot_.B.transpose() * qp_output->dof_torques();
+    VectorX<double> act_torques =
+        robot_.B.transpose() * qp_output->dof_torques();
 
     // Set desired position, velocity and torque for all actuators.
     for (int i = 0; i < act_size; ++i) {
@@ -92,9 +98,11 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     eigenVectorToStdVector(ff_f_d_, msg.ff_f_d);
     eigenVectorToStdVector(ff_const_, msg.ff_const);
 
-    // This is only used for the Virtural Robotics Challenge's gazebo simulator. Should be deprecated by now.
+    // This is only used for the Virtural Robotics Challenge's gazebo simulator.
+    // Should be deprecated by now.
     msg.k_effort.resize(msg.num_joints, 0);
-    // TODO(siyuan.feng): I am not sure what this does exactly. Probably also deprecated.
+    // TODO(siyuan.feng): I am not sure what this does exactly. Probably also
+    // deprecated.
     msg.desired_controller_period_ms = 0;
 
     // Encode and send the lcm message.
@@ -115,8 +123,7 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
   /**
    * @return Port for the input: QPOutput.
    */
-  inline const SystemPortDescriptor<double>& get_input_port_qp_output()
-      const {
+  inline const SystemPortDescriptor<double>& get_input_port_qp_output() const {
     return get_input_port(in_port_idx_qp_output_);
   }
 

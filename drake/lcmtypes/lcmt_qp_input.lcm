@@ -13,5 +13,6 @@ struct lcmt_qp_input {
 
   lcmt_desired_centroidal_momentum_dot desired_centroidal_momentum_dot;
 
+  // Weight for regularizing contact basis.
   double w_basis_reg;
 }

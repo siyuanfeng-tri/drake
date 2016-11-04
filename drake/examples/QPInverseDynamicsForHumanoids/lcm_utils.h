@@ -4,50 +4,82 @@
 #include <vector>
 #include <unordered_map>
 
-#include "bot_core/robot_state_t.hpp"
 #include "bot_core/atlas_command_t.hpp"
+#include "bot_core/robot_state_t.hpp"
 #include "drake/common/eigen_types.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 
+#include "drake/lcmt_body_acceleration.hpp"
 #include "drake/lcmt_constrained_values.hpp"
 #include "drake/lcmt_contact_information.hpp"
+#include "drake/lcmt_desired_body_motion.hpp"
 #include "drake/lcmt_desired_centroidal_momentum_dot.hpp"
 #include "drake/lcmt_desired_dof_motions.hpp"
-#include "drake/lcmt_desired_body_motion.hpp"
 #include "drake/lcmt_qp_input.hpp"
 #include "drake/lcmt_resolved_contact.hpp"
-#include "drake/lcmt_body_acceleration.hpp"
 
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+/**
+ * @param type A constant defined in drake/lcmt_constrained_values.hpp.
+ * Should be one of these: lcmt_constrained_values::HARD, SKIP, SOFT.
+ */
 ConstraintType DecodeConstraintType(int8_t type);
+
+/**
+ * @return A constant defined in drake/lcmt_constrained_values.hpp
+ * Should be one of these: lcmt_constrained_values::HARD, SKIP, SOFT.
+ */
 int8_t EncodeConstraintType(ConstraintType type);
 
-void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput* qp_input);
+void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg,
+                   QPInput* qp_input);
 void EncodeQPInput(const QPInput& qp_input, lcmt_qp_input* msg);
 
-void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValues* val);
-void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_values* msg);
+// TODO(siyuan.feng): Add encode / decode for QPOutput.
 
-void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_information& msg, ContactInformation* info);
-void EncodeContactInformation(const ContactInformation& info, lcmt_contact_information* msg);
+void DecodeConstrainedValues(const lcmt_constrained_values& msg,
+                             ConstrainedValues* val);
+void EncodeConstrainedValues(const ConstrainedValues& val,
+                             lcmt_constrained_values* msg);
 
-void DecodeDesiredCentroidalMomentumDot(const lcmt_desired_centroidal_momentum_dot& msg, DesiredCentroidalMomentumDot* momdot);
-void EncodeDesiredCentroidalMomentumDot(const DesiredCentroidalMomentumDot& momdot, lcmt_desired_centroidal_momentum_dot* msg);
+void DecodeContactInformation(const RigidBodyTree& robot,
+                              const lcmt_contact_information& msg,
+                              ContactInformation* info);
+void EncodeContactInformation(const ContactInformation& info,
+                              lcmt_contact_information* msg);
 
-void DecodeDesiredDoFMotions(const lcmt_desired_dof_motions& msg, DesiredDoFMotions* dof_motions);
-void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions, lcmt_desired_dof_motions* msg);
+void DecodeDesiredCentroidalMomentumDot(
+    const lcmt_desired_centroidal_momentum_dot& msg,
+    DesiredCentroidalMomentumDot* momdot);
+void EncodeDesiredCentroidalMomentumDot(
+    const DesiredCentroidalMomentumDot& momdot,
+    lcmt_desired_centroidal_momentum_dot* msg);
 
-void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion);
-void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_body_motion* msg);
+void DecodeDesiredDoFMotions(const lcmt_desired_dof_motions& msg,
+                             DesiredDoFMotions* dof_motions);
+void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions,
+                             lcmt_desired_dof_motions* msg);
 
-void DecodeBodyAcceleration(const RigidBodyTree& robot, const lcmt_body_acceleration& msg, BodyAcceleration* acc);
-void EncodeBodyAcceleration(const BodyAcceleration& acc, lcmt_body_acceleration* msg);
+void DecodeDesiredBodyMotion(const RigidBodyTree& robot,
+                             const lcmt_desired_body_motion& msg,
+                             DesiredBodyMotion* body_motion);
+void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion,
+                             lcmt_desired_body_motion* msg);
 
-void DecodeResolvedContact(const RigidBodyTree& robot, const lcmt_resolved_contact& msg, ResolvedContact* contact);
-void EncodeResolvedContact(const ResolvedContact& contact, lcmt_resolved_contact* msg);
+void DecodeBodyAcceleration(const RigidBodyTree& robot,
+                            const lcmt_body_acceleration& msg,
+                            BodyAcceleration* acc);
+void EncodeBodyAcceleration(const BodyAcceleration& acc,
+                            lcmt_body_acceleration* msg);
+
+void DecodeResolvedContact(const RigidBodyTree& robot,
+                           const lcmt_resolved_contact& msg,
+                           ResolvedContact* contact);
+void EncodeResolvedContact(const ResolvedContact& contact,
+                           lcmt_resolved_contact* msg);
 
 // TODO(siyuan.feng) Replace these with Twan's similar Encode / Decode methods.
 /**

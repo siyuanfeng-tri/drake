@@ -23,7 +23,8 @@ namespace qp_inverse_dynamics {
  */
 class PlanEvalSystem : public systems::LeafSystem<double> {
  public:
-  explicit PlanEvalSystem(const RigidBodyTree& robot) : robot_(robot), qp_input_(robot) {
+  explicit PlanEvalSystem(const RigidBodyTree& robot)
+      : robot_(robot), qp_input_(robot) {
     input_port_index_humanoid_status_ =
         DeclareAbstractInputPort(systems::kInheritedSampling).get_index();
     output_port_index_qp_input_ =
@@ -58,7 +59,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
     // Output:
     lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
-                               ->GetMutableValue<lcmt_qp_input>();
+                             ->GetMutableValue<lcmt_qp_input>();
 
     // Update desired accelerations.
     qp_input_.mutable_desired_centroidal_momentum_dot()

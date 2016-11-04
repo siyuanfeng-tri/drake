@@ -81,6 +81,14 @@ void eigenVectorToCArray(const Eigen::MatrixBase<Derived>& source,
   }
 }
 
+/**
+ * Copies the elements of a C array to an Eigen vector (row or column).
+ * This function does not resize @p destination, and will throw an exception
+ * if dimension mismatches.
+ *
+ * @param[in] source Fixed sized C array.
+ * @param[out] destination Eigen vector
+ */
 template <typename SourceScalar, size_t Size, typename Derived>
 void cArrayToEigenVector(const SourceScalar (&source)[Size],
                          Eigen::MatrixBase<Derived>& destination) {
@@ -114,6 +122,14 @@ void eigenVectorToStdVector(const Eigen::MatrixBase<Derived>& source,
   }
 }
 
+/**
+ * Copies the elements of a std::vector to a (row or column) Eigen vector.
+ * This function does not resize @p destination, and will throw an exception
+ * if dimension mismatches.
+ *
+ * @param[in] source std vector.
+ * @param[out] destination Eigen vector.
+ */
 template <typename SourceScalar, typename Derived>
 void stdVectorToEigenVector(const std::vector<SourceScalar>& source,
                             Eigen::MatrixBase<Derived>& destination) {
@@ -127,10 +143,18 @@ void stdVectorToEigenVector(const std::vector<SourceScalar>& source,
 
 // note for if/when we split off all Matlab related stuff into a different file:
 // this function is not Matlab related
+/**
+ * Copies the elements of an Eigen Matrix to a std vector of std vectors,
+ * s.t. @p destination[i][j] = @p source(i, j).
+ * This function resizes @p destination.
+ *
+ * @param[in] source Eigen matrix
+ * @param[out] destination std vector of std vectors
+ */
 template <typename DestScalar, typename Derived>
 void eigenToStdVectorOfStdVectors(
     const Eigen::MatrixBase<Derived>& source,
-    std::vector<std::vector<DestScalar> >& destination) {
+    std::vector<std::vector<DestScalar>>& destination) {
   destination.resize(source.rows());
   for (Eigen::Index row = 0; row < source.rows(); ++row) {
     auto& destination_row = destination[row];
@@ -141,6 +165,15 @@ void eigenToStdVectorOfStdVectors(
   }
 }
 
+/**
+ * Copies the elements of a std vector of std vectors to an Eigen Matrix,
+ * s.t. @p destination(i, j) = @p source[i][j].
+ * This function does not resize @p destination, and will throw an exception if
+ * dimension mismatches.
+ *
+ * @param[in] source std vector of std vectors
+ * @param[out] destination Eigen matrix
+ */
 template <typename SourceScalar, typename Derived>
 void stdVectorOfStdVectorsToEigen(
     const std::vector<std::vector<SourceScalar>>& source,
@@ -151,7 +184,8 @@ void stdVectorOfStdVectorsToEigen(
     if (source[row].size() != static_cast<size_t>(destination.cols()))
       throw std::runtime_error("Size of source doesn't match destination");
     for (size_t col = 0; col < source[row].size(); ++col) {
-      destination(row, col) = static_cast<typename Derived::Scalar>(source[row][col]);
+      destination(row, col) =
+        static_cast<typename Derived::Scalar>(source[row][col]);
     }
   }
 }

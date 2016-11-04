@@ -110,7 +110,8 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
     v += output.vd() * dt;
     time += dt;
 
-    robot_status.Update(time, q, v, VectorX<double>::Zero(robot.actuators.size()),
+    robot_status.Update(time, q, v,
+                        VectorX<double>::Zero(robot.actuators.size()),
                         Vector6<double>::Zero(), Vector6<double>::Zero());
     tick_ctr++;
   }

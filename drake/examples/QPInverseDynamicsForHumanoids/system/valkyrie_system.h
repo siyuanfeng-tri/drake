@@ -240,7 +240,7 @@ class ValkyrieSystem : public LeafSystem<double> {
   }
 
   /**
-   * @return Port for the output: vector based state.
+   * @return Port for the output: vector based state (q, v).
    */
   inline const SystemPortDescriptor<double>& get_output_port_raw_state() const {
     return get_output_port(output_port_index_raw_state_);

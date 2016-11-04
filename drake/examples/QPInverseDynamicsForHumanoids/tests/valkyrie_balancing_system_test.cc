@@ -60,10 +60,8 @@ GTEST_TEST(testQPInverseDynamicsController, testValkyrieBalancingSystem) {
       builder.AddSystem(std::make_unique<PlanEvalSystem>(robot));
   RobotStateMsgToHumanoidStatusSystem* rs_msg_to_rs = builder.AddSystem(
       std::make_unique<RobotStateMsgToHumanoidStatusSystem>(robot));
-
   DrakeVisualizer* viz_publisher =
       builder.template AddSystem<DrakeVisualizer>(robot, &lcm);
-
   JointLevelControllerSystem* joint_con =
       builder.template AddSystem<JointLevelControllerSystem>(robot, &lcm);
 
@@ -83,7 +81,6 @@ GTEST_TEST(testQPInverseDynamicsController, testValkyrieBalancingSystem) {
 
   builder.Connect(rs_msg_to_rs->get_output_port_humanoid_status(),
                   joint_con->get_input_port_humanoid_status());
-
   builder.Connect(qp_con->get_output_port_qp_output(),
                   joint_con->get_input_port_qp_output());
 

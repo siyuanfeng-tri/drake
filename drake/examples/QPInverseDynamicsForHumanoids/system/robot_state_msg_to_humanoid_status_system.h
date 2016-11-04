@@ -34,9 +34,12 @@ class RobotStateMsgToHumanoidStatusSystem : public systems::LeafSystem<double> {
 
   void EvalOutput(const Context<double>& context,
                   SystemOutput<double>* output) const override {
+    // Input:
     const bot_core::robot_state_t* msg =
         EvalInputValue<bot_core::robot_state_t>(context,
                                                 input_port_index_lcm_msg_);
+
+    // Output:
     HumanoidStatus& hum_status =
         output->GetMutableData(output_port_index_humanoid_status_)
             ->GetMutableValue<HumanoidStatus>();

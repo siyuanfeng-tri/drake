@@ -41,7 +41,8 @@ QPInput MakeExampleQPInput(const HumanoidStatus& robot_status) {
   torsodd_d.SetConstraintType({1, 2}, ConstraintType::Soft);
   torsodd_d.SetConstraintType({0}, ConstraintType::Hard);
   // Wipe out the weights for the position part.
-  input.mutable_desired_body_motions().emplace(torsodd_d.body_name(), torsodd_d);
+  input.mutable_desired_body_motions().emplace(torsodd_d.body_name(),
+                                               torsodd_d);
 
   // Weights are set arbitrarily by the control designer, these typically
   // require tuning.
@@ -73,21 +74,23 @@ QPInput MakeExampleQPInput(const HumanoidStatus& robot_status) {
   right_foot_contact.mutable_weight() = -1;
   right_foot_contact.mutable_Kd() = 8;
 
-  input.mutable_contact_information().emplace(left_foot_contact.body_name(), left_foot_contact);
-  input.mutable_contact_information().emplace(right_foot_contact.body_name(), right_foot_contact);
+  input.mutable_contact_information().emplace(left_foot_contact.body_name(),
+                                              left_foot_contact);
+  input.mutable_contact_information().emplace(right_foot_contact.body_name(),
+                                              right_foot_contact);
 
   // Set arm and neck joint accelerations to hard constraints.
   for (const std::string& joint_name : robot_status.arm_joint_names()) {
     int idx = robot_status.name_to_position_index().at(joint_name);
     input.mutable_desired_dof_motions().mutable_weight(idx) = -1;
     input.mutable_desired_dof_motions().mutable_constraint_type(idx) =
-      ConstraintType::Hard;
+        ConstraintType::Hard;
   }
   for (const std::string& joint_name : robot_status.neck_joint_names()) {
     int idx = robot_status.name_to_position_index().at(joint_name);
     input.mutable_desired_dof_motions().mutable_weight(idx) = -1;
     input.mutable_desired_dof_motions().mutable_constraint_type(idx) =
-      ConstraintType::Hard;
+        ConstraintType::Hard;
   }
   return input;
 }

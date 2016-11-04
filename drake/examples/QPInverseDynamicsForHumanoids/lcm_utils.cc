@@ -13,7 +13,9 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
-void DecodeBodyAcceleration(const RigidBodyTree& robot, const lcmt_body_acceleration& msg, BodyAcceleration* acc) {
+void DecodeBodyAcceleration(const RigidBodyTree& robot,
+                            const lcmt_body_acceleration& msg,
+                            BodyAcceleration* acc) {
   if (!acc) return;
   acc->set_body(*robot.FindBody(msg.body_name));
   cArrayToEigenVector(msg.accelerations, acc->mutable_accelerations());
@@ -23,7 +25,8 @@ void DecodeBodyAcceleration(const RigidBodyTree& robot, const lcmt_body_accelera
   }
 }
 
-void EncodeBodyAcceleration(const BodyAcceleration& acc, lcmt_body_acceleration* msg) {
+void EncodeBodyAcceleration(const BodyAcceleration& acc,
+                            lcmt_body_acceleration* msg) {
   if (!msg) return;
   if (!acc.is_valid()) {
     throw std::runtime_error("invalid ResolvedContact");
@@ -32,19 +35,25 @@ void EncodeBodyAcceleration(const BodyAcceleration& acc, lcmt_body_acceleration*
   eigenVectorToCArray(acc.accelerations(), msg->accelerations);
 }
 
-void DecodeResolvedContact(const RigidBodyTree& robot, const lcmt_resolved_contact& msg, ResolvedContact* contact) {
+void DecodeResolvedContact(const RigidBodyTree& robot,
+                           const lcmt_resolved_contact& msg,
+                           ResolvedContact* contact) {
   if (!contact) return;
   contact->set_body(*robot.FindBody(msg.body_name));
   contact->mutable_basis().resize(msg.num_all_basis);
-  contact->mutable_num_basis_per_contact_point() = msg.num_basis_per_contact_point;
+  contact->mutable_num_basis_per_contact_point() =
+      msg.num_basis_per_contact_point;
   stdVectorToEigenVector(msg.basis, contact->mutable_basis());
 
   contact->mutable_point_forces().resize(3, msg.num_contact_points);
-  stdVectorOfStdVectorsToEigen(msg.point_forces, contact->mutable_point_forces());
+  stdVectorOfStdVectorsToEigen(msg.point_forces,
+                               contact->mutable_point_forces());
   contact->mutable_contact_points().resize(3, msg.num_contact_points);
-  stdVectorOfStdVectorsToEigen(msg.contact_points, contact->mutable_contact_points());
+  stdVectorOfStdVectorsToEigen(msg.contact_points,
+                               contact->mutable_contact_points());
 
-  cArrayToEigenVector(msg.equivalent_wrench, contact->mutable_equivalent_wrench());
+  cArrayToEigenVector(msg.equivalent_wrench,
+                      contact->mutable_equivalent_wrench());
   cArrayToEigenVector(msg.reference_point, contact->mutable_reference_point());
 
   if (!contact->is_valid()) {
@@ -52,7 +61,8 @@ void DecodeResolvedContact(const RigidBodyTree& robot, const lcmt_resolved_conta
   }
 }
 
-void EncodeResolvedContact(const ResolvedContact& contact, lcmt_resolved_contact* msg) {
+void EncodeResolvedContact(const ResolvedContact& contact,
+                           lcmt_resolved_contact* msg) {
   if (!msg) return;
   if (!contact.is_valid()) {
     throw std::runtime_error("invalid ResolvedContact");
@@ -70,7 +80,8 @@ void EncodeResolvedContact(const ResolvedContact& contact, lcmt_resolved_contact
   eigenVectorToCArray(contact.reference_point(), msg->reference_point);
 }
 
-void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput* qp_input) {
+void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg,
+                   QPInput* qp_input) {
   if (!qp_input) return;
 
   ContactInformation info(*robot.FindBody("world"));
@@ -87,8 +98,11 @@ void DecodeQPInput(const RigidBodyTree& robot, const lcmt_qp_input& msg, QPInput
     qp_input->mutable_desired_body_motions().emplace(mot.body_name(), mot);
   }
 
-  DecodeDesiredDoFMotions(msg.desired_dof_motions, &(qp_input->mutable_desired_dof_motions()));
-  DecodeDesiredCentroidalMomentumDot(msg.desired_centroidal_momentum_dot, &(qp_input->mutable_desired_centroidal_momentum_dot()));
+  DecodeDesiredDoFMotions(msg.desired_dof_motions,
+                          &(qp_input->mutable_desired_dof_motions()));
+  DecodeDesiredCentroidalMomentumDot(
+      msg.desired_centroidal_momentum_dot,
+      &(qp_input->mutable_desired_centroidal_momentum_dot()));
   qp_input->mutable_w_basis_reg() = msg.w_basis_reg;
 
   if (!qp_input->is_valid(robot.get_num_velocities())) {
@@ -107,21 +121,26 @@ void EncodeQPInput(const QPInput& qp_input, lcmt_qp_input* msg) {
   msg->contact_information.resize(msg->num_contacts);
   int contact_ctr = 0;
   for (const auto& contact_pair : qp_input.contact_information()) {
-    EncodeContactInformation(contact_pair.second, &(msg->contact_information[contact_ctr]));
+    EncodeContactInformation(contact_pair.second,
+                             &(msg->contact_information[contact_ctr]));
     contact_ctr++;
   }
 
-  msg->num_desired_body_motions = static_cast<int>(qp_input.desired_body_motions().size());
+  msg->num_desired_body_motions =
+      static_cast<int>(qp_input.desired_body_motions().size());
   msg->desired_body_motions.resize(msg->num_desired_body_motions);
   int desired_body_motion_ctr = 0;
   for (const auto& mot_pair : qp_input.desired_body_motions()) {
-    EncodeDesiredBodyMotion(mot_pair.second, &(msg->desired_body_motions[desired_body_motion_ctr]));
+    EncodeDesiredBodyMotion(
+        mot_pair.second, &(msg->desired_body_motions[desired_body_motion_ctr]));
     desired_body_motion_ctr++;
   }
 
-  EncodeDesiredDoFMotions(qp_input.desired_dof_motions(), &(msg->desired_dof_motions));
+  EncodeDesiredDoFMotions(qp_input.desired_dof_motions(),
+                          &(msg->desired_dof_motions));
 
-  EncodeDesiredCentroidalMomentumDot(qp_input.desired_centroidal_momentum_dot(), &(msg->desired_centroidal_momentum_dot));
+  EncodeDesiredCentroidalMomentumDot(qp_input.desired_centroidal_momentum_dot(),
+                                     &(msg->desired_centroidal_momentum_dot));
 
   msg->w_basis_reg = qp_input.w_basis_reg();
 }
@@ -152,7 +171,9 @@ ConstraintType DecodeConstraintType(int8_t type) {
   }
 }
 
-void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body_motion& msg, DesiredBodyMotion* body_motion) {
+void DecodeDesiredBodyMotion(const RigidBodyTree& robot,
+                             const lcmt_desired_body_motion& msg,
+                             DesiredBodyMotion* body_motion) {
   if (!body_motion) return;
 
   body_motion->set_body(*robot.FindBody(msg.body_name));
@@ -164,7 +185,8 @@ void DecodeDesiredBodyMotion(const RigidBodyTree& robot, const lcmt_desired_body
   }
 }
 
-void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_body_motion* msg) {
+void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion,
+                             lcmt_desired_body_motion* msg) {
   if (!msg) return;
   if (!body_motion.is_valid()) {
     throw std::runtime_error("invalid DesiredBodyMotion");
@@ -175,7 +197,8 @@ void EncodeDesiredBodyMotion(const DesiredBodyMotion& body_motion, lcmt_desired_
   EncodeConstrainedValues(body_motion, &(msg->constrained_accelerations));
 }
 
-void DecodeDesiredDoFMotions(const lcmt_desired_dof_motions& msg, DesiredDoFMotions* dof_motions) {
+void DecodeDesiredDoFMotions(const lcmt_desired_dof_motions& msg,
+                             DesiredDoFMotions* dof_motions) {
   if (!dof_motions) return;
 
   *dof_motions = DesiredDoFMotions(msg.dof_names);
@@ -186,7 +209,8 @@ void DecodeDesiredDoFMotions(const lcmt_desired_dof_motions& msg, DesiredDoFMoti
   }
 }
 
-void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions, lcmt_desired_dof_motions* msg) {
+void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions,
+                             lcmt_desired_dof_motions* msg) {
   if (!msg) return;
   if (!dof_motions.is_valid()) {
     throw std::runtime_error("invalid DesiredDoFMotions");
@@ -197,7 +221,9 @@ void EncodeDesiredDoFMotions(const DesiredDoFMotions& dof_motions, lcmt_desired_
   EncodeConstrainedValues(dof_motions, &(msg->constrained_accelerations));
 }
 
-void DecodeDesiredCentroidalMomentumDot(const lcmt_desired_centroidal_momentum_dot& msg, DesiredCentroidalMomentumDot* momdot) {
+void DecodeDesiredCentroidalMomentumDot(
+    const lcmt_desired_centroidal_momentum_dot& msg,
+    DesiredCentroidalMomentumDot* momdot) {
   if (!momdot) return;
   DecodeConstrainedValues(msg.centroidal_momentum_dot, momdot);
   if (!momdot->is_valid()) {
@@ -205,7 +231,9 @@ void DecodeDesiredCentroidalMomentumDot(const lcmt_desired_centroidal_momentum_d
   }
 }
 
-void EncodeDesiredCentroidalMomentumDot(const DesiredCentroidalMomentumDot& momdot, lcmt_desired_centroidal_momentum_dot* msg) {
+void EncodeDesiredCentroidalMomentumDot(
+    const DesiredCentroidalMomentumDot& momdot,
+    lcmt_desired_centroidal_momentum_dot* msg) {
   if (!msg) return;
   if (!momdot.is_valid()) {
     throw std::runtime_error("invalid DesiredCentroidalMomentumDot");
@@ -214,12 +242,14 @@ void EncodeDesiredCentroidalMomentumDot(const DesiredCentroidalMomentumDot& momd
   EncodeConstrainedValues(momdot, &(msg->centroidal_momentum_dot));
 }
 
-void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValues* val) {
+void DecodeConstrainedValues(const lcmt_constrained_values& msg,
+                             ConstrainedValues* val) {
   if (!val) return;
   if (msg.size != static_cast<int>(msg.types.size()) ||
       msg.types.size() != msg.weights.size() ||
       msg.types.size() != msg.values.size()) {
-    throw std::runtime_error("lcmt_constrained_values has inconsistent dimensions.");
+    throw std::runtime_error(
+        "lcmt_constrained_values has inconsistent dimensions.");
   }
 
   val->resize(msg.size);
@@ -234,7 +264,8 @@ void DecodeConstrainedValues(const lcmt_constrained_values& msg, ConstrainedValu
   }
 }
 
-void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_values* msg) {
+void EncodeConstrainedValues(const ConstrainedValues& val,
+                             lcmt_constrained_values* msg) {
   if (!msg) return;
   if (!val.is_valid()) {
     throw std::runtime_error("invalid ConstrainedValues");
@@ -252,17 +283,21 @@ void EncodeConstrainedValues(const ConstrainedValues& val, lcmt_constrained_valu
   eigenVectorToStdVector(val.weights(), msg->weights);
 }
 
-void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_information& msg, ContactInformation* info) {
+void DecodeContactInformation(const RigidBodyTree& robot,
+                              const lcmt_contact_information& msg,
+                              ContactInformation* info) {
   if (!info) return;
   info->set_body(*robot.FindBody(msg.body_name));
   info->mutable_num_basis_per_contact_point() = msg.num_basis_per_contact_point;
   info->mutable_contact_points().resize(3, msg.num_contact_points);
-  stdVectorOfStdVectorsToEigen(msg.contact_points, info->mutable_contact_points());
+  stdVectorOfStdVectorsToEigen(msg.contact_points,
+                               info->mutable_contact_points());
   cArrayToEigenVector(msg.normal, info->mutable_normal());
   info->mutable_mu() = msg.mu;
   info->mutable_Kd() = msg.Kd;
 
-  info->mutable_acceleration_constraint_type() = DecodeConstraintType(msg.acceleration_constraint_type);
+  info->mutable_acceleration_constraint_type() =
+      DecodeConstraintType(msg.acceleration_constraint_type);
   info->mutable_weight() = msg.weight;
 
   if (!info->is_valid()) {
@@ -270,7 +305,8 @@ void DecodeContactInformation(const RigidBodyTree& robot, const lcmt_contact_inf
   }
 }
 
-void EncodeContactInformation(const ContactInformation& info, lcmt_contact_information* msg) {
+void EncodeContactInformation(const ContactInformation& info,
+                              lcmt_contact_information* msg) {
   if (!msg) return;
   if (!info.is_valid()) {
     throw std::runtime_error("invalid ContactInformation.");
@@ -285,7 +321,8 @@ void EncodeContactInformation(const ContactInformation& info, lcmt_contact_infor
   msg->mu = info.mu();
   msg->Kd = info.Kd();
 
-  msg->acceleration_constraint_type = EncodeConstraintType(info.acceleration_constraint_type());
+  msg->acceleration_constraint_type =
+      EncodeConstraintType(info.acceleration_constraint_type());
   msg->weight = info.weight();
 }
 
