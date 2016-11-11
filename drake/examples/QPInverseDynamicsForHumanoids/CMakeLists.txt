@@ -11,6 +11,8 @@ target_link_libraries(drakeQPController
   drakeSide)
 
 if(lcm_FOUND)
+  set_source_files_properties(lcm_utils.cc
+  PROPERTIES COMPILE_FLAGS -g)
   add_library(drakeQPControllerLcmTranslator lcm_utils.cc)
   target_link_libraries(drakeQPControllerLcmTranslator
     drakeLCMTypes

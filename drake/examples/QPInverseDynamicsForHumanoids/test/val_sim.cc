@@ -39,10 +39,6 @@ namespace qp_inverse_dynamics {
 // NOTE: the acceleration is passed in the velocity field in
 // bot_core::atlas_command_t.
 void sim_loop() {
-#ifdef HAVE_SPDLOG
-  std::cout << "hahahaha\n";
-#endif
-
   // Loads model.
   std::string urdf =
       drake::GetDrakePath() +
