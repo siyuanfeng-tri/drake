@@ -57,12 +57,14 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
     lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
                              ->GetMutableValue<lcmt_qp_input>();
 
+    double z_offset = 0.05 * sin(2 * M_PI * robot_status->time());
+
     // Update desired accelerations.
     QPInput qp_input = MakeExampleQPInput(*robot_status);
     qp_input.mutable_desired_centroidal_momentum_dot()
         .mutable_values()
         .tail<3>() =
-        (Kp_com_.array() * (desired_com_ - robot_status->com()).array() -
+        (Kp_com_.array() * (desired_com_ + Vector3<double>(0, 0, z_offset) - robot_status->com()).array() -
          Kd_com_.array() * robot_status->comd().array()).matrix() *
         robot_.getMass();
 
