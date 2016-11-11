@@ -46,7 +46,7 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
         DeclareAbstractOutputPort(systems::kInheritedSampling).get_index();
 
     // TODO(siyuan.fent): Load gains from some config.
-    int act_size = robot_.get_num_velocities();
+    int act_size = static_cast<int>(robot_.actuators.size()); // get_num_velocities();
     k_q_p_ = VectorX<double>::Zero(act_size);
     k_q_i_ = VectorX<double>::Zero(act_size);
     k_qd_p_ = VectorX<double>::Zero(act_size);
@@ -85,19 +85,24 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     // This should really be robot_.actuator.size(), and everything in
     // robot_.actuator order instead of dof order, joint names need to change
     // as well.
-    int act_size = robot_.get_num_velocities();
+    int act_size = static_cast<int>(robot_.actuators.size()); // get_num_velocities();
     msg.num_joints = act_size;
     msg.joint_names.resize(msg.num_joints);
     msg.position.resize(msg.num_joints);
     msg.velocity.resize(msg.num_joints);
     msg.effort.resize(msg.num_joints);
-    VectorX<double> act_torques = qp_output->dof_torques();
+
+    VectorX<double> act_torques = robot_.B.transpose() * qp_output->dof_torques();
+    if (act_torques.size() != act_size) {
+      throw std::runtime_error("torque dimension mismatch.");
+    }
+
     // Set desired position, velocity and torque for all actuators.
     for (int i = 0; i < act_size; ++i) {
-      msg.joint_names[i] = robot_.get_position_name(i);
+      msg.joint_names[i] = robot_.actuators[i].name_; // robot_.get_position_name(i);
       msg.position[i] = 0;
       // This is abusing the velocity channel to transport acceleration.
-      msg.velocity[i] = qp_output->vd()[i];
+      msg.velocity[i] = 0; // qp_output->vd()[i];
       // This should have been actuator torque not dof torque.
       msg.effort[i] = act_torques[i];
     }

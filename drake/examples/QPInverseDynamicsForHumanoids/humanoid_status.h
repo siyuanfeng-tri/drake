@@ -141,6 +141,8 @@ class HumanoidStatus {
 
     // TODO(siyuan.feng): these are hard coded for Valkyrie, and they should
     // be included in the model file or loaded from a separate config file.
+    /*
+    nominal_position_[name_to_position_index().at("base_z")] = 1.025;
     nominal_position_[name_to_position_index().at("rightHipRoll")] = 0.01;
     nominal_position_[name_to_position_index().at("rightHipPitch")] = -0.5432;
     nominal_position_[name_to_position_index().at("rightKneePitch")] = 1.2195;
@@ -162,6 +164,15 @@ class HumanoidStatus {
     nominal_position_[name_to_position_index().at("leftShoulderYaw")] = 0.5;
     nominal_position_[name_to_position_index().at("leftElbowPitch")] =
         -M_PI / 2.;
+    */
+    VectorX<double> ret(72);
+    ret << 0, 0, 1.025, 0, 0, 0, 0, 0, 0, 0, 0.300196631343025, 1.25, 0,
+        0.785398163397448, 1.571, 0, 0, 0.300196631343025, -1.25, 0,
+        -0.785398163397448, 1.571, 0, 0, 0, 0, -0.49, 1.205, -0.71, 0, 0, 0,
+        -0.49, 1.205, -0.71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0;
+
+    nominal_position_ = ret.head(36);
 
     leg_joint_names_.insert("rightHipYaw");
     leg_joint_names_.insert("rightHipRoll");
