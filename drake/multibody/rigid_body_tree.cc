@@ -82,6 +82,58 @@ template <typename T>
 const int RigidBodyTree<T>::kWorldBodyIndex = 0;
 
 template <typename T>
+int RigidBodyTree<T>::get_position_index(const std::string& name) const {
+  for (int i = 0; i < get_num_positions(); ++i) {
+    if (name.compare(get_position_name(i)) == 0)
+      return i;
+  }
+  throw std::runtime_error(
+      "RigidBodyTree::get_position_index: ERROR: no matching position name:"
+      + name);
+}
+
+template <typename T>
+int RigidBodyTree<T>::get_velocity_index(const std::string& name) const {
+  for (int i = 0; i < get_num_velocities(); ++i) {
+    if (name.compare(get_velocity_name(i)) == 0)
+      return i;
+  }
+  throw std::runtime_error(
+      "RigidBodyTree::get_velocity_index: ERROR: no matching velocity name: "
+      + name);
+}
+
+template <typename T>
+void RigidBodyTree<T>::AddPositionGroup(const std::string& group_name,
+    const std::vector<std::string>& position_names) {
+  std::vector<int> position_indices(position_names.size());
+  for (size_t i = 0; i < position_names.size(); ++i) {
+    position_indices[i] = get_position_index(position_names[i]);
+  }
+  position_groups_[group_name] = position_indices;
+}
+
+template <typename T>
+void RigidBodyTree<T>::AddVelocityGroup(const std::string& group_name,
+    const std::vector<std::string>& velocity_names) {
+  std::vector<int> velocity_indices(velocity_names.size());
+  for (size_t i = 0; i < velocity_names.size(); ++i) {
+    velocity_indices[i] = get_velocity_index(velocity_names[i]);
+  }
+  velocity_groups_[group_name] = velocity_indices;
+}
+
+template <typename T>
+void RigidBodyTree<T>::AddBodyGroup(const std::string& group_name,
+    const std::vector<std::string>& body_names) {
+  std::vector<const RigidBody*> bodies(body_names.size());
+  for (size_t i = 0; i < body_names.size(); ++i) {
+    bodies[i] = FindBody(body_names[i]);
+  }
+  body_groups_[group_name] = bodies;
+}
+
+template <typename T>
 // TODO(#2274) Fix NOLINTNEXTLINE(runtime/references).
 void getFiniteIndexes(T const& v, std::vector<int>& finite_indexes) {
   finite_indexes.clear();

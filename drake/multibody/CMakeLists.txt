@@ -7,7 +7,7 @@ pods_install_pkg_config_file(drake-xml-util
   REQUIRES
   VERSION 0.0.1)
 
-add_library_with_exports(LIB_NAME drakeRBM SOURCE_FILES
+set(drake_RBM_source_files
   parser_model_instance_id_table.cc
   parser_common.cc
   parser_sdf.cc
@@ -20,10 +20,8 @@ add_library_with_exports(LIB_NAME drakeRBM SOURCE_FILES
   rigid_body_loop.cc
   rigid_body_tree_construction.cc
   $<TARGET_OBJECTS:drakeUtil>)
-target_link_libraries(drakeRBM
-  drakeCollision drakeCommon drakeJoints drakeXMLUtil)
-pods_install_libraries(drakeRBM)
-drake_install_headers(
+
+set(drake_RBM_header_files
   constraint_wrappers.h
   force_torque_measurement.h
   kinematic_path.h
@@ -40,6 +38,27 @@ drake_install_headers(
   parser_urdf.h
   rigid_body_loop.h
   rigid_body_tree_construction.h)
+
+set(drake_RBM_yaml_dependent_source_files)
+set(drake_RBM_yaml_dependent_header_files)
+set(drake_RBM_yaml_dependent_libraries)
+if (yaml-cpp_FOUND)
+  set(drake_RBM_yaml_dependent_source_files parser_yaml.cc)
+  set(drake_RBM_yaml_dependent_header_files parser_yaml.h)
+  set(drake_RBM_yaml_dependent_libraries yaml-cpp)
+endif()
+
+add_library_with_exports(LIB_NAME drakeRBM SOURCE_FILES
+  ${drake_RBM_source_files}
+  ${drake_RBM_yaml_dependent_source_files})
+
+target_link_libraries(drakeRBM
+  drakeCollision drakeCommon drakeJoints drakeXMLUtil ${drake_RBM_yaml_dependent_libraries})
+pods_install_libraries(drakeRBM)
+drake_install_headers(
+  ${drake_RBM_header_files}
+  ${drake_RBM_yaml_dependent_header_files})
+
 
 pods_install_pkg_config_file(drake-rbm
   LIBS -ldrakeRBM -ldrakeCollision -ldrakeJoints -ldrakeXMLUtil

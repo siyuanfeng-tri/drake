@@ -1182,7 +1182,80 @@ class DRAKE_EXPORT RigidBodyTree {
   drake::TwistVector<double> a_grav;
   Eigen::MatrixXd B;  // the B matrix maps inputs into joint-space forces
 
+  inline bool has_position_group(const std::string& group_name) const {
+    return position_groups_.find(group_name) != position_groups_.end();
+  }
+
+  inline const std::vector<int>& get_position_group(
+      const std::string& group_name) const {
+    return position_groups_.at(group_name);
+  }
+
+  inline bool has_velocity_group(const std::string& group_name) const {
+    return velocity_groups_.find(group_name) != velocity_groups_.end();
+  }
+
+  inline const std::vector<int>& get_velocity_group(
+      const std::string& group_name) const {
+    return velocity_groups_.at(group_name);
+  }
+
+  inline bool has_body_group(const std::string& group_name) const {
+    return body_groups_.find(group_name) != body_groups_.end();
+  }
+
+  inline const std::vector<const RigidBody*>& get_body_group(
+      const std::string& group_name) const {
+    return body_groups_.at(group_name);
+  }
+
+  void AddPositionGroup(const std::string& group_name,
+                        const std::vector<std::string>& position_names);
+
+  void AddVelocityGroup(const std::string& group_name,
+                        const std::vector<std::string>& velocity_names);
+
+  inline void AddPositionGroup(const std::string& group_name,
+                               const std::vector<int>& position_idx) {
+    position_groups_[group_name] = position_idx;
+  }
+
+  inline void AddVelocityGroup(const std::string& group_name,
+                               const std::vector<int>& velocity_idx) {
+    velocity_groups_[group_name] = velocity_idx;
+  }
+
+  void AddBodyGroup(const std::string& group_name,
+                    const std::vector<std::string>& body_names);
+
+  /**
+   * Returns the first encountered position index, whose name matches @p name.
+   * This function iterates through all position names, so result should be
+   * cached by the caller to speedup lookup.
+   *
+   * @throws std::runtime_error if @p name does not math any positions.
+   */
+  int get_position_index(const std::string& name) const;
+
+  /**
+   * Returns the first encountered velocity index, whose name matches @p name.
+   * This function iterates through all position names, so result should be
+   * cached by the caller to speedup lookup.
+   *
+   * @throws std::runtime_error if @p name does not math any velocities.
+   */
+  int get_velocity_index(const std::string& name) const;
+
  private:
+  // A map from group name to position indices.
+  std::map<std::string, std::vector<int>> position_groups_;
+
+  // A map from group name to velocity indices.
+  std::map<std::string, std::vector<int>> velocity_groups_;
+
+  // A map from group name to body pointers.
+  std::map<std::string, std::vector<const RigidBody*>> body_groups_;
+
   // The number of generalized position states in this rigid body tree.
   int num_positions_{};
 
