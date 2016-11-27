@@ -52,6 +52,15 @@ drake_install_pkg_config_file(drake-zmp-util
   LIBS -ldrakeZMPUtil
   REQUIRES eigen3)
 
+add_library_with_exports(LIB_NAME drakeZMPPlanner SOURCE_FILES zmp_planner.cc)
+target_link_libraries(drakeZMPPlanner drakeTrajectories)
+drake_install_libraries(drakeZMPPlanner)
+drake_install_headers(zmp_planner.h)
+drake_install_pkg_config_file(drake-zmp-planner
+  TARGET drakeZMPPlanner
+  LIBS -ldrakeZMPPlanner
+  REQUIRES eigen3)
+
 # System 2 controllers
 set(system2_sources
   gravity_compensator.cc
