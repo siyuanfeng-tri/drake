@@ -7,7 +7,7 @@ if(gurobi_FOUND)
 endif()
 
 drake_add_mex(lqrmex lqrmex.cpp)
-target_link_libraries(lqrmex drakeLinearControl)
+target_link_libraries(lqrmex drakeMath)
 
 if(snopt_FOUND)
   drake_add_mex(NonlinearProgramSnoptmex NonlinearProgramSnoptmex.cpp)

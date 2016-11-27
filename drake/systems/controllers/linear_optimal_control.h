@@ -50,23 +50,5 @@ std::unique_ptr<systems::AffineSystem<double>> LinearQuadraticRegulator(
     const Eigen::Ref<const Eigen::MatrixXd>& Q,
     const Eigen::Ref<const Eigen::MatrixXd>& R);
 
-/// Computes the unique stabilizing solution X to the continuous-time algebraic
-/// Riccati equation:
-///
-/// @verbatim
-///  S'A + A'S + S B inv(R) B' S + Q = 0
-/// @endverbatim
-///
-/// @throws std::runtime_error if R is not positive definite.
-///
-/// Based on the Matrix Sign Function method outlined in this paper:
-/// http://www.engr.iupui.edu/~skoskie/ECE684/Riccati_algorithms.pdf
-///
-Eigen::MatrixXd ContinuousAlgebraicRiccatiEquation(
-    const Eigen::Ref<const Eigen::MatrixXd>& A,
-    const Eigen::Ref<const Eigen::MatrixXd>& B,
-    const Eigen::Ref<const Eigen::MatrixXd>& Q,
-    const Eigen::Ref<const Eigen::MatrixXd>& R);
-
 }  // namespace systems
 }  // namespace drake

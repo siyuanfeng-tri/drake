@@ -1,6 +1,6 @@
 
 add_library_with_exports(LIB_NAME drakeLinearControl SOURCE_FILES linear_optimal_control.cc)
-target_link_libraries(drakeLinearControl drakeSystemFramework)
+target_link_libraries(drakeLinearControl drakeSystemFramework drakeMath)
 drake_install_libraries(drakeLinearControl)
 drake_install_headers(linear_optimal_control.h)
 drake_install_pkg_config_file(drake-linear-control
@@ -53,7 +53,7 @@ drake_install_pkg_config_file(drake-zmp-util
   REQUIRES eigen3)
 
 add_library_with_exports(LIB_NAME drakeZMPPlanner SOURCE_FILES zmp_planner.cc)
-target_link_libraries(drakeZMPPlanner drakeTrajectories)
+target_link_libraries(drakeZMPPlanner drakeTrajectories drakeMath)
 drake_install_libraries(drakeZMPPlanner)
 drake_install_headers(zmp_planner.h)
 drake_install_pkg_config_file(drake-zmp-planner

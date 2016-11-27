@@ -2,8 +2,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "drake/math/continuous_algebraic_riccati_equation.h"
 #include "drake/systems/controllers/zmp_planner.h"
-#include "drake/util/drakeUtil.h"
 
 namespace drake {
 namespace systems {
@@ -32,8 +32,20 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   Eigen::Matrix<double, 4, 2> N = C_.transpose() * Qy_ * D_;
   Eigen::Matrix<double, 2, 2> R1i = R1.inverse();
 
-  lqr(A_, B_, Q1, R1, N, K_, S_);
-  K_ = -K_;
+  std::cout << A_ << std::endl << std::endl;
+  std::cout << B_ << std::endl << std::endl;
+  std::cout << Q1 << std::endl << std::endl;
+  std::cout << R1 << std::endl << std::endl;
+  std::cout << N << std::endl << std::endl;
+
+  S_ = math::ContinuousAlgebraicRiccatiEquation(A_, B_, Q1, R1, N);
+  Eigen::LLT<Eigen::MatrixXd> R_cholesky(R1);
+  K_ = -R_cholesky.solve(B_.transpose() * S_ + N.transpose());
+
+  std::cout << S_ << std::endl << std::endl;
+  std::cout << K_ << std::endl << std::endl;
+  //lqr(A_, B_, Q1, R1, N, K_, S_);
+  //K_ = -K_;
 
   s1_dot_.setZero();
   u0_.setZero();
@@ -59,8 +71,8 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   std::vector<Eigen::Matrix<Polynomial<double>, Eigen::Dynamic, Eigen::Dynamic>> beta_poly(n_segments);
 
   for (int t = n_segments-1; t >= 0; t--) {
-    c[t].row(0) = zmp_d.getPolynomial(t, 0, 0).getCoefficients();
-    c[t].row(1) = zmp_d.getPolynomial(t, 1, 0).getCoefficients();
+    c[t].row(0) = zmp_d.getPolynomial(t, 0, 0).GetCoefficients();
+    c[t].row(1) = zmp_d.getPolynomial(t, 1, 0).GetCoefficients();
     /// switch to zbar coord
     c[t].col(0) -= zmp_tf;
 
