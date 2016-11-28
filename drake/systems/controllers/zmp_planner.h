@@ -32,7 +32,7 @@ class ZMPPlanner {
     return comd_traj_.value(time);
   }
 
- //private:
+ private:
   PiecewisePolynomial<double> zmp_traj_;
   PiecewisePolynomial<double> zmpd_traj_;
   ExponentialPlusPiecewisePolynomial<double> com_traj_;

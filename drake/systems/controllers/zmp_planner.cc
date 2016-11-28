@@ -32,18 +32,10 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   Eigen::Matrix<double, 4, 2> N = C_.transpose() * Qy_ * D_;
   Eigen::Matrix<double, 2, 2> R1i = R1.inverse();
 
-  std::cout << A_ << std::endl << std::endl;
-  std::cout << B_ << std::endl << std::endl;
-  std::cout << Q1 << std::endl << std::endl;
-  std::cout << R1 << std::endl << std::endl;
-  std::cout << N << std::endl << std::endl;
-
   S_ = math::ContinuousAlgebraicRiccatiEquation(A_, B_, Q1, R1, N);
   Eigen::LLT<Eigen::MatrixXd> R_cholesky(R1);
   K_ = -R_cholesky.solve(B_.transpose() * S_ + N.transpose());
 
-  std::cout << S_ << std::endl << std::endl;
-  std::cout << K_ << std::endl << std::endl;
   //lqr(A_, B_, Q1, R1, N, K_, S_);
   //K_ = -K_;
 
@@ -55,6 +47,11 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   Eigen::Matrix<double, 4, 4> A2 = NB.transpose() * R1i * B_.transpose() - A_.transpose();
   Eigen::Matrix<double, 4, 2> B2 = 2 * (C_.transpose() - NB.transpose() * R1i * D_) * Qy_;
   Eigen::Matrix<double, 4, 4> A2i = A2.inverse();
+
+  std::cout << "NB: " << std::endl << NB << std::endl << std::endl;
+  std::cout << "A2: " << std::endl << A2 << std::endl << std::endl;
+  std::cout << "B2: " << std::endl << B2 << std::endl << std::endl;
+  std::cout << "A2i: " << std::endl << A2i << std::endl << std::endl;
 
   int n_segments = zmp_d.getNumberOfSegments();
   Eigen::Vector2d zmp_tf;
@@ -85,18 +82,29 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
       gamma[t].col(d) = R1i * D_ * Qy_ * c[t].col(d) - 0.5 * R1i * B_.transpose() * beta[t].col(d);
     }
 
+    std::cout << "beta: " << beta[t] << std::endl;
+
     if (t == n_segments-1) {
       s1dt = Eigen::Vector4d::Zero();
     }
     else {
       s1dt = alpha.col(t+1) + beta[t+1].col(0);
     }
+
+    std::cout << "s1dt: " << s1dt.col(t).transpose() << std::endl;
+
     double dt = zmp_d.getDuration(t);
     Eigen::Matrix4d A2exp = A2 * dt;
     A2exp = A2exp.exp();
 
     alpha.col(t) = Eigen::Vector4d(1, dt, dt * dt, dt * dt * dt);
+    std::cout << "alpha1: " << alpha.col(t).transpose() << std::endl;
     alpha.col(t) = s1dt - beta[t] * alpha.col(t);
+    std::cout << "alpha2: " << alpha.col(t).transpose() << std::endl;
+
+    std::cout << "t: " << t << std::endl;
+    std::cout << "A2exp: " << A2exp << std::endl;
+    std::cout << "alpha3: " << alpha.col(t).transpose() << std::endl;
 
     alpha.col(t) = A2exp.inverse() * alpha.col(t);
 
@@ -105,6 +113,7 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
     for (int n = 0; n < 4; n++) {
       beta_poly[t](n, 0) = Polynomial<double>(beta[t].row(n));
     }
+
   }
 
   PiecewisePolynomial<double> beta_traj(beta_poly, zmp_d.getSegmentTimes());
@@ -164,6 +173,9 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   tmp28.block<2, 2>(0, 0).setIdentity();
   tmp28.block<2, 6>(0, 2).setZero();
   PiecewisePolynomial<double> b_traj(b_poly, zmp_d.getSegmentTimes());
+
+  std::cout << "alpha: " << alpha << std::endl;
+
   com_traj_ = ExponentialPlusPiecewisePolynomial<double>(tmp28, Ay, a, b_traj);
   comd_traj_ = com_traj_.derivative();
   comdd_traj_ = comd_traj_.derivative(); // this is essentially the feedforward/nominal control input coming from lqr solution

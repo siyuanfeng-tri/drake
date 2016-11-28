@@ -36,24 +36,26 @@ int main() {
   PiecewisePolynomial<double> zmp_traj_ = GeneratePCHIPSpline(Ts, zmp_d, zero, zero);
   zmp.Plan(zmp_traj_, x0, 1);
 
-  std::cout << "S: " << zmp.S_ << std::endl;
+  //std::cout << "S: " << zmp.S_ << std::endl;
   out.open("/home/sfeng/zmp_d");
   for (double t = Ts[0]; t <= Ts[Ts.size()-1] + 5; t+= 0.01) {
-    out << t << " " << zmp.zmp_traj_.value(t).transpose() << std::endl;
+    out << t << " " << zmp.GetDesiredZMP(t).transpose() << std::endl;
   }
   out.close();
 
   out.open("/home/sfeng/com");
   for (double t = Ts[0]; t <= Ts[Ts.size()-1] + 5; t+= 0.01) {
-    out << t << " " << zmp.com_traj_.value(t).transpose() << std::endl;
+    out << t << " " << zmp.GetNominalCOM(t).transpose() << std::endl;
   }
   out.close();
 
+  /*
   out.open("/home/sfeng/s1");
   for (double t = Ts[0]; t <= Ts[Ts.size()-1] + 5; t+= 0.01) {
     out << t << " " << zmp.s1_traj_.value(t).transpose() << std::endl;
   }
   out.close();
+  */
 
   return 0;
 }
