@@ -2,7 +2,7 @@
 #include <fstream>
 
 #include "drake/systems/controllers/zmp_planner.h"
-#include "drake/systems/controllers/generate_spline.h"
+#include "drake/common/trajectories/spline_util.h"
 
 int main() {
   drake::systems::ZMPPlanner zmp;

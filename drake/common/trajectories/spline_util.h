@@ -108,24 +108,6 @@ PiecewisePolynomial<Scalar> GeneratePCHIPSpline(
       int n = N - 1;
       c1[0](j, k) = dY0(j, k);
       c1[n](j, k) = dY1(j, k);
-      /*
-        ((2 * dt[0] + dt[1]) * m[0](j, k) - dt[0] * m[1](j, k)) /
-                    (dt[0] + dt[1]);
-      if (c1[0](j, k) * m[0](j, k) <= 0)
-        c1[0](j, k) = 0;
-      else if (m[0](j, k) * m[1](j, k) <= 0 &&
-               abs(c1[0](j, k)) > abs(3 * m[0](j, k)))
-        c1[0](j, k) = 3 * m[0](j, k);
-
-      c1[n](j, k) = ((2 * dt[n - 1] + dt[n - 2]) * m[n - 1](j, k) -
-                     dt[n - 1] * m[n - 2](j, k)) /
-                    (dt[n - 1] + dt[n - 2]);
-      if (c1[n](j, k) * m[n - 1](j, k) <= 0)
-        c1[n](j, k) = 0;
-      else if (m[n - 1](j, k) * m[n - 2](j, k) <= 0 &&
-               abs(c1[n](j, k)) > abs(3 * m[n - 1](j, k)))
-        c1[n](j, k) = 3 * m[n - 1](j, k);
-      */
 
       for (size_t t = 0; t < N - 1; t++) {
         Eigen::Vector4d coeffs;
