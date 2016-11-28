@@ -9,9 +9,8 @@ namespace drake {
 namespace systems {
 
 void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vector4d &x0, double height) {
-  assert(zmp_d.rows() == 2 && zmp_d.cols() == 1);
-  assert(zmp_d.getSegmentPolynomialDegree(0) == 4);
-
+  int zmp_d_poly_order = zmp_d.getSegmentPolynomialDegree(0) + 1;
+  DRAKE_DEMAND(zmp_d_poly_order <= 4);
   zmp_traj_ = zmp_d;
   zmpd_traj_ = zmp_traj_.derivative();
 
@@ -36,9 +35,6 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   Eigen::LLT<Eigen::MatrixXd> R_cholesky(R1);
   K_ = -R_cholesky.solve(B_.transpose() * S_ + N.transpose());
 
-  //lqr(A_, B_, Q1, R1, N, K_, S_);
-  //K_ = -K_;
-
   s1_dot_.setZero();
   u0_.setZero();
 
@@ -47,11 +43,6 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   Eigen::Matrix<double, 4, 4> A2 = NB.transpose() * R1i * B_.transpose() - A_.transpose();
   Eigen::Matrix<double, 4, 2> B2 = 2 * (C_.transpose() - NB.transpose() * R1i * D_) * Qy_;
   Eigen::Matrix<double, 4, 4> A2i = A2.inverse();
-
-  std::cout << "NB: " << std::endl << NB << std::endl << std::endl;
-  std::cout << "A2: " << std::endl << A2 << std::endl << std::endl;
-  std::cout << "B2: " << std::endl << B2 << std::endl << std::endl;
-  std::cout << "A2i: " << std::endl << A2i << std::endl << std::endl;
 
   int n_segments = zmp_d.getNumberOfSegments();
   Eigen::Vector2d zmp_tf;
@@ -68,8 +59,9 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   std::vector<Eigen::Matrix<Polynomial<double>, Eigen::Dynamic, Eigen::Dynamic>> beta_poly(n_segments);
 
   for (int t = n_segments-1; t >= 0; t--) {
-    c[t].row(0) = zmp_d.getPolynomial(t, 0, 0).GetCoefficients();
-    c[t].row(1) = zmp_d.getPolynomial(t, 1, 0).GetCoefficients();
+    c[t].setZero();
+    c[t].row(0).head(zmp_d_poly_order) = zmp_d.getPolynomial(t, 0, 0).GetCoefficients();
+    c[t].row(1).head(zmp_d_poly_order) = zmp_d.getPolynomial(t, 1, 0).GetCoefficients();
     /// switch to zbar coord
     c[t].col(0) -= zmp_tf;
 
@@ -82,8 +74,6 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
       gamma[t].col(d) = R1i * D_ * Qy_ * c[t].col(d) - 0.5 * R1i * B_.transpose() * beta[t].col(d);
     }
 
-    std::cout << "beta: " << beta[t] << std::endl;
-
     if (t == n_segments-1) {
       s1dt = Eigen::Vector4d::Zero();
     }
@@ -91,22 +81,12 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
       s1dt = alpha.col(t+1) + beta[t+1].col(0);
     }
 
-    std::cout << "s1dt: " << s1dt.col(t).transpose() << std::endl;
-
     double dt = zmp_d.getDuration(t);
     Eigen::Matrix4d A2exp = A2 * dt;
     A2exp = A2exp.exp();
+    Eigen::Vector4d tmp4 = s1dt - beta[t] * Eigen::Vector4d(1, dt, dt * dt, dt * dt * dt);
 
-    alpha.col(t) = Eigen::Vector4d(1, dt, dt * dt, dt * dt * dt);
-    std::cout << "alpha1: " << alpha.col(t).transpose() << std::endl;
-    alpha.col(t) = s1dt - beta[t] * alpha.col(t);
-    std::cout << "alpha2: " << alpha.col(t).transpose() << std::endl;
-
-    std::cout << "t: " << t << std::endl;
-    std::cout << "A2exp: " << A2exp << std::endl;
-    std::cout << "alpha3: " << alpha.col(t).transpose() << std::endl;
-
-    alpha.col(t) = A2exp.inverse() * alpha.col(t);
+    alpha.col(t) = A2exp.inverse() * tmp4;
 
     // setup the poly part
     beta_poly[t].resize(4,1);
@@ -173,8 +153,6 @@ void ZMPPlanner::Plan(const PiecewisePolynomial<double> &zmp_d, const Eigen::Vec
   tmp28.block<2, 2>(0, 0).setIdentity();
   tmp28.block<2, 6>(0, 2).setZero();
   PiecewisePolynomial<double> b_traj(b_poly, zmp_d.getSegmentTimes());
-
-  std::cout << "alpha: " << alpha << std::endl;
 
   com_traj_ = ExponentialPlusPiecewisePolynomial<double>(tmp28, Ay, a, b_traj);
   comd_traj_ = com_traj_.derivative();

@@ -33,7 +33,8 @@ int main() {
   }
 
   Eigen::Vector2d zero(Eigen::Vector2d::Zero());
-  PiecewisePolynomial<double> zmp_traj_ = GeneratePCHIPSpline(Ts, zmp_d, zero, zero);
+  PiecewisePolynomial<double> zmp_traj_ = GenerateLinearSpline(Ts, zmp_d);
+  //PiecewisePolynomial<double> zmp_traj_ = GeneratePCHIPSpline(Ts, zmp_d, zero, zero);
   zmp.Plan(zmp_traj_, x0, 1);
 
   //std::cout << "S: " << zmp.S_ << std::endl;
