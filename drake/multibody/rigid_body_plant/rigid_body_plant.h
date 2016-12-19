@@ -5,9 +5,9 @@
 
 #include <Eigen/Geometry>
 
+#include "drake/multibody/kinematics_results.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/multibody/rigid_body_plant/contact_results.h"
-#include "drake/multibody/rigid_body_plant/kinematics_results.h"
 #include "drake/systems/framework/leaf_system.h"
 
 namespace drake {

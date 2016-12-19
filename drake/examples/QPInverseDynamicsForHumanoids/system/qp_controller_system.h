@@ -4,6 +4,7 @@
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
+#include "drake/multibody/kinematics_results.h"
 #include "drake/systems/framework/leaf_system.h"
 
 namespace drake {
@@ -13,7 +14,7 @@ namespace qp_inverse_dynamics {
 /**
  * A wrapper around qp inverse dynamics controller.
  *
- * Input: HumanoidStatus
+ * Input: KinematicsResults
  * Input: QPInput
  * Output: QPOutput
  */
@@ -21,7 +22,7 @@ class QPControllerSystem : public systems::LeafSystem<double> {
  public:
   explicit QPControllerSystem(const RigidBodyTree<double>& robot)
       : robot_(robot) {
-    input_port_index_humanoid_status_ = DeclareAbstractInputPort().get_index();
+    input_port_index_kinematics_results_ = DeclareAbstractInputPort().get_index();
     input_port_index_qp_input_ = DeclareAbstractInputPort().get_index();
     output_port_index_qp_input_ = DeclareAbstractOutputPort().get_index();
 
@@ -34,8 +35,9 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   void EvalOutput(const Context<double>& context,
                   SystemOutput<double>* output) const override {
     // Inputs:
-    const HumanoidStatus* rs = EvalInputValue<HumanoidStatus>(
-        context, input_port_index_humanoid_status_);
+    const systems::KinematicsResults<double>* kin_res =
+        EvalInputValue<systems::KinematicsResults<double>>(
+           context, input_port_index_kinematics_results_);
 
     const lcmt_qp_input* qp_input_msg =
         EvalInputValue<lcmt_qp_input>(context, input_port_index_qp_input_);
@@ -47,9 +49,9 @@ class QPControllerSystem : public systems::LeafSystem<double> {
     QPOutput& qp_output = output->GetMutableData(output_port_index_qp_input_)
                               ->GetMutableValue<QPOutput>();
 
-    if (qp_controller_.Control(*rs, qp_input, &qp_output) < 0) {
-      std::cout << rs->position().transpose() << std::endl;
-      std::cout << rs->velocity().transpose() << std::endl;
+    if (qp_controller_.Control(*kin_res, qp_input, &qp_output) < 0) {
+      std::cout << kin_res->get_positions().transpose() << std::endl;
+      std::cout << kin_res->get_velocities().transpose() << std::endl;
       std::cout << qp_input << std::endl;
       throw std::runtime_error("System2QP: QP cannot solve\n");
     }
@@ -65,11 +67,11 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   }
 
   /**
-   * @return Port for the input: HumanoidStatus.
+   * @return Port for the input: KinematicsResults.
    */
-  inline const SystemPortDescriptor<double>& get_input_port_humanoid_status()
+  inline const SystemPortDescriptor<double>& get_input_port_kinematics_results()
       const {
-    return get_input_port(input_port_index_humanoid_status_);
+    return get_input_port(input_port_index_kinematics_results_);
   }
 
   /**
@@ -96,7 +98,7 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   // This should be taken care of with the new system2 cache.
   mutable QPController qp_controller_;
 
-  int input_port_index_humanoid_status_;
+  int input_port_index_kinematics_results_;
   int input_port_index_qp_input_;
   int output_port_index_qp_input_;
 };

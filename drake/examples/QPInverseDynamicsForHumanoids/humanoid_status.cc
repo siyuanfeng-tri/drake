@@ -17,8 +17,9 @@ const Vector3<double> HumanoidStatus::kFootToSensorPositionOffset =
 const Matrix3<double> HumanoidStatus::kFootToSensorRotationOffset =
     Matrix3<double>(AngleAxis<double>(-M_PI, Vector3<double>::UnitX()));
 
-void HumanoidStatus::Update() {
-  cache_.initialize(position_, velocity_);
+void HumanoidStatus::Update(const Eigen::Ref<const VectorX<double>>& q,
+                            const Eigen::Ref<const VectorX<double>>& v) {
+  cache_.initialize(q, v);
   robot_->doKinematics(cache_, true);
 
   M_ = robot_->massMatrix(cache_);

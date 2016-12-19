@@ -1,5 +1,6 @@
 add_library_with_exports(LIB_NAME drakeRBM SOURCE_FILES
     kinematics_cache.cc
+    kinematics_results.cc
     rigid_body_tree.cc
     rigid_body.cc
     rigid_body_tree_contact.cc
@@ -20,6 +21,7 @@ drake_install_headers(
     kinematic_path.h
     kinematics_cache.h
     kinematics_cache-inl.h
+    kinematics_results.h
     material_map.h
     pose_map.h
     rigid_body.h

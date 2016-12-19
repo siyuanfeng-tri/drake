@@ -86,6 +86,9 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
   EXPECT_TRUE(robot_status.foot(Side::RIGHT).velocity().norm() < 1e-10);
 
   int tick_ctr = 0;
+
+  systems::KinematicsResults<double> kin_res(robot.get());
+
   while (time < 4) {
     // Update desired accelerations.
     input.mutable_desired_body_motions().at("pelvis").mutable_values() =
@@ -102,7 +105,8 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
          Kd_com.array() * robot_status.comd().array()).matrix() *
         robot->getMass();
 
-    int status = con.Control(robot_status, input, &output);
+    kin_res.Update(q, v);
+    int status = con.Control(kin_res, input, &output);
 
     if (status) {
       std::cout << input << output;

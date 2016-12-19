@@ -4,7 +4,6 @@ set(source_files
     contact_info.cc
     contact_resultant_force_calculator.cc
     contact_results.cc
-    kinematics_results.cc
     point_contact_detail.cc
     rigid_body_plant.cc)
 
@@ -49,7 +48,6 @@ drake_install_headers(
     contact_force.h
     contact_info.h
     contact_results.h
-    kinematics_results.h
     rigid_body_plant.h)
 
 drake_install_libraries(drakeRigidBodyPlant)

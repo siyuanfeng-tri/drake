@@ -3,7 +3,6 @@
 #include <Eigen/Geometry>
 
 #include "drake/multibody/rigid_body_tree.h"
-#include "drake/systems/framework/context.h"
 
 namespace drake {
 namespace systems {
@@ -70,21 +69,50 @@ class KinematicsResults {
   Eigen::VectorBlock<const VectorX<T>> get_joint_velocity(
       const RigidBody<T>& body) const;
 
+  const RigidBodyTree<T>& get_tree() const { return *tree_; }
+
+  const KinematicsCache<T>& get_kinematics_cache() const { return kinematics_cache_; }
+
+  const MatrixX<T>& get_mass_matrix() const { return mass_matrix_; }
+
+  const VectorX<T>& get_dynamics_bias() const { return dynamics_bias_; }
+
+  const MatrixX<T>& get_centroidal_momentum_matrix() const { return centroidal_momentum_matrix_; }
+
+  const VectorX<T>& get_centroidal_momentum_matrix_dot_times_v() const { return centroidal_momentum_matrix_dot_times_v_; }
+
+  const Vector3<T>& get_center_of_mass() const { return center_of_mass_; }
+
+  const Vector3<T>& get_center_of_mass_dot() const { return center_of_mass_dot_; }
+
+  const VectorX<T>& get_positions() const { return kinematics_cache_.getQ(); }
+
+  const VectorX<T>& get_velocities() const { return kinematics_cache_.getV(); }
+
  private:
   // RigidBodyPlant is the only class allowed to update KinematicsResults
   // through UpdateFromContext().
   // TODO(amcastro-tri): when KinematicsResults can reference entries in the
   // cache this friendship and the method UpdateFromContext() won't be needed.
-  friend class RigidBodyPlant<T>;
+  // friend class RigidBodyPlant<T>;
 
   // Updates KinematicsResults from a context provided by RigidBodyPlant.
   // Only RigidBodyPlant has access to this method since it is a friend.
   // TODO(amcastro-tri): when KinematicsResults can reference entries in the
   // cache this method won't be needed.
-  void UpdateFromContext(const Context<T>& context);
+  // void UpdateFromContext(const Context<T>& context);
 
   const RigidBodyTree<T>* tree_;
   KinematicsCache<T> kinematics_cache_;
+
+  MatrixX<T> mass_matrix_;
+  VectorX<T> dynamics_bias_;
+
+  MatrixX<T> centroidal_momentum_matrix_;
+  VectorX<T> centroidal_momentum_matrix_dot_times_v_;
+
+  Vector3<T> center_of_mass_;
+  Vector3<T> center_of_mass_dot_;
 };
 
 }  // namespace systems

@@ -3,6 +3,7 @@
 #include "bot_core/atlas_command_t.hpp"
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
+#include "drake/multibody/kinematics_results.h"
 #include "drake/systems/framework/leaf_system.h"
 #include "drake/util/drakeUtil.h"
 
@@ -28,7 +29,7 @@ using systems::Value;
  *  joint level set points, gains, integrators, filters,
  *  disturbance observers, etc.
  *
- * Input: HumanoidStatus
+ * Input: KinematicsResults
  * Input: QPOutput
  * Output: lcm message bot_core::atlas_command_t in channel "ROBOT_COMMAND"
  */
@@ -38,7 +39,7 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
       : robot_(robot) {
     in_port_idx_qp_output_ = DeclareAbstractInputPort().get_index();
 
-    in_port_idx_humanoid_status_ = DeclareAbstractInputPort().get_index();
+    in_port_idx_kinematics_results_ = DeclareAbstractInputPort().get_index();
 
     out_port_index_atlas_cmd_ = DeclareAbstractOutputPort().get_index();
 
@@ -60,8 +61,6 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
     // Inputs
     const QPOutput* qp_output =
         EvalInputValue<QPOutput>(context, in_port_idx_qp_output_);
-    const HumanoidStatus* rs =
-        EvalInputValue<HumanoidStatus>(context, in_port_idx_humanoid_status_);
 
     // Output
     bot_core::atlas_command_t& msg =
@@ -69,7 +68,7 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
             ->GetMutableValue<bot_core::atlas_command_t>();
 
     // Make bot_core::atlas_command_t message.
-    msg.utime = static_cast<uint64_t>(rs->time() * 1e6);
+    msg.utime = static_cast<uint64_t>(context.get_time() * 1e6);
 
     int act_size = static_cast<int>(robot_.actuators.size());
     msg.num_joints = act_size;
@@ -125,11 +124,11 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
   }
 
   /**
-   * @return Port for the input: HumanoidStatus.
+   * @return Port for the input: KinematicsResults.
    */
-  inline const SystemPortDescriptor<double>& get_input_port_humanoid_status()
+  inline const SystemPortDescriptor<double>& get_input_port_kinematics_results()
       const {
-    return get_input_port(in_port_idx_humanoid_status_);
+    return get_input_port(in_port_idx_kinematics_results_);
   }
 
   /**
@@ -151,7 +150,7 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
   const RigidBodyTree<double>& robot_;
 
   int in_port_idx_qp_output_;
-  int in_port_idx_humanoid_status_;
+  int in_port_idx_kinematics_results_;
   int out_port_index_atlas_cmd_;
 
   // Joint level gains, these are in actuator order.

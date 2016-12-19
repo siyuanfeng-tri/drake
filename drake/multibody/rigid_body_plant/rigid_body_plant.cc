@@ -193,7 +193,20 @@ void RigidBodyPlant<T>::EvalOutput(const Context<T>& context,
   auto& kinematics_results =
       output->GetMutableData(kinematics_output_port_id_)
           ->template GetMutableValue<KinematicsResults<T>>();
-  kinematics_results.UpdateFromContext(context);
+
+  //kinematics_results.UpdateFromContext(context);
+  auto x = dynamic_cast<const BasicVector<T>&>(
+      context.get_continuous_state_vector()).get_value();
+
+  const int nq = tree_->get_num_positions();
+  const int nv = tree_->get_num_velocities();
+
+  // TODO(amcastro-tri): We would like to compile here with `auto` instead of
+  // `VectorX<T>`. However it seems we get some sort of block from a block which
+  // is not explicitly instantiated in drakeRBM.
+  VectorX<T> q = x.topRows(nq);
+  VectorX<T> v = x.bottomRows(nv);
+  kinematics_results.Update(q, v);
 
   // Evaluates the contact results output port.
   auto& contact_results = output->GetMutableData(contact_output_port_id_)

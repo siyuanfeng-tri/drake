@@ -9,7 +9,8 @@
 #include <vector>
 
 #include "drake/common/eigen_types.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/rigid_body_tree_utils.h"
+#include "drake/multibody/kinematics_results.h"
 #include "drake/math/cross_product.h"
 #include "drake/solvers/gurobi_solver.h"
 #include "drake/solvers/mathematical_program.h"
@@ -1098,8 +1099,8 @@ class QPController {
    * @param output Container for outputs
    * @return 0 if successful. < 0 if error.
    */
-  int Control(const HumanoidStatus& robot_status, const QPInput& input,
-              QPOutput* output);
+  int Control(const systems::KinematicsResults<double>& kin_results,
+              const QPInput& input, QPOutput* output);
 
   static const double kUpperBoundForContactBasis;
 

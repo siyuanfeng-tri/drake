@@ -1,4 +1,4 @@
-#include "drake/multibody/rigid_body_plant/kinematics_results.h"
+#include "drake/multibody/kinematics_results.h"
 
 #include "drake/common/eigen_types.h"
 #include "drake/multibody/kinematics_cache.h"
@@ -16,7 +16,20 @@ template <typename T>
 void KinematicsResults<T>::Update(const Eigen::Ref<const VectorX<T>>& q,
                                   const Eigen::Ref<const VectorX<T>>& v) {
   this->kinematics_cache_.initialize(q, v);
-  this->tree_->doKinematics(this->kinematics_cache_, false);
+  //this->tree_->doKinematics(this->kinematics_cache_, false);
+  this->tree_->doKinematics(this->kinematics_cache_, true);
+
+  mass_matrix_ = tree_->massMatrix(kinematics_cache_);
+  eigen_aligned_std_unordered_map<RigidBody<T> const*, TwistVector<T>> f_ext;
+  dynamics_bias_ = tree_->dynamicsBiasTerm(kinematics_cache_, f_ext);
+
+  centroidal_momentum_matrix_ = tree_->centroidalMomentumMatrix(kinematics_cache_);
+  centroidal_momentum_matrix_dot_times_v_ =
+     tree_->centroidalMomentumMatrixDotTimesV(kinematics_cache_);
+
+//  centroidal_momentum_ = centroidal_momentum_matrix_ * v;
+  center_of_mass_ = tree_->centerOfMass(kinematics_cache_);
+  center_of_mass_dot_ = centroidal_momentum_matrix_ * v / tree_->getMass();
 }
 
 template <typename T>
@@ -78,6 +91,7 @@ TwistVector<T> KinematicsResults<T>::get_twist_in_world_aligned_body_frame(
   return transformSpatialMotion(world_to_world_aligned_body, twist_in_world);
 }
 
+/*
 template <typename T>
 void KinematicsResults<T>::UpdateFromContext(const Context<T>& context) {
   // TODO(amcastro-tri): provide nicer accessor to an Eigen representation for
@@ -94,9 +108,9 @@ void KinematicsResults<T>::UpdateFromContext(const Context<T>& context) {
   VectorX<T> q = x.topRows(nq);
   VectorX<T> v = x.bottomRows(nv);
 
-  kinematics_cache_.initialize(q, v);
-  tree_->doKinematics(kinematics_cache_, false);
+  Update(q, v);
 }
+*/
 
 template <typename T>
 Eigen::VectorBlock<const VectorX<T>> KinematicsResults<T>::get_joint_position(
