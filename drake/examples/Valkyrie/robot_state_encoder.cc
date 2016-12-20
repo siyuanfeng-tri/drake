@@ -135,7 +135,7 @@ void RobotStateEncoder::SetStateAndEfforts(
   if (floating_body_) {
     // Pose of floating body with respect to world.
     Isometry3d floating_body_to_world =
-        kinematics_results.get_pose_in_world(*floating_body_);
+        kinematics_results.get_pose_in_world_frame(*floating_body_);
     EncodePose(floating_body_to_world, message->pose);
 
     // Twist of floating body with respect to world.
@@ -210,7 +210,7 @@ RobotStateEncoder::GetSpatialForceActingOnBody1ByBody2InBody1Frame(
 
   ContactResultantForceCalculator<double> calc;
   const Vector3<double>& reference_point =
-      kinematics_results.get_pose_in_world(body1).translation();
+      kinematics_results.get_pose_in_world_frame(body1).translation();
 
   for (const ContactForce<double>& f : contact_forces) {
     calc.AddForce(f);
@@ -220,7 +220,7 @@ RobotStateEncoder::GetSpatialForceActingOnBody1ByBody2InBody1Frame(
       calc.ComputeResultant(reference_point).get_spatial_force();
   Isometry3<double> world_aligned_to_body_frame(Isometry3<double>::Identity());
   world_aligned_to_body_frame.linear() =
-      kinematics_results.get_pose_in_world(body1).linear().transpose();
+      kinematics_results.get_pose_in_world_frame(body1).linear().transpose();
   return transformSpatialForce(world_aligned_to_body_frame,
                                spatial_force_in_world_aligned_body_frame);
 }

@@ -37,23 +37,55 @@ class KinematicsResults {
 
   /// Returns the quaternion representation of the three dimensional orientation
   /// of body @p body_index in the world's frame.
-  Quaternion<T> get_body_orientation(int body_index) const;
+  Quaternion<T> get_body_orientation(int body_index) const {
+    return Quaternion<T>(get_pose_in_world_frame(body_index).linear());
+  }
 
   /// Returns the three dimensional position of body @p body_index in world's
   /// frame.
-  Vector3<T> get_body_position(int body_index) const;
+  Vector3<T> get_body_position(int body_index) const {
+    return get_pose_in_world_frame(body_index).translation();
+  }
 
   /// Returns the pose of body @p body with respect to the world.
-  Isometry3<T> get_pose_in_world(const RigidBody<T>& body) const;
+  Isometry3<T> get_pose_in_world_frame(
+      const RigidBody<T>& body, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_pose_in_world_frame(body.get_body_index(), local_offset);
+  }
 
   /// Returns the twist of @p body with respect to the world, expressed in world
   /// frame.
-  TwistVector<T> get_twist_in_world_frame(const RigidBody<T>& body) const;
+  TwistVector<T> get_twist_in_world_frame(
+      const RigidBody<T>& body, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_twist_in_world_frame(body.get_body_index(), local_offset);
+  }
 
   /// Returns the twist of @p body with respect to the world, expressed in world
   /// frame.
   TwistVector<T> get_twist_in_world_aligned_body_frame(
-      const RigidBody<T>& body) const;
+      const RigidBody<T>& body, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_twist_in_world_aligned_body_frame(body.get_body_index(), local_offset);
+  }
+
+  /// Returns the pose of body @p body with respect to the world.
+  Isometry3<T> get_pose_in_world_frame(
+      const RigidBodyFrame<T>& frame, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_pose_in_world_frame(frame.get_frame_index(), local_offset);
+  }
+
+  /// Returns the twist of @p body with respect to the world, expressed in world
+  /// frame.
+  TwistVector<T> get_twist_in_world_frame(
+      const RigidBodyFrame<T>& frame, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_twist_in_world_frame(frame.get_frame_index(), local_offset);
+  }
+
+  /// Returns the twist of @p body with respect to the world, expressed in world
+  /// frame.
+  TwistVector<T> get_twist_in_world_aligned_body_frame(
+      const RigidBodyFrame<T>& frame, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_twist_in_world_aligned_body_frame(frame.get_frame_index(), local_offset);
+  }
 
   /// Returns the joint position vector associated with the joint between
   /// @p body and @p body's parent.
@@ -89,6 +121,58 @@ class KinematicsResults {
 
   const VectorX<T>& get_velocities() const { return kinematics_cache_.getV(); }
 
+  /**
+   * This function computes the Jacobian of the body frame with respect to the
+   * world frame expressed in a frame that is aligned with the world frame but
+   * located at the origin of the body frame.
+   * get_twist_in_world_aligned_body_frame(body) =
+   * get_jacobian_for_world_aligned_body_frame(body) * v
+   * @param body, Reference to the body
+   * @param local_offset from the body frame origin to the point of interest
+   * in body frame
+   * @return Jacobian
+   */
+  MatrixX<T> get_jacobian_for_world_aligned_body_frame(
+      const RigidBody<T>& body,
+      const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_jacobian_for_world_aligned_body_frame(
+        body.get_body_index(), local_offset);
+  }
+
+  MatrixX<T> get_jacobian_for_world_aligned_body_frame(
+      const RigidBodyFrame<T>& frame,
+      const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_jacobian_for_world_aligned_body_frame(
+        frame.get_frame_index(), local_offset);
+  }
+
+  /**
+   * This function computes the Jacobian dot times the generalized velocities
+   * term of the body frame with respect to the world frame expressed in a
+   * frame that is aligned with the world frame but located at the origin of
+   * the body frame.
+   * get_twist_in_world_aligned_body_frame(body)_dot =
+   * get_jacobian_for_world_aligned_body_frame(body) * vd +
+   * get_jacobian_dot_time_v_for_world_aligned_body_frame(body)
+   * @param body reference to the body
+   * @param local_offset from the body frame origin to the point of interest
+   * in body frame
+   * @return Jacobian_dot * v
+   */
+  TwistVector<T> get_jacobian_dot_time_v_for_world_aligned_body_frame(
+      const RigidBody<T>& body,
+      const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_jacobian_dot_time_v_for_world_aligned_body_frame(
+        body.get_body_index(), local_offset);
+  }
+
+  TwistVector<T> get_jacobian_dot_time_v_for_world_aligned_body_frame(
+      const RigidBodyFrame<T>& frame,
+      const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const {
+    return get_jacobian_dot_time_v_for_world_aligned_body_frame(
+        frame.get_frame_index(), local_offset);
+  }
+
  private:
   // RigidBodyPlant is the only class allowed to update KinematicsResults
   // through UpdateFromContext().
@@ -101,6 +185,21 @@ class KinematicsResults {
   // TODO(amcastro-tri): when KinematicsResults can reference entries in the
   // cache this method won't be needed.
   // void UpdateFromContext(const Context<T>& context);
+
+  Isometry3<T> get_pose_in_world_frame(
+      int index, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const;
+
+  TwistVector<T> get_twist_in_world_frame(
+      int index, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const;
+
+  TwistVector<T> get_twist_in_world_aligned_body_frame(
+      int index, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const;
+
+  MatrixX<T> get_jacobian_for_world_aligned_body_frame(
+      int index, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const;
+
+  TwistVector<T> get_jacobian_dot_time_v_for_world_aligned_body_frame(
+      int index, const Isometry3<T>& local_offset = Isometry3<T>::Identity()) const;
 
   const RigidBodyTree<T>* tree_;
   KinematicsCache<T> kinematics_cache_;

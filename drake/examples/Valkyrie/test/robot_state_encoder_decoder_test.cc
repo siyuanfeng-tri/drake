@@ -119,9 +119,9 @@ void TestEncodeThenDecode(FloatingBaseType floating_base_type) {
   std::map<Side, Isometry3<double>> hand_poses;
   for (Side side : Side::values) {
     foot_poses[side] =
-        kinematics_results.get_pose_in_world(*tree.FindBody(foot_names[side]));
+        kinematics_results.get_pose_in_world_frame(*tree.FindBody(foot_names[side]));
     hand_poses[side] =
-        kinematics_results.get_pose_in_world(*tree.FindBody(hand_names[side]));
+        kinematics_results.get_pose_in_world_frame(*tree.FindBody(hand_names[side]));
   }
 
   auto& kinematics_results_source =

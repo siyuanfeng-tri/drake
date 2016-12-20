@@ -46,7 +46,7 @@ class KinematicsResultsTest : public ::testing::Test {
 
 TEST_F(KinematicsResultsTest, PoseTest) {
   const RigidBody<double>& body = *robot_->FindBody("link1");
-  Isometry3<double> pose = kinematics_result_->get_pose_in_world(body);
+  Isometry3<double> pose = kinematics_result_->get_pose_in_world_frame(body);
   Matrix3<double> rotmat = math::rpy2rotmat(q_.segment<3>(3));
 
   // Position and orientation get from kinematics result = quantities directly
@@ -64,7 +64,7 @@ TEST_F(KinematicsResultsTest, TwistTest) {
   Vector3<double> rpydot = v_.segment<3>(3);
   Vector3<double> xyzdot = v_.segment<3>(0);
 
-  Isometry3<double> pose = kinematics_result_->get_pose_in_world(body);
+  Isometry3<double> pose = kinematics_result_->get_pose_in_world_frame(body);
 
   Vector6<double> v_in_world_aligned_body =
       kinematics_result_->get_twist_in_world_aligned_body_frame(body);
@@ -98,6 +98,19 @@ TEST_F(KinematicsResultsTest, TwistTest) {
                                      drake::MatrixCompareType::absolute));
 }
 
+TEST_F(KinematicsResultsTest, JacobianTest) {
+  const RigidBody<double>& body = *robot_->FindBody("link3");
+  TwistVector<double> xdot =
+      kinematics_result_->get_twist_in_world_aligned_body_frame(body);
+  MatrixX<double> J =
+      kinematics_result_->get_jacobian_for_world_aligned_body_frame(body);
+
+  VectorX<double> v = kinematics_result_->get_velocities();
+
+  EXPECT_TRUE(drake::CompareMatrices(xdot, J * v, 1e-14,
+                                     drake::MatrixCompareType::absolute));
+}
+
 TEST_F(KinematicsResultsTest, JointTest) {
   EXPECT_EQ(
       kinematics_result_->get_joint_position(*robot_->FindBody("link2"))[0],
@@ -112,6 +125,41 @@ TEST_F(KinematicsResultsTest, JointTest) {
   EXPECT_EQ(
       kinematics_result_->get_joint_velocity(*robot_->FindBody("link3"))[0],
       v_[7]);
+}
+
+TEST_F(KinematicsResultsTest, OffsetTest) {
+  auto frame_ptr = robot_->findFrame("test_frame");
+  const RigidBody<double>& body = frame_ptr->get_rigid_body();
+  const Isometry3<double>& offset = frame_ptr->get_transform_to_body();
+
+  VectorX<double> v = kinematics_result_->get_velocities();
+
+  int frame_id = frame_ptr->get_frame_index();
+  std::cout << frame_id << std::endl;
+
+  TwistVector<double> offset_twist = kinematics_result_->get_twist_in_world_frame(body, offset);
+  TwistVector<double> offset_twist_as_frame = kinematics_result_->get_twist_in_world_frame(*frame_ptr);
+  EXPECT_TRUE(drake::CompareMatrices(offset_twist, offset_twist_as_frame, 1e-14, drake::MatrixCompareType::absolute));
+
+  TwistVector<double> xdot = kinematics_result_->get_twist_in_world_aligned_body_frame(body, offset);
+  TwistVector<double> xdot_as_frame = kinematics_result_->get_twist_in_world_aligned_body_frame(*frame_ptr);
+  MatrixX<double> J = kinematics_result_->get_jacobian_for_world_aligned_body_frame(body, offset);
+  MatrixX<double> J_as_frame = kinematics_result_->get_jacobian_for_world_aligned_body_frame(*frame_ptr);
+
+  EXPECT_TRUE(drake::CompareMatrices(J, J_as_frame, 1e-14,
+                                     drake::MatrixCompareType::absolute));
+  EXPECT_TRUE(drake::CompareMatrices(xdot, xdot_as_frame, 1e-14,
+                                     drake::MatrixCompareType::absolute));
+
+  EXPECT_TRUE(drake::CompareMatrices(xdot_as_frame, J_as_frame * v, 1e-14,
+                                     drake::MatrixCompareType::absolute));
+  EXPECT_TRUE(drake::CompareMatrices(xdot, J * v, 1e-14,
+                                     drake::MatrixCompareType::absolute));
+
+  TwistVector<double> Jdv = kinematics_result_->get_jacobian_dot_time_v_for_world_aligned_body_frame(body, offset);
+  TwistVector<double> Jdv_as_frame = kinematics_result_->get_jacobian_dot_time_v_for_world_aligned_body_frame(*frame_ptr);
+  EXPECT_TRUE(drake::CompareMatrices(Jdv, Jdv_as_frame, 1e-14,
+                                     drake::MatrixCompareType::absolute));
 }
 
 }  // namespace

@@ -4,6 +4,11 @@ target_link_libraries(test_kinematics_cache_checks
     drakeMultibodyParsers
     drakeRBM)
 
+  drake_add_cc_test(kinematics_results_test)
+target_link_libraries(kinematics_results_test
+    drakeMultibodyParsers
+    drakeRBM)
+
 add_executable(benchmark_rigid_body_tree benchmark_rigid_body_tree.cc)
 target_link_libraries(benchmark_rigid_body_tree
     drakeMultibodyParsers

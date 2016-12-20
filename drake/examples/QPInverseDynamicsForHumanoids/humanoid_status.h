@@ -6,7 +6,6 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/multibody/kinematics_results.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/rigid_body_tree_utils.h"
 #include "drake/systems/robotInterfaces/Side.h"
 
 namespace drake {
@@ -28,7 +27,10 @@ class BodyOfInterest {
    */
   BodyOfInterest(const std::string& name, const RigidBody<double>& body,
                  const Vector3<double>& off)
-      : name_(name), body_(&body), offset_(off) {}
+      : name_(name), body_(&body) {
+    offset_.setIdentity();
+    offset_.translation() = off;
+  }
 
   /**
    * Updates pose, velocity, Jacobian, Jacobian_dot_times_v based on @p robot
@@ -36,16 +38,11 @@ class BodyOfInterest {
    * @param robot is the robot model.
    * @param cache is the kinematics cache. It needs to be initialized first
    */
-  void Update(const RigidBodyTree<double>& robot,
-              const KinematicsCache<double>& cache) {
-    pose_.translation() = offset_;
-    pose_.linear().setIdentity();
-    pose_ = robot.relativeTransform(cache, 0, body_->get_body_index()) * pose_;
-
-    vel_ = GetTaskSpaceVel(robot, cache, *body_, offset_);
-    J_ = GetTaskSpaceJacobian(robot, cache, *body_, offset_);
-    Jdot_times_v_ =
-        GetTaskSpaceJacobianDotTimesV(robot, cache, *body_, offset_);
+  void Update(const systems::KinematicsResults<double>& kin_res) {
+    pose_ = kin_res.get_pose_in_world_frame(*body_, offset_);
+    vel_ = kin_res.get_twist_in_world_frame(*body_, offset_);
+    J_ = kin_res.get_jacobian_for_world_aligned_body_frame(*body_, offset_);
+    Jdot_times_v_ = kin_res.get_jacobian_dot_time_v_for_world_aligned_body_frame(*body_, offset_);
   }
 
   inline const std::string& name() const { return name_; }
@@ -63,7 +60,7 @@ class BodyOfInterest {
   // The link which this BOI is attached to
   const RigidBody<double>* body_;
   // Offset is specified in the body frame.
-  Vector3<double> offset_;
+  Isometry3<double> offset_;
 
   Isometry3<double> pose_;
   // This is the task space velocity, or twist of a frame that has the same

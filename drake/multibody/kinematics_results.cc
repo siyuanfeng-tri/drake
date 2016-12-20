@@ -47,70 +47,87 @@ int KinematicsResults<T>::get_num_velocities() const {
   return kinematics_cache_.get_num_velocities();
 }
 
-template<typename T>
-Quaternion<T> KinematicsResults<T>::get_body_orientation(int body_index) const {
-  Isometry3<T>
-      pose = tree_->relativeTransform(kinematics_cache_, 0, body_index);
-  Vector4<T> quat_vector = drake::math::rotmat2quat(pose.linear());
-  // Note that Eigen quaternion elements are not laid out in memory in the
-  // same way Drake currently aligns them. See issue #3470.
-  return Quaternion<T>(
-      quat_vector[0], quat_vector[1], quat_vector[2], quat_vector[3]);
-}
-
-template<typename T>
-Vector3<T> KinematicsResults<T>::get_body_position(int body_index) const {
-  Isometry3<T>
-      pose = tree_->relativeTransform(kinematics_cache_, 0, body_index);
-  return pose.translation();
-}
-
 template <typename T>
-Isometry3<T> KinematicsResults<T>::get_pose_in_world(
-    const RigidBody<T>& body) const {
-  const auto& world = tree_->world();
-  return tree_->relativeTransform(kinematics_cache_, world.get_body_index(),
-                                  body.get_body_index());
+Isometry3<T> KinematicsResults<T>::get_pose_in_world_frame(
+    int index, const Isometry3<T>& local_offset) const {
+  return tree_->relativeTransform(kinematics_cache_,
+      tree_->world().get_body_index(), index) * local_offset;
 }
 
 template <typename T>
 TwistVector<T> KinematicsResults<T>::get_twist_in_world_frame(
-    const RigidBody<T>& body) const {
-  const auto& world = tree_->world();
-  return tree_->relativeTwist(kinematics_cache_, world.get_body_index(),
-                              body.get_body_index(), 0);
+    int index, const Isometry3<T>& local_offset) const {
+  int world_index = tree_->world().get_body_index();
+  // Since there is no relaitve motion between body and the fixed frame.
+  // The twist of the offseted frame is just the twist of the body.
+  return tree_->relativeTwist(
+      kinematics_cache_, world_index, index, world_index);
 }
 
 template <typename T>
 TwistVector<T> KinematicsResults<T>::get_twist_in_world_aligned_body_frame(
-    const RigidBody<T>& body) const {
-  auto twist_in_world = get_twist_in_world_frame(body);
-  auto body_to_world = get_pose_in_world(body);
+    int index, const Isometry3<T>& local_offset) const {
+  TwistVector<T> twist_in_world = get_twist_in_world_frame(index, local_offset);
+  Isometry3<T> body_to_world = get_pose_in_world_frame(index, local_offset);
   Isometry3<T> world_to_world_aligned_body(Isometry3<T>::Identity());
   world_to_world_aligned_body.translation() = -body_to_world.translation();
   return transformSpatialMotion(world_to_world_aligned_body, twist_in_world);
 }
 
-/*
 template <typename T>
-void KinematicsResults<T>::UpdateFromContext(const Context<T>& context) {
-  // TODO(amcastro-tri): provide nicer accessor to an Eigen representation for
-  // LeafSystems.
-  auto x = dynamic_cast<const BasicVector<T>&>(
-      context.get_continuous_state_vector()).get_value();
+MatrixX<T> KinematicsResults<T>::get_jacobian_for_world_aligned_body_frame(
+    int index, const Isometry3<T>& local_offset) const {
+  int world_index = tree_->world().get_body_index();
 
-  const int nq = tree_->get_num_positions();
-  const int nv = tree_->get_num_velocities();
+  Vector3<T> p = tree_->transformPoints(
+      kinematics_cache_, local_offset.translation(), index, world_index);
 
-  // TODO(amcastro-tri): We would like to compile here with `auto` instead of
-  // `VectorX<T>`. However it seems we get some sort of block from a block which
-  // is not explicitly instantiated in drakeRBM.
-  VectorX<T> q = x.topRows(nq);
-  VectorX<T> v = x.bottomRows(nv);
+  std::vector<int> v_or_q_indices;
+  MatrixX<T> J_body = tree_->geometricJacobian(
+      kinematics_cache_, world_index, index, world_index,
+      true, &v_or_q_indices);
 
-  Update(q, v);
+  int col = 0;
+  MatrixX<T> J = MatrixX<T>::Zero(kTwistSize, tree_->get_num_velocities());
+  for (int idx : v_or_q_indices) {
+    // Angular velocity stays the same.
+    J.col(idx) = J_body.col(col);
+    // Linear velocity needs an additional cross product term.
+    J.col(idx).template tail<kSpaceDimension>() +=
+        J_body.col(col).template head<kSpaceDimension>().cross(p);
+    col++;
+  }
+
+  return J;
 }
-*/
+
+template <typename T>
+TwistVector<T> KinematicsResults<T>::get_jacobian_dot_time_v_for_world_aligned_body_frame(
+    int index, const Isometry3<T>& local_offset) const {
+  int world_index = tree_->world().get_body_index();
+
+  Vector3<T> p = tree_->transformPoints(
+      kinematics_cache_, local_offset.translation(), index, world_index);
+  TwistVector<T> twist = tree_->relativeTwist(
+      kinematics_cache_, world_index, index, world_index);
+  TwistVector<T> J_body_dot_times_v = tree_->geometricJacobianDotTimesV(
+      kinematics_cache_, world_index, index, world_index);
+
+  // linear vel of p
+  Vector3<T> pdot = twist.template head<3>().cross(p)
+                  + twist.template tail<3>();
+
+  // each column of Jt = [Jg_omega; Jg_v + Jg_omega.cross(p)]
+  // for Jtdot * v, the angular part stays the same,
+  // for the linear part:
+  //  = [\dot{Jg_v} + \dot{Jg_omega}.cross(p) + Jg_omega.cross(pdot)] * v
+  //  = [liner part of JgdotV + angular of JgdotV.cross(p) + omega.cross(pdot)]
+  TwistVector<T> Jdv = J_body_dot_times_v;
+  Jdv.template tail<3>() += twist.template head<3>().cross(pdot)
+                         + J_body_dot_times_v.template head<3>().cross(p);
+
+  return Jdv;
+}
 
 template <typename T>
 Eigen::VectorBlock<const VectorX<T>> KinematicsResults<T>::get_joint_position(

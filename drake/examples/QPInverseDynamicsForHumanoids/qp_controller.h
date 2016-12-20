@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "drake/common/eigen_types.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/rigid_body_tree_utils.h"
 #include "drake/multibody/kinematics_results.h"
 #include "drake/math/cross_product.h"
 #include "drake/solvers/gurobi_solver.h"
@@ -313,13 +312,14 @@ class ContactInformation {
    * @return The stacked Jacobian matrix
    */
   MatrixX<double> ComputeJacobianAtContactPoints(
-      const RigidBodyTree<double>& robot,
-      const KinematicsCache<double>& cache) const {
-    MatrixX<double> J(3 * contact_points_.cols(), robot.get_num_velocities());
+      const systems::KinematicsResults<double>& kin_res) const {
+    int  nv = kin_res.get_tree().get_num_velocities();
+    MatrixX<double> J(3 * contact_points_.cols(), nv);
+    Isometry3<double> offset(Isometry3<double>::Identity());
     for (int i = 0; i < contact_points_.cols(); ++i) {
-      J.block(3 * i, 0, 3, robot.get_num_velocities()) =
-          GetTaskSpaceJacobian(robot, cache, *body_, contact_points_.col(i))
-              .bottomRows<3>();
+      offset.translation() = contact_points_.col(i);
+      J.block(3 * i, 0, 3, nv) =
+          kin_res.get_jacobian_for_world_aligned_body_frame(*body_, offset).bottomRows<3>();
     }
     return J;
   }
@@ -333,13 +333,13 @@ class ContactInformation {
    * @return The stacked Jacobian dot times v vector
    */
   VectorX<double> ComputeJacobianDotTimesVAtContactPoints(
-      const RigidBodyTree<double>& robot,
-      const KinematicsCache<double>& cache) const {
+      const systems::KinematicsResults<double>& kin_res) const {
     VectorX<double> Jdv(3 * contact_points_.cols());
+    Isometry3<double> offset(Isometry3<double>::Identity());
     for (int i = 0; i < contact_points_.cols(); ++i) {
+      offset.translation() = contact_points_.col(i);
       Jdv.segment<3>(3 * i) =
-          GetTaskSpaceJacobianDotTimesV(robot, cache, *body_,
-                                        contact_points_.col(i)).bottomRows<3>();
+          kin_res.get_jacobian_dot_time_v_for_world_aligned_body_frame(*body_, offset).bottomRows<3>();
     }
     return Jdv;
   }
@@ -352,13 +352,12 @@ class ContactInformation {
    * @return Stacked velocities.
    */
   VectorX<double> ComputeLinearVelocityAtContactPoints(
-      const RigidBodyTree<double>& robot,
-      const KinematicsCache<double>& cache) const {
+      const systems::KinematicsResults<double>& kin_res) const {
     VectorX<double> vel(3 * contact_points_.cols());
+    Isometry3<double> offset(Isometry3<double>::Identity());
     for (int i = 0; i < contact_points_.cols(); ++i) {
-      vel.segment<3>(3 * i) =
-          GetTaskSpaceVel(robot, cache, *body_, contact_points_.col(i))
-              .bottomRows<3>();
+      offset.translation() = contact_points_.col(i);
+      vel.segment<3>(3 * i) = kin_res.get_twist_in_world_frame(*body_, offset).bottomRows<3>();
     }
     return vel;
   }

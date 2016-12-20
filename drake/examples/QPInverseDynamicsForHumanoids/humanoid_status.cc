@@ -23,7 +23,7 @@ void HumanoidStatus::Update(const Eigen::Ref<const VectorX<double>>& q,
 
   // body parts
   for (BodyOfInterest& body_of_interest : bodies_of_interest_)
-    body_of_interest.Update(get_tree(), get_kinematics_cache());
+    body_of_interest.Update(*this);
 
   // ft sensor
   for (int i = 0; i < 2; ++i) {

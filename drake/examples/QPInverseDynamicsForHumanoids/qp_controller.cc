@@ -252,19 +252,19 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
   basis_reg_vec_ = VectorX<double>::Zero(num_basis_);
 }
 
-int QPController::Control(const systems::KinematicsResults<double>& kin,
+int QPController::Control(const systems::KinematicsResults<double>& kin_res,
                           const QPInput& input, QPOutput* output) {
-  if (!input.is_valid(kin.get_num_velocities())) {
+  if (!input.is_valid(kin_res.get_num_velocities())) {
     std::cerr << "input is invalid\n";
     return -1;
   }
 
-  const RigidBodyTree<double>& robot = kin.get_tree();
-  const KinematicsCache<double>& kin_cache = kin.get_kinematics_cache();
-  const MatrixX<double>& M = kin.get_mass_matrix();
-  const VectorX<double>& h = kin.get_dynamics_bias();
-  const MatrixX<double>& C = kin.get_centroidal_momentum_matrix();
-  const VectorX<double>& C_dotv = kin.get_centroidal_momentum_matrix_dot_times_v();
+  const RigidBodyTree<double>& robot = kin_res.get_tree();
+  const KinematicsCache<double>& kin_cache = kin_res.get_kinematics_cache();
+  const MatrixX<double>& M = kin_res.get_mass_matrix();
+  const VectorX<double>& h = kin_res.get_dynamics_bias();
+  const MatrixX<double>& C = kin_res.get_centroidal_momentum_matrix();
+  const VectorX<double>& C_dotv = kin_res.get_centroidal_momentum_matrix_dot_times_v();
 
   // Resize and zero temporary matrices.
   ResizeQP(robot, input);
@@ -325,11 +325,11 @@ int QPController::Control(const systems::KinematicsResults<double>& kin,
     basis_to_force_matrix_.block(rowIdx, colIdx, force_dim, basis_dim) =
         contact.ComputeBasisMatrix(robot, kin_cache);
     stacked_contact_jacobians_.block(rowIdx, 0, force_dim, num_vd_) =
-        contact.ComputeJacobianAtContactPoints(robot, kin_cache);
+        contact.ComputeJacobianAtContactPoints(kin_res);
     stacked_contact_jacobians_dot_times_v_.segment(rowIdx, force_dim) =
-        contact.ComputeJacobianDotTimesVAtContactPoints(robot, kin_cache);
+        contact.ComputeJacobianDotTimesVAtContactPoints(kin_res);
     stacked_contact_velocities_.segment(rowIdx, force_dim) =
-        contact.ComputeLinearVelocityAtContactPoints(robot, kin_cache);
+        contact.ComputeLinearVelocityAtContactPoints(kin_res);
 
     rowIdx += force_dim;
     colIdx += basis_dim;
@@ -413,7 +413,7 @@ int QPController::Control(const systems::KinematicsResults<double>& kin,
   // Tau is joint space indexed, and u is actuator space indexed.
   // constraints are specified with u index.
   inequality_linear_ =
-      kin.get_tree().B.bottomRows(num_torque_).transpose() * torque_linear_;
+      robot.B.bottomRows(num_torque_).transpose() * torque_linear_;
   inequality_upper_bound_ = inequality_lower_bound_ =
       -robot.B.bottomRows(num_torque_).transpose() * torque_constant_;
   for (size_t i = 0; i < robot.actuators.size(); ++i) {
@@ -447,10 +447,8 @@ int QPController::Control(const systems::KinematicsResults<double>& kin,
   cost_ctr = eq_ctr = 0;
   for (const auto& pair : input.desired_body_motions()) {
     const DesiredBodyMotion& body_motion_d = pair.second;
-    body_J_[body_ctr] = GetTaskSpaceJacobian(
-        robot, kin_cache, body_motion_d.body(), Vector3<double>::Zero());
-    body_Jdv_[body_ctr] = GetTaskSpaceJacobianDotTimesV(
-        robot, kin_cache, body_motion_d.body(), Vector3<double>::Zero());
+    body_J_[body_ctr] = kin_res.get_jacobian_for_world_aligned_body_frame(body_motion_d.body());
+    body_Jdv_[body_ctr] = kin_res.get_jacobian_dot_time_v_for_world_aligned_body_frame(body_motion_d.body());
     linear_term = body_Jdv_[body_ctr] - body_motion_d.values();
 
     // Find the rows that correspond to cost and equality constraints.
@@ -613,12 +611,8 @@ int QPController::Control(const systems::KinematicsResults<double>& kin,
     }
 
     // Compute acceleration for contact body.
-    MatrixX<double> J_body = GetTaskSpaceJacobian(
-        robot, kin_cache, resolved_contact.body(),
-        Vector3<double>::Zero());
-    Vector6<double> Jdv_body = GetTaskSpaceJacobianDotTimesV(
-        robot, kin_cache, resolved_contact.body(),
-        Vector3<double>::Zero());
+    MatrixX<double> J_body = kin_res.get_jacobian_for_world_aligned_body_frame(resolved_contact.body());
+    Vector6<double> Jdv_body = kin_res.get_jacobian_dot_time_v_for_world_aligned_body_frame(resolved_contact.body());
 
     resolved_contact.mutable_body_acceleration() =
         J_body * vd_value + Jdv_body;
@@ -627,7 +621,6 @@ int QPController::Control(const systems::KinematicsResults<double>& kin,
   // Set output accelerations.
   output->mutable_vd() = vd_value;
   output->mutable_centroidal_momentum_dot() = C * output->vd() + C_dotv;
-  //output->mutable_comdd() = rs.J_com() * output->vd() + rs.Jdot_times_v_com();
   output->mutable_comdd() = output->mutable_centroidal_momentum_dot().tail<3>() / robot.getMass();
 
   int body_motion_ctr = 0;
@@ -666,7 +659,7 @@ int QPController::Control(const systems::KinematicsResults<double>& kin,
     const Vector3<double>& ref_point = resolved_contact.reference_point();
     net_wrench += contact_wrench;
     net_wrench.head<3>() +=
-        (ref_point - kin.get_center_of_mass()).cross(contact_wrench.tail<3>());
+        (ref_point - kin_res.get_center_of_mass()).cross(contact_wrench.tail<3>());
   }
   if (!(net_wrench - Ld).isZero(1e-5)) {
     std::cerr << "change in centroidal momentum != net external wrench\n";
