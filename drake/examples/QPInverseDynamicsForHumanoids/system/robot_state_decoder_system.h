@@ -42,9 +42,9 @@ class RobotStateDecoderSystem : public systems::LeafSystem<double> {
         output->GetMutableData(output_port_index_humanoid_status_)
             ->GetMutableValue<HumanoidStatus>();
 
-    VectorX<double> pos(hum_status.position().size());
-    VectorX<double> vel(hum_status.velocity().size());
-    VectorX<double> joint_torque(hum_status.joint_torque().size());
+    VectorX<double> pos(robot_.get_num_positions());
+    VectorX<double> vel(robot_.get_num_velocities());
+    VectorX<double> joint_torque(robot_.actuators.size());
     Vector6<double> l_foot_wrench, r_foot_wrench;
     double time;
 

@@ -1,3 +1,5 @@
+add_definitions(-g)
+
 drake_add_cc_test(NAME setpoint_test)
 target_link_libraries(setpoint_test
   drakeQPController

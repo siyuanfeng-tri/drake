@@ -53,7 +53,7 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
   Vector3<double> Kp_com = Vector3<double>::Constant(40);
   Vector3<double> Kd_com = Vector3<double>::Constant(12);
 
-  Vector3<double> desired_com = robot_status.com();
+  Vector3<double> desired_com = robot_status.get_center_of_mass();
 
   VectorX<double> Kp_q(VectorX<double>::Constant(q.size(), 20));
   VectorX<double> Kd_q(VectorX<double>::Constant(q.size(), 8));
@@ -98,11 +98,11 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
         torso_PDff.ComputeTargetAcceleration(robot_status.torso().pose(),
                                              robot_status.torso().velocity());
     input.mutable_desired_dof_motions().mutable_values() =
-        joint_PDff.ComputeTargetAcceleration(robot_status.position(),
-                                             robot_status.velocity());
+        joint_PDff.ComputeTargetAcceleration(robot_status.get_positions(),
+                                             robot_status.get_velocities());
     input.mutable_desired_centroidal_momentum_dot().mutable_values().tail<3>() =
-        (Kp_com.array() * (desired_com - robot_status.com()).array() -
-         Kd_com.array() * robot_status.comd().array()).matrix() *
+        (Kp_com.array() * (desired_com - robot_status.get_center_of_mass()).array() -
+         Kd_com.array() * robot_status.get_center_of_mass_dot().array()).matrix() *
         robot->getMass();
 
     kin_res.Update(q, v);

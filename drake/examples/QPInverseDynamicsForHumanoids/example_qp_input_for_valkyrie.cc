@@ -8,7 +8,7 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 QPInput MakeExampleQPInput(const HumanoidStatus& robot_status) {
-  const RigidBodyTree<double>& robot = robot_status.robot();
+  const RigidBodyTree<double>& robot = robot_status.get_tree();
 
   int dim = robot.get_num_velocities();
   QPInput input(robot);

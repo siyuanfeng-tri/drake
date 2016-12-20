@@ -70,12 +70,12 @@ void controller_loop() {
                   plan_eval->get_input_port_humanoid_status());
   // rs + qp_input -> qp_output
   builder.Connect(rs_msg_to_rs->get_output_port_humanoid_status(),
-                  qp_con->get_input_port_humanoid_status());
+                  qp_con->get_input_port_kinematics_results());
   builder.Connect(plan_eval->get_output_port_qp_input(),
                   qp_con->get_input_port_qp_input());
   // rs + qp_output -> atlas_command_t
   builder.Connect(rs_msg_to_rs->get_output_port_humanoid_status(),
-                  joint_con->get_input_port_humanoid_status());
+                  joint_con->get_input_port_kinematics_results());
   builder.Connect(qp_con->get_output_port_qp_output(),
                   joint_con->get_input_port_qp_output());
   // atlas_command_t -> lcm

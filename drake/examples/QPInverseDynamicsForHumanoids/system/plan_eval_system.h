@@ -58,8 +58,8 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
     lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
                              ->GetMutableValue<lcmt_qp_input>();
 
-    Vector3<double> com_err = desired_com_ - robot_status->com();
-    Vector3<double> comd_err = -robot_status->comd();
+    Vector3<double> com_err = desired_com_ - robot_status->get_center_of_mass();
+    Vector3<double> comd_err = -robot_status->get_center_of_mass_dot();
 
     // Update desired accelerations.
     QPInput qp_input = MakeExampleQPInput(*robot_status);
@@ -69,8 +69,8 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
          Kd_com_.array() * comd_err.array()).matrix();
 
     qp_input.mutable_desired_dof_motions().mutable_values() =
-        joint_PDff_.ComputeTargetAcceleration(robot_status->position(),
-                                              robot_status->velocity());
+        joint_PDff_.ComputeTargetAcceleration(robot_status->get_positions(),
+                                              robot_status->get_velocities());
     qp_input.mutable_desired_body_motions().at("pelvis").mutable_values() =
         pelvis_PDff_.ComputeTargetAcceleration(
             robot_status->pelvis().pose(), robot_status->pelvis().velocity());
@@ -96,16 +96,20 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
    * @param robot_status, desired robot state
    */
   void SetDesired(const HumanoidStatus& robot_status) {
-    desired_com_ = robot_status.com();
+    desired_com_ = robot_status.get_center_of_mass();
     pelvis_PDff_ = CartesianSetpoint<double>(
         robot_status.pelvis().pose(), Vector6<double>::Zero(),
         Vector6<double>::Zero(), Kp_pelvis_, Kd_pelvis_);
     torso_PDff_ = CartesianSetpoint<double>(
         robot_status.torso().pose(), Vector6<double>::Zero(),
         Vector6<double>::Zero(), Kp_torso_, Kd_torso_);
-    int dim = robot_status.position().size();
+
+    int dim = robot_status.get_velocities().size();
+    VectorX<double> current_joints(dim);
+    current_joints.head<6>().setZero();
+    current_joints.tail(dim - 6) = robot_status.get_positions().tail(dim - 6);
     joint_PDff_ = VectorSetpoint<double>(
-        robot_status.position(), VectorX<double>::Zero(dim),
+        current_joints, VectorX<double>::Zero(dim),
         VectorX<double>::Zero(dim), Kp_joints_, Kd_joints_);
   }
 

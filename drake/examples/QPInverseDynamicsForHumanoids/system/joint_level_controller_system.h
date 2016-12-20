@@ -58,6 +58,8 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
 
   void EvalOutput(const Context<double>& context,
                   SystemOutput<double>* output) const override {
+    std::cout << "JOINT CONT\n";
+
     // Inputs
     const QPOutput* qp_output =
         EvalInputValue<QPOutput>(context, in_port_idx_qp_output_);

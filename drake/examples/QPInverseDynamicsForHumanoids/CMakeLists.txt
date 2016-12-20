@@ -1,3 +1,4 @@
+add_definitions(-g)
 set(qp_inverse_dynamics_controller_src
   humanoid_status.cc
   example_qp_input_for_valkyrie.cc

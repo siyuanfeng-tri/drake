@@ -19,27 +19,11 @@ const Matrix3<double> HumanoidStatus::kFootToSensorRotationOffset =
 
 void HumanoidStatus::Update(const Eigen::Ref<const VectorX<double>>& q,
                             const Eigen::Ref<const VectorX<double>>& v) {
-  cache_.initialize(q, v);
-  robot_->doKinematics(cache_, true);
-
-  M_ = robot_->massMatrix(cache_);
-  drake::eigen_aligned_std_unordered_map<RigidBody<double> const*,
-                                         drake::TwistVector<double>> f_ext;
-  bias_term_ = robot_->dynamicsBiasTerm(cache_, f_ext);
-
-  // com
-  com_ = robot_->centerOfMass(cache_);
-  J_com_ = robot_->centerOfMassJacobian(cache_);
-  Jdot_times_v_com_ = robot_->centerOfMassJacobianDotTimesV(cache_);
-  comd_ = J_com_ * velocity_;
-  centroidal_momentum_matrix_ = robot_->centroidalMomentumMatrix(cache_);
-  centroidal_momentum_matrix_dot_times_v_ =
-      robot_->centroidalMomentumMatrixDotTimesV(cache_);
-  centroidal_momentum_ = centroidal_momentum_matrix_ * velocity_;
+  KinematicsResults::Update(q, v);
 
   // body parts
   for (BodyOfInterest& body_of_interest : bodies_of_interest_)
-    body_of_interest.Update(*robot_, cache_);
+    body_of_interest.Update(get_tree(), get_kinematics_cache());
 
   // ft sensor
   for (int i = 0; i < 2; ++i) {
@@ -99,10 +83,10 @@ void HumanoidStatus::Update(const Eigen::Ref<const VectorX<double>>& q,
 std::ostream& operator<<(std::ostream& out,
                          const HumanoidStatus& robot_status) {
   out << "Time: " << robot_status.time() << std::endl;
-  for (int i = 0; i < robot_status.position().size(); ++i) {
-    out << robot_status.robot().get_position_name(i) << ": "
-        << robot_status.position(i) << ", " << robot_status.velocity(i)
-        << std::endl;
+  for (int i = 0; i < robot_status.get_positions().size(); ++i) {
+    out << robot_status.get_tree().get_position_name(i) << ": "
+        << robot_status.get_positions()[i] << ", "
+        << robot_status.get_velocities()[i] << std::endl;
   }
   out << "left foot vel: " << robot_status.foot(Side::LEFT).velocity()
       << std::endl;

@@ -214,19 +214,21 @@ class HumanoidStatus : public systems::KinematicsResults<double> {
               const Eigen::Ref<const VectorX<double>>& joint_torque,
               const Eigen::Ref<const Vector6<double>>& l_wrench,
               const Eigen::Ref<const Vector6<double>>& r_wrench) {
-    /*
-    if (q.size() != get_positions().size() || v.size() != get_velocities.size() ||
+    if (q.size() != get_tree().get_num_positions() ||
+        v.size() != get_tree().get_num_velocities() ||
         joint_torque.size() != joint_torque_.size()) {
       throw std::runtime_error("robot state update dimension mismatch.");
     }
-    */
 
     time_ = t;
     joint_torque_ = joint_torque;
     foot_wrench_raw_[Side::LEFT] = l_wrench;
     foot_wrench_raw_[Side::RIGHT] = r_wrench;
-    KinematicsResults::Update(q, v);
+    HumanoidStatus::Update(q, v);
   }
+
+  void Update(const Eigen::Ref<const VectorX<double>>& q,
+              const Eigen::Ref<const VectorX<double>>& v);
 
   /**
    * Returns a nominal q.

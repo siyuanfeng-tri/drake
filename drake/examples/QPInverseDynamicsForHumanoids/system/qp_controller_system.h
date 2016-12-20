@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/multibody/kinematics_results.h"
 #include "drake/systems/framework/leaf_system.h"
@@ -35,8 +36,8 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   void EvalOutput(const Context<double>& context,
                   SystemOutput<double>* output) const override {
     // Inputs:
-    const systems::KinematicsResults<double>* kin_res =
-        EvalInputValue<systems::KinematicsResults<double>>(
+    const HumanoidStatus* kin_res =
+        EvalInputValue<HumanoidStatus>(
            context, input_port_index_kinematics_results_);
 
     const lcmt_qp_input* qp_input_msg =
