@@ -1,6 +1,6 @@
+#include <iostream>
 #include <memory>
 #include <thread>
-#include <iostream>
 
 #include "drake/common/drake_path.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/joint_level_controller_system.h"

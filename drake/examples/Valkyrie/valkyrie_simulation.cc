@@ -47,14 +47,14 @@ int main(int argc, const char** argv) {
   drake::parsers::urdf::AddModelInstanceFromUrdfFile(
       drake::GetDrakePath() +
           "/examples/Valkyrie/urdf/urdf/"
-          "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom.urdf",
+          "valkyrie_A_sim_drake_one_neck_dof_wide_ankle_rom_no_collision.urdf",
       kRollPitchYaw, nullptr /* weld to frame */, tree_ptr.get());
   multibody::AddFlatTerrainToWorld(tree_ptr.get(), 100., 10.);
 
   // Instantiate a RigidBodyPlant from the RigidBodyTree.
   auto& plant = *builder.AddSystem<RigidBodyPlant<double>>(move(tree_ptr));
   // Contact parameters set arbitrarily.
-  plant.set_contact_parameters(10000., 100., 10.);
+  plant.set_contact_parameters(40000., 400., 20.);
   const auto& tree = plant.get_rigid_body_tree();
 
   // RigidBodyActuators.

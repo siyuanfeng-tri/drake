@@ -20,10 +20,18 @@ if(gurobi_FOUND)
     GTest::GTest GTest::Main)
 endif()
 
+drake_add_cc_test(NAME plan_eval_test)
+target_link_libraries(plan_eval_test
+  drakePlanEval
+  drakeMultibodyParsers
+  drakeQPController
+  GTest::GTest GTest::Main)
+
 if(gurobi_FOUND AND lcm_FOUND)
   add_executable(valkyrie_qp_inverse_dynamics_controller
     valkyrie_qp_inverse_dynamics_controller.cc)
   target_link_libraries(valkyrie_qp_inverse_dynamics_controller
+    drakePlanEval
     drakeLCMSystem2
     drakeMultibodyParsers
     drakeQPController

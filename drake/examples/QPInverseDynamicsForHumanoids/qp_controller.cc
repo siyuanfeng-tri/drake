@@ -568,6 +568,19 @@ int QPController::Control(const HumanoidStatus& rs, const QPInput& input,
 
   const auto& vd_value =
       drake::solvers::GetSolution(vd_);
+
+  std::list<std::string> need_to_be_removed;
+  // Remove contacts that is not in input.
+  for (const auto& contact_pair : output->resolved_contacts()) {
+    // this contact doesn't exist anymore.
+    if (input.contact_information().find(contact_pair.first) == input.contact_information().end()) {
+      need_to_be_removed.push_back(contact_pair.first);
+    }
+  }
+  for (const std::string& old_contact : need_to_be_removed) {
+    output->mutable_resolved_contacts().erase(old_contact);
+  }
+
   for (const auto& contact_pair : input.contact_information()) {
     const ContactInformation& contact = contact_pair.second;
     if (output->mutable_resolved_contacts().find(contact.body_name()) ==

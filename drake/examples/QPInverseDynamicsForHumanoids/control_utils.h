@@ -6,6 +6,9 @@
 #include "drake/common/eigen_types.h"
 #include "drake/math/rotation_matrix.h"
 
+#include "drake/common/trajectories/piecewise_polynomial.h"
+#include "drake/common/trajectories/piecewise_quaternion.h"
+
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
@@ -31,13 +34,7 @@ namespace qp_inverse_dynamics {
 template <typename Scalar>
 class CartesianSetpoint {
  public:
-  CartesianSetpoint() {
-    pose_d_.setIdentity();
-    vel_d_.setZero();
-    acc_d_.setZero();
-    Kp_.setZero();
-    Kd_.setZero();
-  }
+  CartesianSetpoint();
 
   /**
    * @param pose_d Desired pose
@@ -48,13 +45,7 @@ class CartesianSetpoint {
    */
   CartesianSetpoint(const Isometry3<Scalar>& pose_d,
                     const Vector6<Scalar>& vel_d, const Vector6<Scalar>& acc_d,
-                    const Vector6<Scalar>& Kp, const Vector6<Scalar>& Kd) {
-    pose_d_ = pose_d;
-    vel_d_ = vel_d;
-    acc_d_ = acc_d;
-    Kp_ = Kp;
-    Kd_ = Kd;
-  }
+                    const Vector6<Scalar>& Kp, const Vector6<Scalar>& Kd);
 
   /**
    * Computes target acceleration using PD feedback + feedfoward acceleration.
@@ -63,53 +54,9 @@ class CartesianSetpoint {
    * @return Computed spatial acceleration.
    */
   Vector6<Scalar> ComputeTargetAcceleration(const Isometry3<Scalar>& pose,
-                                            const Vector6<Scalar>& vel) const {
-    // feedforward acc + velocity feedback
-    Vector6<Scalar> acc = acc_d_;
-    acc += (Kd_.array() * (vel_d_ - vel).array()).matrix();
+                                            const Vector6<Scalar>& vel) const;
 
-    // pose feedback
-    // H^w_d = desired orientation in the world frame,
-    // H^w_m = measured orientation in the world frame,
-    // E = a small rotation in the world frame from measured to desired.
-    // H^w_d = E * H^w_m, E = H^w_d * H^w_m.inverse()
-    Quaternion<Scalar> quat_d(pose_d_.linear());
-    Quaternion<Scalar> quat(pose.linear());
-    // Make sure the relative rotation between the desired and the measured
-    // rotation goes the "shortest" way.
-    if (quat_d.dot(quat) < 0) {
-      quat.w() *= -1;
-      quat.x() *= -1;
-      quat.y() *= -1;
-      quat.z() *= -1;
-    }
-    AngleAxis<Scalar> angle_axis_err(quat_d * quat.inverse().normalized());
-
-    Vector3<Scalar> pos_err = pose_d_.translation() - pose.translation();
-    Vector3<Scalar> rot_err = angle_axis_err.axis() * angle_axis_err.angle();
-
-    // orientation
-    acc.template head<3>() +=
-        (Kp_.template head<3>().array() * rot_err.array()).matrix();
-
-    // position
-    acc.template tail<3>() +=
-        (Kp_.template tail<3>().array() * pos_err.array()).matrix();
-
-    return acc;
-  }
-
-  bool is_valid() const {
-    bool ret = pose_d_.translation().allFinite();
-    ret &= Matrix3<Scalar>::Identity().isApprox(
-        pose_d_.linear() * pose_d_.linear().transpose(),
-        Eigen::NumTraits<Scalar>::epsilon());
-    ret &= vel_d_.allFinite();
-    ret &= acc_d_.allFinite();
-    ret &= Kp_.allFinite();
-    ret &= Kd_.allFinite();
-    return ret;
-  }
+  bool is_valid() const;
 
   // Getters
   inline const Isometry3<Scalar>& desired_pose() const { return pose_d_; }
@@ -160,13 +107,7 @@ class VectorSetpoint {
  public:
   VectorSetpoint() {}
 
-  explicit VectorSetpoint(int dim) {
-    pos_d_ = VectorX<Scalar>::Zero(dim);
-    vel_d_ = VectorX<Scalar>::Zero(dim);
-    acc_d_ = VectorX<Scalar>::Zero(dim);
-    Kp_ = VectorX<Scalar>::Zero(dim);
-    Kd_ = VectorX<Scalar>::Zero(dim);
-  }
+  explicit VectorSetpoint(int dim);
 
   /**
    * @param pos_d Desired position
@@ -177,18 +118,7 @@ class VectorSetpoint {
    */
   VectorSetpoint(const VectorX<Scalar>& pos_d, const VectorX<Scalar>& vel_d,
                  const VectorX<Scalar>& acc_d, const VectorX<Scalar>& Kp,
-                 const VectorX<Scalar>& Kd) {
-    if (pos_d.size() != vel_d.size() || pos_d.size() != acc_d.size() ||
-        pos_d.size() != Kp.size() || pos_d.size() != Kd.size()) {
-      throw std::runtime_error(
-          "Setpoints and gains have different dimensions.");
-    }
-    pos_d_ = pos_d;
-    vel_d_ = vel_d;
-    acc_d_ = acc_d;
-    Kp_ = Kp;
-    Kd_ = Kd;
-  }
+                 const VectorX<Scalar>& Kd);
 
   /**
    * Computes target acceleration using PD feedback + feedforward acceleration
@@ -197,14 +127,7 @@ class VectorSetpoint {
    * @param vel Measured velocity
    * @return Computed acceleration
    */
-  Scalar ComputeTargetAcceleration(int idx, Scalar pos, Scalar vel) const {
-    if (idx < 0 || idx >= pos_d_.size())
-      throw std::runtime_error("Index out of bound.");
-    Scalar acc = acc_d_[idx];
-    acc += Kp_[idx] * (pos_d_[idx] - pos);
-    acc += Kd_[idx] * (vel_d_[idx] - vel);
-    return acc;
-  }
+  Scalar ComputeTargetAcceleration(int idx, Scalar pos, Scalar vel) const;
 
   /**
    * Computes target acceleration using PD feedback + feedforward acceleration
@@ -214,28 +137,9 @@ class VectorSetpoint {
    * @return Computed acceleration
    */
   VectorX<Scalar> ComputeTargetAcceleration(const VectorX<Scalar>& pos,
-                                            const VectorX<Scalar>& vel) const {
-    if (pos.size() != vel.size() || pos.size() != pos_d_.size()) {
-      throw std::runtime_error(
-          "Setpoints and states have different dimensions.");
-    }
-    VectorX<Scalar> acc(pos_d_.size());
-    for (int i = 0; i < size(); ++i)
-      acc[i] = ComputeTargetAcceleration(i, pos[i], vel[i]);
-    return acc;
-  }
+                                            const VectorX<Scalar>& vel) const;
 
-  bool is_valid(int dim) const {
-    bool ret = pos_d_.size() == vel_d_.size() &&
-               pos_d_.size() == acc_d_.size() && pos_d_.size() == Kp_.size() &&
-               pos_d_.size() == Kd_.size() && pos_d_.size() == dim;
-    ret &= pos_d_.allFinite();
-    ret &= vel_d_.allFinite();
-    ret &= acc_d_.allFinite();
-    ret &= Kp_.allFinite();
-    ret &= Kd_.allFinite();
-    return ret;
-  }
+  bool is_valid(int dim) const;
 
   // Getters
   inline const VectorX<Scalar>& desired_position() const { return pos_d_; }
@@ -276,6 +180,52 @@ std::ostream& operator<<(std::ostream& out,
   out << "Kd: " << setpoint.Kd().transpose() << std::endl;
   return out;
 }
+
+template <typename Scalar>
+class VectorTrajectoryTracker {
+ public:
+  VectorTrajectoryTracker() {}
+
+  VectorTrajectoryTracker(
+      const PiecewisePolynomial<Scalar>& traj,
+      const VectorX<Scalar>& Kp, const VectorX<Scalar>& Kd);
+
+  Scalar ComputeTargetAcceleration(int idx, double time, Scalar pos, Scalar vel) const;
+
+  VectorX<Scalar> ComputeTargetAcceleration(double time,
+                                            const VectorX<Scalar>& pos,
+                                            const VectorX<Scalar>& vel) const;
+
+ private:
+  // TODO make these const
+  mutable VectorSetpoint<Scalar> tracker_;
+  PiecewisePolynomial<Scalar> traj_d_;
+  PiecewisePolynomial<Scalar> trajd_d_;
+  PiecewisePolynomial<Scalar> trajdd_d_;
+};
+
+template <typename Scalar>
+class CartesianTrajectoryTracker {
+ public:
+  CartesianTrajectoryTracker() {}
+
+  CartesianTrajectoryTracker(
+      const PiecewisePolynomial<Scalar>& pos_traj,
+      const PiecewiseQuaternionSlerp<Scalar>& rot_traj,
+      const Vector6<Scalar>& Kp, const Vector6<Scalar>& Kd);
+
+  Vector6<Scalar> ComputeTargetAcceleration(double time,
+                                            const Isometry3<Scalar>& pose,
+                                            const Vector6<Scalar>& vel) const;
+
+ private:
+  // TODO make these const
+  mutable CartesianSetpoint<Scalar> tracker_;
+  PiecewisePolynomial<Scalar> pos_traj_d_;
+  PiecewisePolynomial<Scalar> pos_trajd_d_;
+  PiecewisePolynomial<Scalar> pos_trajdd_d_;
+  PiecewiseQuaternionSlerp<Scalar> rot_traj_d_;
+};
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
