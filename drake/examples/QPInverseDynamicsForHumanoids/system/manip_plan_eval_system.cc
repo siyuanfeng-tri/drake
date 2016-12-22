@@ -126,8 +126,7 @@ void ManipPlanEvalSystem::HandleNewManipPlan(const robotlocomotion::robot_plan_t
       x_d[b][t].segment<3>(0) = pose.translation();
       x_d[b][t].segment<4>(3) = rotmat2quat(pose.linear());
 
-      Vector6<double> xd =
-          GetTaskSpaceVel(robot_, cache_plan, *body, Vector3<double>::Zero());
+      Vector6<double> xd = robot_.CalcTwistInWorldAlignedBody(cache_plan, *body);
       xd_d[b][t].segment<3>(0) = xd.segment<3>(3);
       // http://www.euclideanspace.com/physics/kinematics/angularvelocity/QuaternionDifferentiation2.pdf
       Vector4<double> W(0, xd[0], xd[1], xd[2]);

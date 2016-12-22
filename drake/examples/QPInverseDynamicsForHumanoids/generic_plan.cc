@@ -147,7 +147,7 @@ void GenericHumanoidPlan::UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_in
     DRAKE_DEMAND(tracker_it != body_trackers_.end());
     // Compute measured body
     Isometry3<double> body_pose = rs.robot().relativeTransform(rs.cache(), 0, body->get_body_index());
-    Vector6<double> body_vel = GetTaskSpaceVel(rs.robot(), rs.cache(), *body, Vector3<double>::Zero());
+    Vector6<double> body_vel = rs.robot().CalcTwistInWorldAlignedBody(rs.cache(), *body);
 
     // Compute desired accelerations
     body_motion_d.mutable_values() = tracker_it->second.ComputeTargetAcceleration(plan_time, body_pose, body_vel);
