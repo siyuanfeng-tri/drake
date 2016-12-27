@@ -10,7 +10,7 @@ HumanoidManipPlan::HumanoidManipPlan(const RigidBodyTree<double>& robot)
   tracked_bodies_.insert(torso_);
 }
 
-void HumanoidManipPlan::HandleManipPlan(const HumanoidStatus&rs, QPInput* qp_input) {
+void HumanoidManipPlan::HandleManipPlan(const HumanoidStatus&rs) {
   std::vector<double> time({0, 1});
   int num_T = static_cast<int>(time.size());
   std::vector<Eigen::MatrixXd> q_d(num_T, rs.position());
@@ -32,13 +32,13 @@ void HumanoidManipPlan::HandleManipPlan(const HumanoidStatus&rs, QPInput* qp_inp
     // TODO fix this
     q = q_d[t];
     //v = v_d[t];
-    KinematicsCache<double> cache_plan = robot_.doKinematics(q);
+    KinematicsCache<double> cache_plan = robot_->doKinematics(q);
 
-    com_d[t] = robot_.centerOfMass(cache_plan).segment<2>(0);
+    com_d[t] = robot_->centerOfMass(cache_plan).segment<2>(0);
 
     int b = 0;
     for (const RigidBody<double>* body : tracked_bodies_) {
-      pose = robot_.relativeTransform(cache_plan, 0, body->get_body_index());
+      pose = robot_->relativeTransform(cache_plan, 0, body->get_body_index());
       pos_d[b][t] = pose.translation();
       rot_d[b][t] = Quaternion<double>(pose.linear());
       b++;
@@ -68,7 +68,8 @@ void HumanoidManipPlan::HandleManipPlan(const HumanoidStatus&rs, QPInput* qp_inp
   contacts[0] = double_support();
   contacts_traj_ = PiecewiseContactInformation(time, contacts);
 
-  InitializeQPInput(rs, qp_input);
+  // Interp timer.
+  interp_t0_ = rs.time();
 }
 
 }  // namespace qp_inverse_dynamics

@@ -9,15 +9,11 @@
 #include "drake/multibody/parsers/urdf_parser.h"
 
 
-//namespace drake {
-//namespace examples {
-//namespace qp_inverse_dynamics {
+namespace drake {
+namespace examples {
+namespace qp_inverse_dynamics {
 
-using namespace drake;
-using namespace examples;
-using namespace qp_inverse_dynamics;
-
-int main() {
+GTEST_TEST(TestManipPlanEval, TestManipPlanEval) {
   // Loads model.
   std::string urdf =
       drake::GetDrakePath() +
@@ -48,7 +44,7 @@ int main() {
   QPInput input(*robot);
   QPOutput output(*robot);
 
-  manip.HandleManipPlan(robot_status, &input);
+  manip.HandleManipPlan(robot_status);
 
   // Perturb initial condition.
   v[robot_status.name_to_position_index().at("torsoRoll")] += 1;
@@ -91,6 +87,9 @@ int main() {
   // they should have no velocity after simulation.
   // Thus, the tolerances on feet velocities are smaller than those for the
   // generalized position and velocity.
+  std::cout << robot_status.foot(Side::LEFT).velocity().transpose() << std::endl;
+  std::cout << robot_status.foot(Side::RIGHT).velocity().transpose() << std::endl;
+
   EXPECT_TRUE(robot_status.foot(Side::LEFT).velocity().norm() < 1e-6);
   EXPECT_TRUE(robot_status.foot(Side::RIGHT).velocity().norm() < 1e-6);
   EXPECT_TRUE(drake::CompareMatrices(q, q_ini, 1e-3,
@@ -102,6 +101,6 @@ int main() {
   std::cout << output;
 }
 
-//}  // namespace qp_inverse_dynamics
-//}  // namespace examples
-//}  // namespace drake
+}  // namespace qp_inverse_dynamics
+}  // namespace examples
+}  // namespace drake

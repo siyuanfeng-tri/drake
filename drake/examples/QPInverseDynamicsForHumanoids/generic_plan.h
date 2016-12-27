@@ -43,15 +43,17 @@ class PiecewiseContactInformation : public PiecewiseFunction {
 class GenericHumanoidPlan {
  protected:
   // TODO;
-  double interp_t0_ = 0;
-  double planned_contact_switch_time_ = 0;
+  double interp_t0_ {0};
+  double planned_contact_switch_time_ {0};
+  // hack
+  mutable bool init_qp_input_ {true};
 
   // robot for doing kinematics
-  const RigidBodyTree<double>& robot_;
-  const RigidBody<double>* const left_foot_;
-  const RigidBody<double>* const right_foot_;
-  const RigidBody<double>* const pelvis_;
-  const RigidBody<double>* const torso_;
+  const RigidBodyTree<double>* robot_;
+  const RigidBody<double>* left_foot_;
+  const RigidBody<double>* right_foot_;
+  const RigidBody<double>* pelvis_;
+  const RigidBody<double>* torso_;
 
   VectorX<double> q_;
   VectorX<double> v_;
@@ -87,6 +89,20 @@ class GenericHumanoidPlan {
   double com_height_ = 1;
   // Also need to have weights
 
+  virtual void InitializeQPInput(const HumanoidStatus& rs, QPInput* qp_input) const;
+
+ public:
+  GenericHumanoidPlan(const RigidBodyTree<double>& robot);
+
+  // Make QPInput
+  virtual void UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_input) const;
+
+  // Trigger event changes.
+  virtual bool DoStateTransition(const HumanoidStatus& rs)=0;
+
+  // Handle plan
+
+  // Contact state related.
   ContactState double_support() const {
     ContactState cs;
     cs.emplace(left_foot_, all_contactable_bodies_.at(left_foot_));
@@ -116,20 +132,9 @@ class GenericHumanoidPlan {
     }
   }
 
-  inline bool is_both_feet_contact(const ContactState& cs) const {
+  bool is_both_feet_contact(const ContactState& cs) const {
     return is_foot_contact(cs, Side::LEFT) && is_foot_contact(cs, Side::RIGHT);
   }
-
-  virtual void InitializeQPInput(const HumanoidStatus& rs, QPInput* qp_input) const;
-
- public:
-  GenericHumanoidPlan(const RigidBodyTree<double>& robot);
-
-  // Make QPInput
-  virtual void UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_input) const;
-
-  // Handle plan
-
 };
 
 }  // namespace qp_inverse_dynamics

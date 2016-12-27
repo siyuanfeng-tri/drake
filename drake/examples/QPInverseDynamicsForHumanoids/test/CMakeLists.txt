@@ -31,7 +31,7 @@ if(gurobi_FOUND AND lcm_FOUND)
   add_executable(valkyrie_qp_inverse_dynamics_controller
     valkyrie_qp_inverse_dynamics_controller.cc)
   target_link_libraries(valkyrie_qp_inverse_dynamics_controller
-    drakePlanEval
+    drakeHumanoidControllerSystemWrappers
     drakeLCMSystem2
     drakeMultibodyParsers
     drakeQPController

@@ -2,6 +2,9 @@
 #include <memory>
 #include <thread>
 
+#include "bot_core/robot_state_t.hpp"
+#include "bot_core/atlas_command_t.hpp"
+
 #include "drake/common/drake_path.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/joint_level_controller_system.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/plan_eval_system.h"
@@ -93,15 +96,20 @@ void controller_loop() {
             VectorX<double>::Zero(robot->get_num_velocities()),
             VectorX<double>::Zero(robot->actuators.size()),
             Vector6<double>::Zero(), Vector6<double>::Zero());
-  plan_eval->SetDesired(rs);
+
+  systems::Context<double>* plan_eval_context = diagram->GetMutableSubsystemContext(context.get(), plan_eval);
+  plan_eval->SetDesired(rs, plan_eval_context);
 
   lcm.StartReceiveThread();
 
   std::cout << "controller started\n";
   // Call controller.
   while (true) {
-    const systems::Context<double>& pub_context =
-        diagram->GetSubsystemContext(*context.get(), &atlas_command_publisher);
+    // Update plans
+    systems::State<double>* plan_eval_state = plan_eval_context->get_mutable_state();
+    plan_eval->DoCalcUnrestrictedUpdate(*plan_eval_context, plan_eval_state);
+
+    const systems::Context<double>& pub_context = diagram->GetSubsystemContext(*context, &atlas_command_publisher);
     atlas_command_publisher.Publish(pub_context);
   }
 }

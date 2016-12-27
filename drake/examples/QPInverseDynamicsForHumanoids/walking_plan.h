@@ -15,10 +15,9 @@ class HumanoidWalkingPlan : public GenericHumanoidPlan {
  public:
   HumanoidWalkingPlan(const RigidBodyTree<double>& robot);
 
-  // TODO: this is obviously wrong.
-  void HandleWalkingPlan(const HumanoidStatus&rs, QPInput* qp_input);
+  void HandleWalkingPlan(const HumanoidStatus&rs);
 
-  void Control(const HumanoidStatus& rs, QPInput* qp_input);
+  bool DoStateTransition(const HumanoidStatus& rs);
 
  private:
   enum WalkingState {
@@ -34,15 +33,15 @@ class HumanoidWalkingPlan : public GenericHumanoidPlan {
 
   Eigen::Vector2d Footstep2DesiredZMP(Side side, const Eigen::Isometry3d &step) const;
   PiecewisePolynomial<double> PlanZMPTraj(const std::vector<Eigen::Vector2d> &zmp_d, int num_of_zmp_knots, const Eigen::Vector2d &zmp_d0, const Eigen::Vector2d &zmpd_d0, double time_before_first_weight_shift) const;
-  void GeneratePelvisTraj(KinematicsCache<double> cache,
+  void GeneratePelvisTraj(const KinematicsCache<double>& cache,
     double pelvis_height_above_sole, double liftoff_time,
     double next_liftoff_time,
-    Eigen::Isometry3d nxt_stance_foot_pose,
-    Eigen::Isometry3d nxt_swing_foot_pose);
+    const Eigen::Isometry3d& nxt_stance_foot_pose,
+    const Eigen::Isometry3d& nxt_swing_foot_pose);
 
-  void GenerateTorsoTraj(KinematicsCache<double> cache,
+  void GenerateTorsoTraj(const KinematicsCache<double>& cache,
     double next_liftoff_time,
-    Eigen::Isometry3d nxt_swing_foot_pose);
+    const Eigen::Isometry3d& nxt_swing_foot_pose);
 
   void GenerateSwingTraj(const RigidBody<double>* swing_foot,
       const Isometry3<double>& foot0,

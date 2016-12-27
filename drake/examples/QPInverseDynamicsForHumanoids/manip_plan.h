@@ -11,7 +11,11 @@ class HumanoidManipPlan : public GenericHumanoidPlan {
   HumanoidManipPlan(const RigidBodyTree<double>& robot);
 
   // TODO: this is obviously wrong.
-  void HandleManipPlan(const HumanoidStatus&rs, QPInput* qp_input);
+  void HandleManipPlan(const HumanoidStatus&rs);
+
+  bool DoStateTransition(const HumanoidStatus& rs) {
+    return false;
+  }
 };
 
 }  // namespace qp_inverse_dynamics
