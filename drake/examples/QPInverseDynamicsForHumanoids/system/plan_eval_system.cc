@@ -17,8 +17,7 @@ using systems::AbstractValue;
 using systems::AbstractState;
 using systems::Value;
 
-PlanEvalSystem::PlanEvalSystem(const RigidBodyTree<double>& robot) : robot_(robot), qp_input_(QPInput(robot)) {
-    //: robot_(robot), manip_plan_eval_(HumanoidManipPlan(robot)), qp_input_(QPInput(robot)) {
+PlanEvalSystem::PlanEvalSystem(const RigidBodyTree<double>& robot) : robot_(robot) {
   input_port_index_humanoid_status_ = DeclareAbstractInputPort().get_index();
   output_port_index_qp_input_ = DeclareAbstractOutputPort().get_index();
 
@@ -36,8 +35,8 @@ void PlanEvalSystem::DoCalcOutput(const Context<double>& context,
     ->GetMutableValue<lcmt_qp_input>();
 
   const HumanoidWalkingPlan& plan = context.get_abstract_state<HumanoidWalkingPlan>(0);
-  plan.UpdateQPInput(*robot_status, &qp_input_);
-  EncodeQPInput(qp_input_, &msg);
+  QPInput qp_input = plan.CalcQPInput(*robot_status);
+  EncodeQPInput(qp_input, &msg);
 }
 
 void PlanEvalSystem::DoCalcUnrestrictedUpdate(const Context<double>& context,
@@ -70,9 +69,6 @@ void PlanEvalSystem::SetDesired(const HumanoidStatus& robot_status, Context<doub
 
   abstract_vals.front() = std::move(plan);
   context->set_abstract_state(std::make_unique<AbstractState>(std::move(abstract_vals)));
-
-  //manip_plan_eval_.HandleWalkingPlan(robot_status, &qp_input_);
-  //manip_plan_eval_.HandleManipPlan(robot_status, &qp_input_);
 }
 
 }  // namespace qp_inverse_dynamics

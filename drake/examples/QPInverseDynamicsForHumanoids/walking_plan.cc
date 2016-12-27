@@ -71,7 +71,6 @@ bool HumanoidWalkingPlan::DoStateTransition(const HumanoidStatus& rs) {
         //SwitchContactState(cur_time);
         cur_state_ = SWING;
         std::cout << "Weight transfer -> Swing @ " << plan_time << std::endl;
-        init_qp_input_ = true;
 
         return true;
       }
@@ -145,7 +144,6 @@ bool HumanoidWalkingPlan::DoStateTransition(const HumanoidStatus& rs) {
         plan_time = cur_time - interp_t0_;
         SwitchContact(plan_time);
         //late_touchdown = false;
-        init_qp_input_ = true;
 
         return true;
       }

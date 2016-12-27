@@ -47,8 +47,6 @@ GenericHumanoidPlan::GenericHumanoidPlan(const RigidBodyTree<double>& robot)
 
   Kp_joints_.head<6>().setZero();
   Kd_joints_.head<6>().setZero();
-
-  init_qp_input_ = true;
 }
 
 void GenericHumanoidPlan::InitializeQPInput(const HumanoidStatus& robot_status, QPInput* qp_input) const {
@@ -107,8 +105,6 @@ void GenericHumanoidPlan::InitializeQPInput(const HumanoidStatus& robot_status, 
     qp_input->mutable_desired_dof_motions().mutable_constraint_type(idx) =
         ConstraintType::Hard;
   }
-
-  init_qp_input_ = false;
 }
 
 ContactInformation GenericHumanoidPlan::MakeDefaultFootContactInformation(const RigidBody<double>* body) const {
@@ -130,9 +126,10 @@ ContactInformation GenericHumanoidPlan::MakeDefaultFootContactInformation(const 
   return contact;
 }
 
-void GenericHumanoidPlan::UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_input) const {
-  if (init_qp_input_)
-    InitializeQPInput(rs, qp_input);
+QPInput GenericHumanoidPlan::CalcQPInput(const HumanoidStatus& rs) const {
+  QPInput qp_input(*robot_);
+
+  InitializeQPInput(rs, &qp_input);
 
   double plan_time = rs.time() - interp_t0_;
 
@@ -141,11 +138,11 @@ void GenericHumanoidPlan::UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_in
   xcom << rs.com().head<2>(), rs.comd().head<2>();
 
   Vector2<double> comdd_d = zmp_planner_.ComputeOptimalCoMdd(plan_time, xcom);
-  qp_input->mutable_desired_centroidal_momentum_dot()
+  qp_input.mutable_desired_centroidal_momentum_dot()
         .mutable_values().segment<2>(3) = robot_->getMass() * comdd_d;
 
   // Body motion feedback
-  for (auto& body_motion_pair : qp_input->mutable_desired_body_motions()) {
+  for (auto& body_motion_pair : qp_input.mutable_desired_body_motions()) {
     DesiredBodyMotion& body_motion_d = body_motion_pair.second;
     const RigidBody<double>* body = &(body_motion_d.body());
     auto tracker_it = body_trackers_.find(body);
@@ -159,18 +156,20 @@ void GenericHumanoidPlan::UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_in
   }
 
   // Joint motion feedback
-  qp_input->mutable_desired_dof_motions().mutable_values() =
+  qp_input.mutable_desired_dof_motions().mutable_values() =
       dof_tracker_.ComputeTargetAcceleration(plan_time, rs.position(), rs.velocity());
 
   // Contacts
   const ContactState& cur_contacts = contacts_traj_.get_contacts(plan_time);
   for (const auto& contact_pair : cur_contacts) {
     const ContactInformation& contact = contact_pair.second;
-    auto it = qp_input->contact_information().find(contact.body_name());
-    if (it == qp_input->contact_information().end()) {
-      qp_input->mutable_contact_information().emplace(contact.body_name(), contact);
+    auto it = qp_input.contact_information().find(contact.body_name());
+    if (it == qp_input.contact_information().end()) {
+      qp_input.mutable_contact_information().emplace(contact.body_name(), contact);
     }
   }
+
+  return qp_input;
 }
 
 }  // namespace qp_inverse_dynamics

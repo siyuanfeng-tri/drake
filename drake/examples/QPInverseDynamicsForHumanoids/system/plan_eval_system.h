@@ -56,11 +56,6 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
   int input_port_index_humanoid_status_;
   int output_port_index_qp_input_;
-
-  // Gains and setpoints.
-  //HumanoidManipPlan manip_plan_eval_;
-  //HumanoidWalkingPlan manip_plan_eval_;
-  mutable QPInput qp_input_;
 };
 
 }  // namespace qp_inverse_dynamics

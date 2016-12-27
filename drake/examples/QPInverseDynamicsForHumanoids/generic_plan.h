@@ -45,8 +45,6 @@ class GenericHumanoidPlan {
   // TODO;
   double interp_t0_ {0};
   double planned_contact_switch_time_ {0};
-  // hack
-  mutable bool init_qp_input_ {true};
 
   // robot for doing kinematics
   const RigidBodyTree<double>* robot_;
@@ -95,7 +93,7 @@ class GenericHumanoidPlan {
   GenericHumanoidPlan(const RigidBodyTree<double>& robot);
 
   // Make QPInput
-  virtual void UpdateQPInput(const HumanoidStatus& rs, QPInput* qp_input) const;
+  virtual QPInput CalcQPInput(const HumanoidStatus& rs) const;
 
   // Trigger event changes.
   virtual bool DoStateTransition(const HumanoidStatus& rs)=0;

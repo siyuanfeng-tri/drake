@@ -41,7 +41,6 @@ GTEST_TEST(TestManipPlanEval, TestManipPlanEval) {
 
   // make plan
   QPController con;
-  QPInput input(*robot);
   QPOutput output(*robot);
 
   manip.HandleManipPlan(robot_status);
@@ -62,7 +61,7 @@ GTEST_TEST(TestManipPlanEval, TestManipPlanEval) {
 
   int tick_ctr = 0;
   while (time < 4) {
-    manip.UpdateQPInput(robot_status, &input);
+    QPInput input = manip.CalcQPInput(robot_status);
     int status = con.Control(robot_status, input, &output);
 
     if (status) {
