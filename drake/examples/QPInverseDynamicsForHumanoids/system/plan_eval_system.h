@@ -34,7 +34,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   std::unique_ptr<systems::SystemOutput<double>> AllocateOutput(
       const systems::Context<double>& context) const override;
 
-  void SetDesired(const HumanoidStatus& robot_status, systems::Context<double>* context);
+  void HandlePlan(const HumanoidStatus& robot_status, systems::Context<double>* context);
 
   /**
    * @return Port for the input: HumanoidStatus.

@@ -12,10 +12,6 @@ class HumanoidManipPlan : public GenericHumanoidPlan {
 
   // TODO: this is obviously wrong.
   void HandleManipPlan(const HumanoidStatus&rs);
-
-  bool DoStateTransition(const HumanoidStatus& rs) {
-    return false;
-  }
 };
 
 }  // namespace qp_inverse_dynamics

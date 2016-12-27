@@ -96,7 +96,7 @@ class GenericHumanoidPlan {
   virtual QPInput CalcQPInput(const HumanoidStatus& rs) const;
 
   // Trigger event changes.
-  virtual bool DoStateTransition(const HumanoidStatus& rs)=0;
+  virtual bool DoStateTransition(const HumanoidStatus& rs) { return false; }
 
   // Handle plan
 

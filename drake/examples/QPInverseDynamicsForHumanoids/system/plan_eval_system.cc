@@ -34,6 +34,7 @@ void PlanEvalSystem::DoCalcOutput(const Context<double>& context,
   lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
     ->GetMutableValue<lcmt_qp_input>();
 
+  //const GenericHumanoidPlan& plan = context.get_abstract_state<GenericHumanoidPlan>(0);
   const HumanoidWalkingPlan& plan = context.get_abstract_state<HumanoidWalkingPlan>(0);
   QPInput qp_input = plan.CalcQPInput(*robot_status);
   EncodeQPInput(qp_input, &msg);
@@ -42,7 +43,9 @@ void PlanEvalSystem::DoCalcOutput(const Context<double>& context,
 void PlanEvalSystem::DoCalcUnrestrictedUpdate(const Context<double>& context,
     State<double>* state) const {
   // Get the plan.
-  HumanoidWalkingPlan& plan = state->get_mutable_abstract_state()->get_mutable_abstract_state(0).GetMutableValue<HumanoidWalkingPlan>();
+  AbstractValue& abs_val = state->get_mutable_abstract_state()->get_mutable_abstract_state(0);
+  //GenericHumanoidPlan& plan = abs_val.GetMutableValue<GenericHumanoidPlan>();
+  HumanoidWalkingPlan& plan = abs_val.GetMutableValue<HumanoidWalkingPlan>();
 
   // Get the state.
   const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
@@ -60,14 +63,13 @@ std::unique_ptr<SystemOutput<double>> PlanEvalSystem::AllocateOutput(
   return std::move(output);
 }
 
-void PlanEvalSystem::SetDesired(const HumanoidStatus& robot_status, Context<double>* context) {
+void PlanEvalSystem::HandlePlan(const HumanoidStatus& planned, Context<double>* context) {
   // Make a walking plan
+  HumanoidWalkingPlan plan(robot_);
+  plan.HandleWalkingPlan(planned);
+
   std::vector<std::unique_ptr<AbstractValue>> abstract_vals(1);
-  std::unique_ptr<AbstractValue> plan(new Value<HumanoidWalkingPlan>(HumanoidWalkingPlan(robot_)));
-
-  plan->GetMutableValue<HumanoidWalkingPlan>().HandleWalkingPlan(robot_status);
-
-  abstract_vals.front() = std::move(plan);
+  abstract_vals.front() = std::unique_ptr<AbstractValue>(new Value<HumanoidWalkingPlan>(plan));
   context->set_abstract_state(std::make_unique<AbstractState>(std::move(abstract_vals)));
 }
 

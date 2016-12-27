@@ -98,7 +98,7 @@ void controller_loop() {
             Vector6<double>::Zero(), Vector6<double>::Zero());
 
   systems::Context<double>* plan_eval_context = diagram->GetMutableSubsystemContext(context.get(), plan_eval);
-  plan_eval->SetDesired(rs, plan_eval_context);
+  plan_eval->HandlePlan(rs, plan_eval_context);
 
   lcm.StartReceiveThread();
 

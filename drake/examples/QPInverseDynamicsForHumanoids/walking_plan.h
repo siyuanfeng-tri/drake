@@ -17,7 +17,7 @@ class HumanoidWalkingPlan : public GenericHumanoidPlan {
 
   void HandleWalkingPlan(const HumanoidStatus&rs);
 
-  bool DoStateTransition(const HumanoidStatus& rs);
+  bool DoStateTransition(const HumanoidStatus& rs) override;
 
  private:
   enum WalkingState {
