@@ -12,6 +12,7 @@ cc_library(
     hdrs = [],
     linkstatic = 1,
     deps = [
+        ":accelerometer",
         ":depth_sensor",
         ":rotary_encoders",
     ],
@@ -23,6 +24,24 @@ cc_library(
     hdrs = ["rotary_encoders.h"],
     linkstatic = 1,
     deps = [
+        "//drake/systems/framework",
+    ],
+)
+
+cc_library(
+    name = "accelerometer",
+    srcs = [
+        "accelerometer.cc",
+        "accelerometer_output.cc",
+    ],
+    hdrs = [
+        "accelerometer.h",
+        "accelerometer_output.h",
+    ],
+    linkstatic = 1,
+    deps = [
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/rigid_body_plant",
         "//drake/systems/framework",
     ],
 )
@@ -46,6 +65,20 @@ cc_library(
     ],
 )
 
+cc_binary(
+    name = "accelerometer_example",
+    srcs = [
+        "test/accelerometer_test/accelerometer_example.cc",
+        "test/accelerometer_test/accelerometer_example_diagram.cc",
+        "test/accelerometer_test/accelerometer_example_diagram.h",
+    ],
+    data = ["//drake/multibody:models"],
+    deps = [
+        ":accelerometer",
+        "//drake/multibody/parsers",
+    ],
+)
+
 # === test/ ===
 
 cc_googletest(
@@ -53,6 +86,20 @@ cc_googletest(
     deps = [
         ":rotary_encoders",
         "//drake/common:eigen_matrix_compare",
+    ],
+)
+
+cc_googletest(
+    name = "accelerometer_test",
+    srcs = [
+        "test/accelerometer_test/accelerometer_test.cc",
+        "test/accelerometer_test/accelerometer_example_diagram.cc",
+    ],
+    data = ["//drake/multibody:models"],
+    deps = [
+        ":accelerometer",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/multibody/parsers",
     ],
 )
 

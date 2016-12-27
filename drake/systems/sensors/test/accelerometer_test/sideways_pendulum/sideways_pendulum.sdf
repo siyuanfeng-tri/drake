@@ -1,0 +1,91 @@
+<sdf version="1.5">
+  <!-- Comments in this file use frames as defined in the C++ Doxygen module
+  "Frames and Bodies",
+  http://drake.mit.edu/doxygen_cxx/group__multibody__frames__and__bodies.html.
+  In particular, this file refers to the link frame L, the body frame B, the
+  inertia frame I and the joint inboard frame F. -->
+  <!-- TODO(liang.fok): The color specifications used for the links in this SDF
+  are custom to the Gazebo simulator. Consider modifying Drake to support them.
+  Maybe this can be done in conjunction with the switch to OSRF's SDF parser,
+  see #4337. -->
+  <model name="Sideways_Pendulum">
+    <!-- Specifies X_WD, which is the model frame, D, expressed in the world
+    frame, W. -->
+    <pose frame="">0 0 0 0 0 0</pose>
+    <link name="base">
+      <!-- Specifies X_DL, which is the link frame, L, expressed in the model
+      frame, D. -->
+      <pose frame="">0 0 0 0 0 0</pose>
+      <inertial>
+        <!-- Specifies X_IL, the inertial frame, I, expressed in the link frame,
+        L. -->
+        <pose frame="">0 0 0 0 0 0</pose>
+        <mass>1.0</mass>
+        <inertia>
+          <ixx>0</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0</iyy>
+          <iyz>0</iyz>
+          <izz>0</izz>
+        </inertia>
+      </inertial>
+      <visual name="base_visual">
+        <pose frame="">0 0 0.25 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>1 0.2 0.5</size>
+          </box>
+        </geometry>
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Red</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <link name="swing_arm">
+      <!-- This specifies X_DL.
+           Explicitly make it to be at Bo.-->
+      <pose frame="">0 0 0 0 0 0</pose>
+      <inertial>
+        <!-- This specifies X_LI. -->
+        <pose frame="">0 -0.5 0 0 0 0</pose>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.08583333333</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.08583333333</iyy>
+          <iyz>0</iyz>
+          <izz>0.005</izz>
+        </inertia>
+      </inertial>
+      <visual name="swing_arm_visual">
+        <pose frame="">0 -0.5 0 1.57079632679 0 0</pose>
+        <geometry>
+          <cylinder>
+            <length>1</length>
+            <radius>0.1</radius>
+          </cylinder>
+        </geometry>
+        <material>
+          <script>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+            <name>Gazebo/Green</name>
+          </script>
+        </material>
+      </visual>
+    </link>
+    <joint name="joint1" type="revolute">
+      <parent>base</parent>
+      <child>swing_arm</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <!-- The default is the axis expressed in the inboard frame F. -->
+        <use_parent_model_frame>1</use_parent_model_frame>
+      </axis>
+    </joint>
+  </model>
+</sdf>

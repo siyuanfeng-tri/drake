@@ -3,6 +3,9 @@ target_link_libraries(rotary_encoders_test drakeSensors)
 
 if(Bullet_FOUND)
   drake_add_cc_test(depth_sensor_test)
-  target_link_libraries(depth_sensor_test
-      drakeSensors)
+  target_link_libraries(depth_sensor_test drakeSensors)
+endif()
+
+if(BUILD_TESTING)
+  add_subdirectory(accelerometer_test)
 endif()
