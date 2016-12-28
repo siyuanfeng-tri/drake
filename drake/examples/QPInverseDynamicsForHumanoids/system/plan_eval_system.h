@@ -28,6 +28,9 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   void DoCalcOutput(const systems::Context<double>& context,
                     systems::SystemOutput<double>* output) const override;
 
+  void DoCalcNextUpdateTime(const systems::Context<double>& context,
+      systems::UpdateActions<double>* actions) const override;
+
   void DoCalcUnrestrictedUpdate(const systems::Context<double>& context,
                                 systems::State<double>* state) const override;
 
@@ -53,7 +56,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
  private:
   const RigidBodyTree<double>& robot_;
-
+  const double time_step_ {1e-3};
   int input_port_index_humanoid_status_;
   int output_port_index_qp_input_;
 };

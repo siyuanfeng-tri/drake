@@ -66,7 +66,7 @@ void HumanoidManipPlan::HandleManipPlan(const HumanoidStatus&rs) {
   // Contacts
   std::vector<ContactState> contacts(1);
   contacts[0] = double_support();
-  contacts_traj_ = PiecewiseContactInformation(time, contacts);
+  contacts_traj_ = PiecewiseContactState(time, contacts);
 
   // Interp timer.
   interp_t0_ = rs.time();

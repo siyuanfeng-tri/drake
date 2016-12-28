@@ -277,13 +277,13 @@ void HumanoidWalkingPlan::GenerateTrajs(double plan_time, const Eigen::VectorXd&
     time = {0, INFINITY};
     std::vector<ContactState> contacts(1);
     contacts[0] = double_support();
-    contacts_traj_ = PiecewiseContactInformation(time, contacts);
+    contacts_traj_ = PiecewiseContactState(time, contacts);
   } else {
     time = {0, liftoff_time, touchdown_time};
     std::vector<ContactState> contacts(2);
     contacts[0] = double_support();
     contacts[1] = nxt_contact_state;
-    contacts_traj_ = PiecewiseContactInformation(time, contacts);
+    contacts_traj_ = PiecewiseContactState(time, contacts);
   }
 }
 

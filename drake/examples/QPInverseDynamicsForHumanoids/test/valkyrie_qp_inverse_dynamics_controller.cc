@@ -103,14 +103,15 @@ void controller_loop() {
   lcm.StartReceiveThread();
 
   std::cout << "controller started\n";
-  // Call controller.
   while (true) {
-    // Update plans
+    // Call updates on various blocks. These should be replaced by diagram->CalcUnrestrictedUpdate().
+
+    // Call plan Eval
     systems::State<double>* plan_eval_state = plan_eval_context->get_mutable_state();
     plan_eval->DoCalcUnrestrictedUpdate(*plan_eval_context, plan_eval_state);
 
-    const systems::Context<double>& pub_context = diagram->GetSubsystemContext(*context, &atlas_command_publisher);
-    atlas_command_publisher.Publish(pub_context);
+    // Publish / send LCM
+    diagram->Publish(*context);
   }
 }
 

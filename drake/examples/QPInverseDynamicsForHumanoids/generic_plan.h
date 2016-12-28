@@ -16,11 +16,11 @@ namespace qp_inverse_dynamics {
 
 typedef std::map<const RigidBody<double>*, ContactInformation> ContactState;
 
-class PiecewiseContactInformation : public PiecewiseFunction {
+class PiecewiseContactState : public PiecewiseFunction {
  public:
-  PiecewiseContactInformation() {}
+  PiecewiseContactState() {}
 
-  PiecewiseContactInformation(const std::vector<double>& time, const std::vector<ContactState>& contact_info)
+  PiecewiseContactState(const std::vector<double>& time, const std::vector<ContactState>& contact_info)
     : PiecewiseFunction(time), contact_info_segments_(contact_info) {
     DRAKE_DEMAND(!contact_info.empty());
     DRAKE_DEMAND(time.size() == contact_info.size() + 1);
@@ -63,7 +63,7 @@ class GenericHumanoidPlan {
   /////////////
   // These are set by HandlePlan in derived classes.
   std::set<const RigidBody<double>*> tracked_bodies_;
-  PiecewiseContactInformation contacts_traj_;
+  PiecewiseContactState contacts_traj_;
 
   // FB controllers
   systems::ZMPPlanner zmp_planner_;

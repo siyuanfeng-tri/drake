@@ -26,6 +26,7 @@ PlanEvalSystem::PlanEvalSystem(const RigidBodyTree<double>& robot) : robot_(robo
 
 void PlanEvalSystem::DoCalcOutput(const Context<double>& context,
     SystemOutput<double>* output) const {
+  /*
   // Input:
   const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
       context, input_port_index_humanoid_status_);
@@ -37,21 +38,39 @@ void PlanEvalSystem::DoCalcOutput(const Context<double>& context,
   //const GenericHumanoidPlan& plan = context.get_abstract_state<GenericHumanoidPlan>(0);
   const HumanoidWalkingPlan& plan = context.get_abstract_state<HumanoidWalkingPlan>(0);
   QPInput qp_input = plan.CalcQPInput(*robot_status);
+  */
+
+  lcmt_qp_input& msg = output->GetMutableData(output_port_index_qp_input_)
+    ->GetMutableValue<lcmt_qp_input>();
+  const QPInput& qp_input = context.get_abstract_state<QPInput>(1);
   EncodeQPInput(qp_input, &msg);
+}
+
+void PlanEvalSystem::DoCalcNextUpdateTime(
+    const systems::Context<double>& context,
+    systems::UpdateActions<double>* actions) const {
+  actions->time = context.get_time() + time_step_;
 }
 
 void PlanEvalSystem::DoCalcUnrestrictedUpdate(const Context<double>& context,
     State<double>* state) const {
+  AbstractState* abs_state = state->get_mutable_abstract_state();
+  DRAKE_DEMAND(abs_state->size() == 2);
+
   // Get the plan.
-  AbstractValue& abs_val = state->get_mutable_abstract_state()->get_mutable_abstract_state(0);
-  //GenericHumanoidPlan& plan = abs_val.GetMutableValue<GenericHumanoidPlan>();
-  HumanoidWalkingPlan& plan = abs_val.GetMutableValue<HumanoidWalkingPlan>();
+  HumanoidWalkingPlan& plan = abs_state->get_mutable_abstract_state(0).GetMutableValue<HumanoidWalkingPlan>();
+
+  // Get QPInput
+  QPInput& qp_input = abs_state->get_mutable_abstract_state(1).GetMutableValue<QPInput>();
 
   // Get the state.
   const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
       context, input_port_index_humanoid_status_);
 
+  std::cout << context.get_time() << ", " << robot_status->time() << std::endl;
+
   plan.DoStateTransition(*robot_status);
+  qp_input = plan.CalcQPInput(*robot_status);
 }
 
 std::unique_ptr<SystemOutput<double>> PlanEvalSystem::AllocateOutput(
@@ -68,8 +87,10 @@ void PlanEvalSystem::HandlePlan(const HumanoidStatus& planned, Context<double>* 
   HumanoidWalkingPlan plan(robot_);
   plan.HandleWalkingPlan(planned);
 
-  std::vector<std::unique_ptr<AbstractValue>> abstract_vals(1);
-  abstract_vals.front() = std::unique_ptr<AbstractValue>(new Value<HumanoidWalkingPlan>(plan));
+  std::vector<std::unique_ptr<AbstractValue>> abstract_vals;
+  abstract_vals.reserve(2);
+  abstract_vals.push_back(std::unique_ptr<AbstractValue>(new Value<HumanoidWalkingPlan>(plan)));
+  abstract_vals.push_back(std::unique_ptr<AbstractValue>(new Value<QPInput>(QPInput(robot_))));
   context->set_abstract_state(std::make_unique<AbstractState>(std::move(abstract_vals)));
 }
 
