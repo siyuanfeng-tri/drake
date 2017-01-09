@@ -1,6 +1,6 @@
+#include <iostream>
 #include <memory>
 #include <thread>
-#include <iostream>
 
 #include "drake/common/drake_path.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/joint_level_controller_system.h"
@@ -88,12 +88,20 @@ void controller_loop() {
   auto output = diagram->AllocateOutput(*context);
 
   // Set plan eval's desired to the initial state.
-  HumanoidStatus rs(*robot);
-  rs.Update(0, rs.GetNominalPosition(),
-            VectorX<double>::Zero(robot->get_num_velocities()),
-            VectorX<double>::Zero(robot->actuators.size()),
-            Vector6<double>::Zero(), Vector6<double>::Zero());
-  plan_eval->SetDesired(rs);
+  {
+    std::string alias_groups_config =
+        drake::GetDrakePath() + std::string(
+                                    "/examples/QPInverseDynamicsForHumanoids/"
+                                    "config/alias_groups.yaml");
+    param_parser::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
+    alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
+    HumanoidStatus desired_rs(*robot, alias_groups);
+    desired_rs.Update(0, desired_rs.GetNominalPosition(),
+                      VectorX<double>::Zero(robot->get_num_velocities()),
+                      VectorX<double>::Zero(robot->actuators.size()),
+                      Vector6<double>::Zero(), Vector6<double>::Zero());
+    plan_eval->SetDesired(desired_rs);
+  }
 
   lcm.StartReceiveThread();
 

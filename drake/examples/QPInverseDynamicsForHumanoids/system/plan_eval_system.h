@@ -2,11 +2,12 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/example_qp_input_for_valkyrie.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/param_parser/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -28,26 +29,38 @@ namespace qp_inverse_dynamics {
  */
 class PlanEvalSystem : public systems::LeafSystem<double> {
  public:
-  explicit PlanEvalSystem(const RigidBodyTree<double>& robot) : robot_(robot) {
+  explicit PlanEvalSystem(const RigidBodyTree<double>& robot)
+      : robot_(robot), alias_groups_(robot) {
     input_port_index_humanoid_status_ = DeclareAbstractInputPort().get_index();
     output_port_index_qp_input_ = DeclareAbstractOutputPort().get_index();
 
     set_name("plan_eval");
 
-    // TODO(siyuan.feng): Move these to some param / config file eventually.
-    // Set up gains.
-    int dim = robot_.get_num_positions();
-    Kp_com_ = Vector3<double>::Constant(40);
-    Kd_com_ = Vector3<double>::Constant(12);
-    Kp_pelvis_ = Vector6<double>::Constant(20);
-    Kd_pelvis_ = Vector6<double>::Constant(8);
-    Kp_torso_ = Vector6<double>::Constant(20);
-    Kd_torso_ = Vector6<double>::Constant(8);
-    Kp_joints_ = VectorX<double>::Constant(dim, 20);
-    Kd_joints_ = VectorX<double>::Constant(dim, 8);
-    // Don't do feedback on pelvis in the generalized coordinates.
-    Kp_joints_.head<6>().setZero();
-    Kd_joints_.head<6>().setZero();
+    std::string alias_groups_config =
+        drake::GetDrakePath() + std::string(
+                                    "/examples/QPInverseDynamicsForHumanoids/"
+                                    "config/alias_groups.yaml");
+    std::string controller_config =
+        drake::GetDrakePath() + std::string(
+                                    "/examples/QPInverseDynamicsForHumanoids/"
+                                    "config/controller.yaml");
+
+    // KinematicsProperty
+    alias_groups_.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
+
+    // Controller config
+    paramset_.LoadFromYAMLConfigFile(YAML::LoadFile(controller_config),
+                                     alias_groups_);
+
+    paramset_.LookupDesiredBodyMotionGains(*robot_.FindBody("pelvis"),
+                                           &Kp_pelvis_, &Kd_pelvis_);
+    paramset_.LookupDesiredBodyMotionGains(*robot_.FindBody("torso"),
+                                           &Kp_torso_, &Kd_torso_);
+    paramset_.LookupDesiredDoFMotionGains(&Kp_dof_, &Kd_dof_);
+    Vector6<double> Kp, Kd;
+    paramset_.LookupDesiredCentroidalMomentumDotGains(&Kp, &Kd);
+    Kp_com_ = Kp.tail<3>();
+    Kd_com_ = Kd.tail<3>();
   }
 
   void DoCalcOutput(const Context<double>& context,
@@ -63,12 +76,33 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
     Vector3<double> com_err = desired_com_ - robot_status->com();
     Vector3<double> comd_err = -robot_status->comd();
 
-    // Update desired accelerations.
-    QPInput qp_input = MakeExampleQPInput(*robot_status);
+    // Make a new QPInput.
+    QPInput qp_input(robot_);
+    qp_input.mutable_contact_information() =
+        paramset_.MakeContactInformation("feet", alias_groups_);
+
+    std::unordered_map<std::string, DesiredBodyMotion> motion_d =
+        paramset_.MakeDesiredBodyMotion("pelvis", alias_groups_);
+    qp_input.mutable_desired_body_motions().insert(motion_d.begin(),
+                                                   motion_d.end());
+    motion_d = paramset_.MakeDesiredBodyMotion("torso", alias_groups_);
+    qp_input.mutable_desired_body_motions().insert(motion_d.begin(),
+                                                   motion_d.end());
+
+    qp_input.mutable_desired_dof_motions() = paramset_.MakeDesiredDoFMotions();
+    qp_input.mutable_w_basis_reg() =
+        paramset_.get_basis_regularization_weight();
+
+    qp_input.mutable_desired_centroidal_momentum_dot() =
+        paramset_.MakeDesiredCentroidalMomentumDot();
+
+    // Do Feedback.
     qp_input.mutable_desired_centroidal_momentum_dot()
-        .mutable_values().tail<3>() = robot_.getMass() *
-        (Kp_com_.array() * com_err.array() +
-         Kd_com_.array() * comd_err.array()).matrix();
+        .mutable_values()
+        .tail<3>() =
+        robot_.getMass() *
+        (Kp_com_.array() * com_err.array() + Kd_com_.array() * comd_err.array())
+            .matrix();
 
     qp_input.mutable_desired_dof_motions().mutable_values() =
         joint_PDff_.ComputeTargetAcceleration(robot_status->position(),
@@ -108,7 +142,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
     int dim = robot_status.position().size();
     joint_PDff_ = VectorSetpoint<double>(
         robot_status.position(), VectorX<double>::Zero(dim),
-        VectorX<double>::Zero(dim), Kp_joints_, Kd_joints_);
+        VectorX<double>::Zero(dim), Kp_dof_, Kd_dof_);
   }
 
   /**
@@ -128,6 +162,8 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
  private:
   const RigidBodyTree<double>& robot_;
+  param_parser::RigidBodyTreeAliasGroups<double> alias_groups_;
+  param_parser::ParamSet paramset_;
 
   int input_port_index_humanoid_status_;
   int output_port_index_qp_input_;
@@ -145,8 +181,8 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   Vector6<double> Kd_pelvis_;
   Vector6<double> Kp_torso_;
   Vector6<double> Kd_torso_;
-  VectorX<double> Kp_joints_;
-  VectorX<double> Kd_joints_;
+  VectorX<double> Kp_dof_;
+  VectorX<double> Kd_dof_;
 };
 
 }  // namespace qp_inverse_dynamics

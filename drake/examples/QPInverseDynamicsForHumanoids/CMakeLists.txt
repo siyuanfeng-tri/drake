@@ -1,6 +1,7 @@
+add_definitions(-g)
+
 set(qp_inverse_dynamics_controller_src
   humanoid_status.cc
-  example_qp_input_for_valkyrie.cc
   qp_controller.cc
   rigid_body_tree_utils.cc)
 
@@ -20,6 +21,7 @@ if(lcm_FOUND)
 endif()
 
 add_subdirectory(param_parsers)
+add_subdirectory(system)
 
 if(BUILD_TESTING)
   add_subdirectory(test)

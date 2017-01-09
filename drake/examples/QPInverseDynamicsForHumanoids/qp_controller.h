@@ -3,9 +3,9 @@
 #include <fstream>
 #include <iostream>
 #include <list>
-#include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -52,6 +52,18 @@ class ConstrainedValues {
     constraint_types_.resize(dim);
     weights_.resize(dim);
     values_.resize(dim);
+  }
+
+  void SetAllConstraintTypesBasedOnWeights() {
+    for (int i = 0; i < weights_.size(); ++i) {
+      if (weights_[i] > 0) {
+        constraint_types_.at(i) = ConstraintType::Soft;
+      } else if (weights_[i] < 0) {
+        constraint_types_.at(i) = ConstraintType::Hard;
+      } else {
+        constraint_types_.at(i) = ConstraintType::Skip;
+      }
+    }
   }
 
   /**
@@ -337,9 +349,9 @@ class ContactInformation {
       const KinematicsCache<double>& cache) const {
     VectorX<double> Jdv(3 * contact_points_.cols());
     for (int i = 0; i < contact_points_.cols(); ++i) {
-      Jdv.segment<3>(3 * i) =
-          GetTaskSpaceJacobianDotTimesV(robot, cache, *body_,
-                                        contact_points_.col(i)).bottomRows<3>();
+      Jdv.segment<3>(3 * i) = GetTaskSpaceJacobianDotTimesV(
+                                  robot, cache, *body_, contact_points_.col(i))
+                                  .bottomRows<3>();
     }
     return Jdv;
   }
@@ -745,12 +757,12 @@ class QPInput {
   inline const std::string& dof_name(size_t idx) const {
     return desired_dof_motions_.dof_name(idx);
   }
-  inline const std::map<std::string, ContactInformation>& contact_information()
-      const {
+  inline const std::unordered_map<std::string, ContactInformation>&
+  contact_information() const {
     return contact_info_;
   }
-  inline const std::map<std::string, DesiredBodyMotion>& desired_body_motions()
-      const {
+  inline const std::unordered_map<std::string, DesiredBodyMotion>&
+  desired_body_motions() const {
     return desired_body_motions_;
   }
   inline const DesiredDoFMotions& desired_dof_motions() const {
@@ -763,11 +775,11 @@ class QPInput {
 
   // Setters
   inline double& mutable_w_basis_reg() { return w_basis_reg_; }
-  inline std::map<std::string, ContactInformation>&
+  inline std::unordered_map<std::string, ContactInformation>&
   mutable_contact_information() {
     return contact_info_;
   }
-  inline std::map<std::string, DesiredBodyMotion>&
+  inline std::unordered_map<std::string, DesiredBodyMotion>&
   mutable_desired_body_motions() {
     return desired_body_motions_;
   }
@@ -781,10 +793,10 @@ class QPInput {
 
  private:
   // Contact information
-  std::map<std::string, ContactInformation> contact_info_;
+  std::unordered_map<std::string, ContactInformation> contact_info_;
 
   // Desired task space accelerations for specific bodies
-  std::map<std::string, DesiredBodyMotion> desired_body_motions_;
+  std::unordered_map<std::string, DesiredBodyMotion> desired_body_motions_;
 
   // Desired joint accelerations
   DesiredDoFMotions desired_dof_motions_;
@@ -1022,13 +1034,13 @@ class QPOutput {
     return centroidal_momentum_dot_;
   }
   inline const VectorX<double>& vd() const { return vd_; }
-  inline const std::map<std::string, BodyAcceleration>& body_accelerations()
-      const {
+  inline const std::unordered_map<std::string, BodyAcceleration>&
+  body_accelerations() const {
     return body_accelerations_;
   }
   inline const VectorX<double>& dof_torques() const { return dof_torques_; }
-  inline const std::map<std::string, ResolvedContact>& resolved_contacts()
-      const {
+  inline const std::unordered_map<std::string, ResolvedContact>&
+  resolved_contacts() const {
     return resolved_contacts_;
   }
   inline const std::vector<std::pair<std::string, double>>& costs() const {
@@ -1044,10 +1056,12 @@ class QPOutput {
     return centroidal_momentum_dot_;
   }
   inline VectorX<double>& mutable_vd() { return vd_; }
-  inline std::map<std::string, BodyAcceleration>& mutable_body_accelerations() {
+  inline std::unordered_map<std::string, BodyAcceleration>&
+  mutable_body_accelerations() {
     return body_accelerations_;
   }
-  inline std::map<std::string, ResolvedContact>& mutable_resolved_contacts() {
+  inline std::unordered_map<std::string, ResolvedContact>&
+  mutable_resolved_contacts() {
     return resolved_contacts_;
   }
   inline VectorX<double>& mutable_dof_torques() { return dof_torques_; }
@@ -1076,10 +1090,10 @@ class QPOutput {
   VectorX<double> dof_torques_;
 
   // Computed contact related information such as point contact forces
-  std::map<std::string, ResolvedContact> resolved_contacts_;
+  std::unordered_map<std::string, ResolvedContact> resolved_contacts_;
 
   // Tracked body motion
-  std::map<std::string, BodyAcceleration> body_accelerations_;
+  std::unordered_map<std::string, BodyAcceleration> body_accelerations_;
 
   // Pair of the name of cost term and cost value (only the quadratic and linear
   // term, no constant term).

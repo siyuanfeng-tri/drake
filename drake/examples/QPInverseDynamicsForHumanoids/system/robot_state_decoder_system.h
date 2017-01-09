@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
@@ -64,7 +65,16 @@ class RobotStateDecoderSystem : public systems::LeafSystem<double> {
       const Context<double>& context) const override {
     std::unique_ptr<LeafSystemOutput<double>> output(
         new LeafSystemOutput<double>);
-    HumanoidStatus rs(robot_);
+
+    std::string alias_groups_config =
+        drake::GetDrakePath() + std::string(
+                                    "/examples/QPInverseDynamicsForHumanoids/"
+                                    "config/alias_groups.yaml");
+    // KinematicsProperty
+    param_parser::RigidBodyTreeAliasGroups<double> alias_groups(robot_);
+    alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
+
+    HumanoidStatus rs(robot_, alias_groups);
     output->add_port(
         std::unique_ptr<AbstractValue>(new Value<HumanoidStatus>(rs)));
     return std::move(output);
