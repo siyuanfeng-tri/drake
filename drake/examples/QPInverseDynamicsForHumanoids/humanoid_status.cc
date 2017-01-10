@@ -19,7 +19,7 @@ const Matrix3<double> HumanoidStatus::kFootToSensorRotationOffset =
 
 HumanoidStatus::HumanoidStatus(
     const RigidBodyTree<double>& robot,
-    const param_parser::RigidBodyTreeAliasGroups<double>& alias_group)
+    const param_parsers::RigidBodyTreeAliasGroups<double>& alias_group)
     : robot_(&robot), cache_(robot_->CreateKinematicsCache()) {
   // TODO(siyuan.feng): The names of the links are hard coded for
   // Valkyrie, and they should be specified in some separate config file.

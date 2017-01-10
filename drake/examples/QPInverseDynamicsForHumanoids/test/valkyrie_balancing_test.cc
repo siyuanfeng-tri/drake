@@ -3,7 +3,7 @@
 #include "drake/common/drake_path.h"
 #include "drake/common/eigen_matrix_compare.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/param_parser/param_parser.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
@@ -42,11 +42,11 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
       urdf, multibody::joints::kRollPitchYaw, robot.get());
 
   // KinematicsProperty
-  param_parser::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
+  param_parsers::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
   alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
 
   // Controller config
-  param_parser::ParamSet paramset;
+  param_parsers::ParamSet paramset;
   paramset.LoadFromYAMLConfigFile(YAML::LoadFile(controller_config),
                                   alias_groups);
 

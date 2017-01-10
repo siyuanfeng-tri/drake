@@ -8,7 +8,7 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/common/eigen_stl_types.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/param_parser/rigid_body_tree_alias_groups.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/rigid_body_tree_alias_groups.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/rigid_body_tree_utils.h"
 #include "drake/systems/robotInterfaces/Side.h"
 
@@ -101,7 +101,7 @@ class HumanoidStatus {
    * lifespan of this obejct.
    */
   HumanoidStatus(const RigidBodyTree<double>& robot,
-      const param_parser::RigidBodyTreeAliasGroups<double>& alias_group);
+      const param_parsers::RigidBodyTreeAliasGroups<double>& alias_group);
 
   /**
    * Do kinematics and compute useful information based on kinematics and

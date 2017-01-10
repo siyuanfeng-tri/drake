@@ -4,15 +4,15 @@
 #include <unordered_map>
 #include <vector>
 
-#include "drake/examples/QPInverseDynamicsForHumanoids/param_parser/rigid_body_tree_alias_groups.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/rigid_body_tree_alias_groups.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller_common.h"
 
 #include "yaml-cpp/yaml.h"
 
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
-namespace param_parser {
+namespace param_parsers {
 
 /**
  * Struct for storing parameters that can be used to generate a desired
@@ -372,7 +372,7 @@ class ParamSet {
       const RigidBody<double>& body, const DesiredMotionParam& param) const;
 };
 
-}  // namespace param_parser
+}  // namespace param_parsers
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
 }  // namespace drake

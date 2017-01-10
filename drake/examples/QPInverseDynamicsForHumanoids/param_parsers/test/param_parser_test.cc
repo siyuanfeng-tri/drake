@@ -11,7 +11,7 @@
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
-namespace param_parser {
+namespace param_parsers {
 namespace {
 
 class ParamParserTests : public ::testing::Test {
@@ -309,7 +309,7 @@ TEST_F(ParamParserTests, DoFParams) {
 }
 
 }  // namespace
-}  // namespace param_parser
+}  // namespace param_parsers
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
 }  // namespace drake

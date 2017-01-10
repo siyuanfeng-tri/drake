@@ -1,4 +1,4 @@
-#include "drake/examples/QPInverseDynamicsForHumanoids/param_parser/param_parser.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 
 #include "drake/common/drake_assert.h"
 #include "drake/util/drakeUtil.h"
@@ -6,7 +6,7 @@
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
-namespace param_parser {
+namespace param_parsers {
 
 namespace {
 
@@ -556,7 +556,7 @@ void ParamSet::LookupDesiredDoFMotionGains(VectorX<double>* Kp,
   }
 }
 
-}  // namespace param_parser
+}  // namespace param_parsers
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
 }  // namespace drake

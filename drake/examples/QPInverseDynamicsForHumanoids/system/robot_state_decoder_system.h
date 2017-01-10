@@ -71,7 +71,7 @@ class RobotStateDecoderSystem : public systems::LeafSystem<double> {
                                     "/examples/QPInverseDynamicsForHumanoids/"
                                     "config/alias_groups.yaml");
     // KinematicsProperty
-    param_parser::RigidBodyTreeAliasGroups<double> alias_groups(robot_);
+    param_parsers::RigidBodyTreeAliasGroups<double> alias_groups(robot_);
     alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
 
     HumanoidStatus rs(robot_, alias_groups);

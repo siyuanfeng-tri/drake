@@ -93,7 +93,7 @@ void controller_loop() {
         drake::GetDrakePath() + std::string(
                                     "/examples/QPInverseDynamicsForHumanoids/"
                                     "config/alias_groups.yaml");
-    param_parser::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
+    param_parsers::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
     alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
     HumanoidStatus desired_rs(*robot, alias_groups);
     desired_rs.Update(0, desired_rs.GetNominalPosition(),

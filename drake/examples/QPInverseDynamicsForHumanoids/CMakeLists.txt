@@ -1,15 +1,14 @@
 add_definitions(-g)
 
-set(qp_inverse_dynamics_controller_src
-  humanoid_status.cc
-  qp_controller.cc
-  rigid_body_tree_utils.cc)
-
-add_library(drakeQPController ${qp_inverse_dynamics_controller_src})
-target_link_libraries(drakeQPController
-  drakeOptimization
+add_library(drakeQPControllerCommon qp_controller_common.cc rigid_body_tree_utils.cc)
+target_link_libraries(drakeQPControllerCommon
   drakeRBM
   drakeSide)
+
+add_library(drakeQPController humanoid_status.cc qp_controller.cc)
+target_link_libraries(drakeQPController
+  drakeOptimization
+  drakeQPControllerCommon)
 
 if(lcm_FOUND)
   add_library(drakeQPControllerLcmTranslator lcm_utils.cc)
@@ -17,6 +16,7 @@ if(lcm_FOUND)
     drakeRBM
     drakeLCMTypes
     drakeLCMUtil
+    drakeQPControllerCommon
     lcmtypes_bot2-core-cpp)
 endif()
 

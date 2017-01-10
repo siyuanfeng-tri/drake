@@ -7,7 +7,7 @@
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/param_parser/param_parser.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -162,8 +162,8 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
  private:
   const RigidBodyTree<double>& robot_;
-  param_parser::RigidBodyTreeAliasGroups<double> alias_groups_;
-  param_parser::ParamSet paramset_;
+  param_parsers::RigidBodyTreeAliasGroups<double> alias_groups_;
+  param_parsers::ParamSet paramset_;
 
   int input_port_index_humanoid_status_;
   int output_port_index_qp_input_;
