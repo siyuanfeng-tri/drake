@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "drake/common/eigen_types.h"
 #include "drake/common/eigen_stl_types.h"
+#include "drake/common/eigen_types.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/rigid_body_tree_alias_groups.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/rigid_body_tree_utils.h"
 #include "drake/systems/robotInterfaces/Side.h"
@@ -100,7 +100,8 @@ class HumanoidStatus {
    * @param robot Reference to a RigidBodyTree, which must be valid through the
    * lifespan of this obejct.
    */
-  HumanoidStatus(const RigidBodyTree<double>& robot,
+  HumanoidStatus(
+      const RigidBodyTree<double>& robot,
       const param_parsers::RigidBodyTreeAliasGroups<double>& alias_group);
 
   /**

@@ -7,12 +7,12 @@ namespace qp_inverse_dynamics {
 const double QPController::kUpperBoundForContactBasis = 1000;
 
 template <typename DerivedA, typename DerivedB>
-void QPController::AddAsConstraints(const Eigen::MatrixBase<DerivedA>& A,
-    const Eigen::MatrixBase<DerivedB>& b, const std::list<int>& idx,
-    drake::solvers::LinearEqualityConstraint* eq) {
+void QPController::AddAsConstraints(
+    const Eigen::MatrixBase<DerivedA>& A, const Eigen::MatrixBase<DerivedB>& b,
+    const std::list<int>& idx, drake::solvers::LinearEqualityConstraint* eq) {
   if (idx.empty()) return;
-  if (A.rows() != b.rows() || A.rows() > tmp_vd_mat_.rows() ||
-      b.cols() != 1 || A.cols() != tmp_vd_mat_.cols()) {
+  if (A.rows() != b.rows() || A.rows() > tmp_vd_mat_.rows() || b.cols() != 1 ||
+      A.cols() != tmp_vd_mat_.cols()) {
     throw std::runtime_error("Invalid input dimension.");
   }
 
@@ -27,9 +27,10 @@ void QPController::AddAsConstraints(const Eigen::MatrixBase<DerivedA>& A,
 
 template <typename DerivedA, typename DerivedB, typename DerivedW>
 void QPController::AddAsCosts(const Eigen::MatrixBase<DerivedA>& A,
-    const Eigen::MatrixBase<DerivedB>& b,
-    const Eigen::MatrixBase<DerivedW>& weights,
-    const std::list<int>& idx, drake::solvers::QuadraticConstraint* cost) {
+                              const Eigen::MatrixBase<DerivedB>& b,
+                              const Eigen::MatrixBase<DerivedW>& weights,
+                              const std::list<int>& idx,
+                              drake::solvers::QuadraticConstraint* cost) {
   if (idx.empty()) return;
   if (A.rows() != b.rows() || A.rows() != weights.rows() ||
       A.rows() > tmp_vd_mat_.rows() || b.cols() != 1 || weights.cols() != 1 ||

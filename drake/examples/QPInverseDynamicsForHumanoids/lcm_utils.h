@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "bot_core/atlas_command_t.hpp"
 #include "bot_core/robot_state_t.hpp"

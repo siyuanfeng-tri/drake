@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/systems/framework/leaf_system.h"
 

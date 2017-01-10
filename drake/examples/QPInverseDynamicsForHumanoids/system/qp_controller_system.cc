@@ -1,4 +1,6 @@
 #include <iostream>
+#include <memory>
+#include <utility>
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/lcm_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/qp_controller_system.h"

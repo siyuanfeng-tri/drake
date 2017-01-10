@@ -2,17 +2,12 @@
 
 #include <memory>
 
-#include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/systems/framework/leaf_system.h"
 
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
-
-// TODO(siyuan.feng): Extend this class properly to support various different
-// plans. This class currently only supports tracking a stationary fixed point.
 
 /**
  * A simple PlanEval block that generates qp input for the qp inverse dynamics
@@ -30,6 +25,15 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   void DoCalcOutput(const systems::Context<double>& context,
                     systems::SystemOutput<double>* output) const override;
 
+  // This is used to trigger DoCalcUnrestrictedUpdate every control_dt_ when
+  // this is wired up with a Simulator.
+  void DoCalcNextUpdateTime(
+      const systems::Context<double>& context,
+      systems::UpdateActions<double>* actions) const override;
+
+  void DoCalcUnrestrictedUpdate(const systems::Context<double>& context,
+                                systems::State<double>* state) const override;
+
   std::unique_ptr<systems::SystemOutput<double>> AllocateOutput(
       const systems::Context<double>& context) const override;
 
@@ -37,7 +41,10 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
    * Set the set point for tracking.
    * @param robot_status, desired robot state
    */
-  void SetDesired(const HumanoidStatus& robot_status);
+  void SetDesired(const VectorX<double>& q, systems::State<double>* state);
+
+  std::unique_ptr<systems::AbstractState> AllocateAbstractState()
+      const override;
 
   /**
    * @return Port for the input: HumanoidStatus.
@@ -57,27 +64,12 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
 
  private:
   const RigidBodyTree<double>& robot_;
+  const double control_dt_{2e-3};
   param_parsers::RigidBodyTreeAliasGroups<double> alias_groups_;
   param_parsers::ParamSet paramset_;
 
   int input_port_index_humanoid_status_;
   int output_port_index_qp_input_;
-
-  // Gains and setpoints.
-  VectorSetpoint<double> joint_PDff_;
-  CartesianSetpoint<double> pelvis_PDff_;
-  CartesianSetpoint<double> torso_PDff_;
-
-  Vector3<double> desired_com_;
-  Vector3<double> Kp_com_;
-  Vector3<double> Kd_com_;
-
-  Vector6<double> Kp_pelvis_;
-  Vector6<double> Kd_pelvis_;
-  Vector6<double> Kp_torso_;
-  Vector6<double> Kd_torso_;
-  VectorX<double> Kp_dof_;
-  VectorX<double> Kd_dof_;
 };
 
 }  // namespace qp_inverse_dynamics

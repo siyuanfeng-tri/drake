@@ -41,7 +41,8 @@ void ConstrainedValues::SetAllConstraintTypesBasedOnWeights() {
   }
 }
 
-std::list<int> ConstrainedValues::GetConstraintTypeIndices(ConstraintType type) const {
+std::list<int> ConstrainedValues::GetConstraintTypeIndices(
+    ConstraintType type) const {
   std::list<int> ret;
   for (int i = 0; i < static_cast<int>(constraint_types_.size()); ++i) {
     if (constraint_types_[i] == type) ret.push_back(i);
@@ -50,7 +51,8 @@ std::list<int> ConstrainedValues::GetConstraintTypeIndices(ConstraintType type) 
   return ret;
 }
 
-void ConstrainedValues::SetConstraintType(const std::list<int>& indices, ConstraintType type) {
+void ConstrainedValues::SetConstraintType(const std::list<int>& indices,
+                                          ConstraintType type) {
   for (int i : indices) {
     if (i < static_cast<int>(constraint_types_.size()) && i >= 0)
       constraint_types_[i] = type;
@@ -101,23 +103,24 @@ bool ConstrainedValues::operator==(const ConstrainedValues& other) const {
   return true;
 }
 
-ContactInformation::ContactInformation(
-    const RigidBody<double>& body, int num_basis) : body_(&body), num_basis_per_contact_point_(num_basis), acceleration_constraint_type_(ConstraintType::Hard) {
+ContactInformation::ContactInformation(const RigidBody<double>& body,
+                                       int num_basis)
+    : body_(&body),
+      num_basis_per_contact_point_(num_basis),
+      acceleration_constraint_type_(ConstraintType::Hard) {
   normal_ = Vector3<double>(0, 0, 1);
   mu_ = 1;
   if (num_basis_per_contact_point_ < 3)
-    throw std::runtime_error(
-        "Number of basis per contact point must be >= 3.");
+    throw std::runtime_error("Number of basis per contact point must be >= 3.");
 }
 
 MatrixX<double> ContactInformation::ComputeBasisMatrix(
     const RigidBodyTree<double>& robot,
     const KinematicsCache<double>& cache) const {
-  MatrixX<double> basis(
-      3 * contact_points_.cols(),
-      num_basis_per_contact_point_ * contact_points_.cols());
+  MatrixX<double> basis(3 * contact_points_.cols(),
+                        num_basis_per_contact_point_ * contact_points_.cols());
   Matrix3<double> body_rot =
-    robot.relativeTransform(cache, 0, body_->get_body_index()).linear();
+      robot.relativeTransform(cache, 0, body_->get_body_index()).linear();
   basis.setZero();
 
   Vector3<double> t1, t2, tangent_vec, base;
@@ -142,7 +145,7 @@ MatrixX<double> ContactInformation::ComputeBasisMatrix(
       base = (normal_ + mu_ * tangent_vec).normalized();
       // Rotate basis into world frame.
       basis.block(3 * i, num_basis_per_contact_point_ * i + k, 3, 1) =
-        body_rot * base;
+          body_rot * base;
     }
   }
   return basis;
@@ -153,7 +156,7 @@ void ContactInformation::ComputeContactPointsAndWrenchReferencePoint(
     const Vector3<double>& offset, drake::Matrix3X<double>* contact_points,
     Vector3<double>* reference_point) const {
   *reference_point =
-    robot.transformPoints(cache, offset, body_->get_body_index(), 0);
+      robot.transformPoints(cache, offset, body_->get_body_index(), 0);
   contact_points->resize(3, contact_points_.cols());
   for (int i = 0; i < contact_points_.cols(); ++i) {
     contact_points->col(i) = robot.transformPoints(
@@ -168,15 +171,15 @@ MatrixX<double> ContactInformation::ComputeWrenchMatrix(
     throw std::runtime_error("contact points size mismatch");
 
   MatrixX<double> force_to_wrench =
-    MatrixX<double>::Zero(6, 3 * contact_points.cols());
+      MatrixX<double>::Zero(6, 3 * contact_points.cols());
   int col_idx = 0;
   for (int i = 0; i < contact_points.cols(); ++i) {
     // Force part: just sum up all the point forces, so these are I
     force_to_wrench.block<3, 3>(3, col_idx).setIdentity();
     // Torque part:
     force_to_wrench.block<3, 3>(0, col_idx) =
-      drake::math::VectorToSkewSymmetric(contact_points.col(i) -
-          reference_point);
+        drake::math::VectorToSkewSymmetric(contact_points.col(i) -
+                                           reference_point);
     col_idx += 3;
   }
   return force_to_wrench;
@@ -188,8 +191,8 @@ MatrixX<double> ContactInformation::ComputeJacobianAtContactPoints(
   MatrixX<double> J(3 * contact_points_.cols(), robot.get_num_velocities());
   for (int i = 0; i < contact_points_.cols(); ++i) {
     J.block(3 * i, 0, 3, robot.get_num_velocities()) =
-      GetTaskSpaceJacobian(robot, cache, *body_, contact_points_.col(i))
-      .bottomRows<3>();
+        GetTaskSpaceJacobian(robot, cache, *body_, contact_points_.col(i))
+            .bottomRows<3>();
   }
   return J;
 }
@@ -200,8 +203,8 @@ VectorX<double> ContactInformation::ComputeJacobianDotTimesVAtContactPoints(
   VectorX<double> Jdv(3 * contact_points_.cols());
   for (int i = 0; i < contact_points_.cols(); ++i) {
     Jdv.segment<3>(3 * i) = GetTaskSpaceJacobianDotTimesV(
-        robot, cache, *body_, contact_points_.col(i))
-      .bottomRows<3>();
+                                robot, cache, *body_, contact_points_.col(i))
+                                .bottomRows<3>();
   }
   return Jdv;
 }
@@ -212,8 +215,8 @@ VectorX<double> ContactInformation::ComputeLinearVelocityAtContactPoints(
   VectorX<double> vel(3 * contact_points_.cols());
   for (int i = 0; i < contact_points_.cols(); ++i) {
     vel.segment<3>(3 * i) =
-      GetTaskSpaceVel(robot, cache, *body_, contact_points_.col(i))
-      .bottomRows<3>();
+        GetTaskSpaceVel(robot, cache, *body_, contact_points_.col(i))
+            .bottomRows<3>();
   }
   return vel;
 }
@@ -360,13 +363,12 @@ std::ostream& operator<<(std::ostream& out,
   return out;
 }
 
-
 QPInput::QPInput(const RigidBodyTree<double>& r) {
   std::vector<std::string> names(r.get_num_velocities());
   // strip out the "dot" part from name
   for (int i = 0; i < r.get_num_velocities(); ++i)
     names[i] =
-      r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
+        r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
   desired_dof_motions_ = DesiredDoFMotions(names);
 }
 
@@ -454,7 +456,6 @@ std::ostream& operator<<(std::ostream& out, const QPInput& input) {
 
   return out;
 }
-
 
 bool ResolvedContact::is_valid() const {
   if (!basis_.allFinite() || basis_.minCoeff() < 0) {
@@ -544,7 +545,7 @@ QPOutput::QPOutput(const RigidBodyTree<double>& r) {
   for (int i = 0; i < r.get_num_velocities(); ++i) {
     // strip out the "dot" part from name
     dof_names_[i] =
-      r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
+        r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
   }
   vd_.resize(r.get_num_velocities());
   dof_torques_.resize(r.get_num_velocities());
@@ -605,7 +606,6 @@ std::ostream& operator<<(std::ostream& out, const QPOutput& output) {
 
   return out;
 }
-
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples

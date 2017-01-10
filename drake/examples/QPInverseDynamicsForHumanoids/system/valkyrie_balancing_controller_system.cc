@@ -83,6 +83,9 @@ void controller_loop() {
   auto context = diagram->CreateDefaultContext();
   auto output = diagram->AllocateOutput(*context);
 
+  systems::Context<double>* plan_eval_context =
+      diagram->GetMutableSubsystemContext(context.get(), plan_eval);
+
   // Set plan eval's desired to the initial state.
   {
     std::string alias_groups_config =
@@ -92,21 +95,29 @@ void controller_loop() {
     param_parsers::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
     alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
     HumanoidStatus desired_rs(*robot, alias_groups);
+    /*
     desired_rs.Update(0, desired_rs.GetNominalPosition(),
                       VectorX<double>::Zero(robot->get_num_velocities()),
                       VectorX<double>::Zero(robot->actuators.size()),
                       Vector6<double>::Zero(), Vector6<double>::Zero());
-    plan_eval->SetDesired(desired_rs);
+                      */
+    systems::State<double>* plan_eval_state =
+        plan_eval_context->get_mutable_state();
+    plan_eval->SetDesired(desired_rs.GetNominalPosition(), plan_eval_state);
   }
 
   lcm.StartReceiveThread();
 
   std::cout << "controller started\n";
-  // Call controller.
+
   while (true) {
-    const systems::Context<double>& pub_context =
-        diagram->GetSubsystemContext(*context.get(), &atlas_command_publisher);
-    atlas_command_publisher.Publish(pub_context);
+    // Call controller.
+    systems::State<double>* plan_eval_state =
+        plan_eval_context->get_mutable_state();
+    plan_eval->DoCalcUnrestrictedUpdate(*plan_eval_context, plan_eval_state);
+
+    // Send LCM msg.
+    diagram->Publish(*context);
   }
 }
 

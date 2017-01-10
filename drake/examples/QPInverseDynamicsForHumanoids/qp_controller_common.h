@@ -3,8 +3,9 @@
 #include <iostream>
 #include <list>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "drake/common/eigen_types.h"
 #include "drake/multibody/kinematics_cache.h"
@@ -699,7 +700,6 @@ class QPOutput {
 };
 
 std::ostream& operator<<(std::ostream& out, const QPOutput& output);
-
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
