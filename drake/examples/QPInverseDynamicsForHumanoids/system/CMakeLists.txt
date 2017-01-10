@@ -11,5 +11,6 @@ if(gurobi_FOUND AND lcm_FOUND AND yaml-cpp_FOUND)
     drakeQPController
     drakeQPControllerLcmTranslator
     drakeQPControllerParamParsing
-    drakeRigidBodyAliasGroups)
+    drakeRigidBodyAliasGroups
+    drakeValkyrieConstants)
 endif()

@@ -136,11 +136,6 @@ class HumanoidStatus {
 
   void Update();
 
-  /**
-   * Returns a nominal q.
-   */
-  VectorX<double> GetNominalPosition() const { return nominal_position_; }
-
   // Getters
   inline const RigidBodyTree<double>& robot() const { return *robot_; }
   inline const KinematicsCache<double>& cache() const { return cache_; }
@@ -242,10 +237,6 @@ class HumanoidStatus {
  private:
   const RigidBodyTree<double>* robot_;
   KinematicsCache<double> cache_;
-
-  // Nominal position for the robot.
-  // TODO(siyuan.feng): should read this from the model file eventually.
-  VectorX<double> nominal_position_;
 
   // Map body name to its index.
   std::unordered_map<std::string, int> body_name_to_id_;

@@ -15,6 +15,10 @@ namespace qp_inverse_dynamics {
  * The controller is set up to track a stationary fixed point assuming the
  * robot is in double support, and the desired set point is set by SetDesired.
  *
+ * The plan is stored in the AbstractState in the Context. Plan's internal
+ * states (e.g. desired trajectories) are modifed with DoCalcUnrestrictedUpdate,
+ * and the output (QPInput) is generated with a const plan in DoCalcOutput.
+ *
  * Input: HumanoidStatus
  * Output: QPInput
  */
@@ -65,6 +69,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
  private:
   const RigidBodyTree<double>& robot_;
   const double control_dt_{2e-3};
+
   param_parsers::RigidBodyTreeAliasGroups<double> alias_groups_;
   param_parsers::ParamSet paramset_;
 

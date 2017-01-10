@@ -57,7 +57,6 @@ HumanoidStatus::HumanoidStatus(
   position_.resize(robot_->get_num_positions());
   velocity_.resize(robot_->get_num_velocities());
   joint_torque_.resize(robot_->actuators.size());
-  nominal_position_ = robot_->getZeroConfiguration();
 
   // Build various lookup maps.
   body_name_to_id_ = std::unordered_map<std::string, int>();
@@ -76,31 +75,6 @@ HumanoidStatus::HumanoidStatus(
   for (int i = 0; i < static_cast<int>(robot_->actuators.size()); ++i) {
     actuator_name_to_actuator_index_[robot_->actuators.at(i).name_] = i;
   }
-
-  // TODO(siyuan.feng): these are hard coded for Valkyrie, and they should
-  // be included in the model file or loaded from a separate config file.
-  nominal_position_[name_to_position_index().at("base_z")] = 1.025;
-  nominal_position_[name_to_position_index().at("rightHipPitch")] = -0.49;
-  nominal_position_[name_to_position_index().at("rightKneePitch")] = 1.205;
-  nominal_position_[name_to_position_index().at("rightAnklePitch")] = -0.71;
-
-  nominal_position_[name_to_position_index().at("leftHipPitch")] = -0.49;
-  nominal_position_[name_to_position_index().at("leftKneePitch")] = 1.205;
-  nominal_position_[name_to_position_index().at("leftAnklePitch")] = -0.71;
-
-  nominal_position_[name_to_position_index().at("rightShoulderPitch")] =
-      0.300196631343025;
-  nominal_position_[name_to_position_index().at("rightShoulderRoll")] = 1.25;
-  nominal_position_[name_to_position_index().at("rightElbowPitch")] =
-      0.785398163397448;
-  nominal_position_[name_to_position_index().at("rightForearmYaw")] = 1.571;
-
-  nominal_position_[name_to_position_index().at("leftShoulderPitch")] =
-      0.300196631343025;
-  nominal_position_[name_to_position_index().at("leftShoulderRoll")] = -1.25;
-  nominal_position_[name_to_position_index().at("leftElbowPitch")] =
-      -0.785398163397448;
-  nominal_position_[name_to_position_index().at("leftForearmYaw")] = 1.571;
 }
 
 void HumanoidStatus::Update() {

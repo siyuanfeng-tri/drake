@@ -5,6 +5,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
+#include "drake/examples/Valkyrie/valkyrie_constants.h"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 
@@ -73,11 +74,11 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
       paramset.MakeDesiredCentroidalMomentumDot();
 
   // Set up initial condition.
-  VectorX<double> q(robot->get_num_positions());
-  VectorX<double> v(robot->get_num_velocities());
+  VectorX<double> q =
+      valkyrie::RPYValkyrieFixedPointState().head(valkyrie::kRPYValkyrieDoF);
+  VectorX<double> v = VectorX<double>::Zero(robot->get_num_velocities());
+  DRAKE_DEMAND(valkyrie::kRPYValkyrieDoF == robot->get_num_positions());
 
-  q = robot_status.GetNominalPosition();
-  v.setZero();
   VectorX<double> q_ini = q;
 
   robot_status.Update(0, q, v, VectorX<double>::Zero(robot->actuators.size()),

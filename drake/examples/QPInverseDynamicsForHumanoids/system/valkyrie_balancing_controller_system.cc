@@ -9,6 +9,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/plan_eval_system.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/qp_controller_system.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/robot_state_decoder_system.h"
+#include "drake/examples/Valkyrie/valkyrie_constants.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
@@ -87,24 +88,12 @@ void controller_loop() {
       diagram->GetMutableSubsystemContext(context.get(), plan_eval);
 
   // Set plan eval's desired to the initial state.
-  {
-    std::string alias_groups_config =
-        drake::GetDrakePath() + std::string(
-                                    "/examples/QPInverseDynamicsForHumanoids/"
-                                    "config/alias_groups.yaml");
-    param_parsers::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
-    alias_groups.LoadFromYAMLFile(YAML::LoadFile(alias_groups_config));
-    HumanoidStatus desired_rs(*robot, alias_groups);
-    /*
-    desired_rs.Update(0, desired_rs.GetNominalPosition(),
-                      VectorX<double>::Zero(robot->get_num_velocities()),
-                      VectorX<double>::Zero(robot->actuators.size()),
-                      Vector6<double>::Zero(), Vector6<double>::Zero());
-                      */
-    systems::State<double>* plan_eval_state =
-        plan_eval_context->get_mutable_state();
-    plan_eval->SetDesired(desired_rs.GetNominalPosition(), plan_eval_state);
-  }
+  systems::State<double>* plan_eval_state =
+      plan_eval_context->get_mutable_state();
+  VectorX<double> desired_q =
+      valkyrie::RPYValkyrieFixedPointState().head(valkyrie::kRPYValkyrieDoF);
+  DRAKE_DEMAND(valkyrie::kRPYValkyrieDoF == robot->get_num_positions());
+  plan_eval->SetDesired(desired_q, plan_eval_state);
 
   lcm.StartReceiveThread();
 

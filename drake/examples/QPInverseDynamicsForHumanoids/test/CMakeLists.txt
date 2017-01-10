@@ -1,5 +1,6 @@
 drake_add_cc_test(NAME setpoint_test)
-target_link_libraries(setpoint_test drakeQPController)
+target_link_libraries(setpoint_test
+    drakeQPController)
 
 if(lcm_FOUND AND yaml-cpp_FOUND)
   drake_add_cc_test(NAME lcm_utils_test)
@@ -15,5 +16,6 @@ if(gurobi_FOUND AND yaml-cpp_FOUND)
     drakeMultibodyParsers
     drakeQPController
     drakeQPControllerParamParsing
-    drakeRigidBodyAliasGroups)
+    drakeRigidBodyAliasGroups
+    drakeValkyrieConstants)
 endif()
