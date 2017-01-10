@@ -24,8 +24,8 @@ cc_library(
     ],
     linkstatic = 1,
     deps = [
-        "@yaml_cpp//:lib",
         "//drake/multibody:rigid_body_tree",
+        "@yaml_cpp//:lib",
     ],
 )
 
@@ -43,10 +43,10 @@ cc_library(
 cc_library(
     name = "param_parser",
     srcs = [
-        "param_parsers/param_parser.cc"
+        "param_parsers/param_parser.cc",
     ],
     hdrs = [
-        "param_parsers/param_parser.h"
+        "param_parsers/param_parser.h",
     ],
     linkstatic = 1,
     deps = [
@@ -112,6 +112,8 @@ cc_test(
     name = "valkyrie_balancing_test",
     srcs = ["test/valkyrie_balancing_test.cc"],
     data = [
+        "config/alias_groups.yaml",
+        "config/controller.yaml",
         "//drake/examples/Valkyrie:models",
     ],
     tags = [
@@ -121,9 +123,10 @@ cc_test(
     ],
     deps = [
         ":control_utils",
-        ":example_qp_input_for_valkyrie",
+        ":param_parser",
         ":qp_controller",
         "//drake/common:eigen_matrix_compare",
+        "//drake/examples/Valkyrie:valkyrie_constants",
         "//drake/multibody/parsers",
         "@gtest//:main",
     ],
@@ -169,9 +172,9 @@ cc_test(
     name = "param_parser_test",
     srcs = ["param_parsers/test/param_parser_test.cc"],
     data = [
-        "//drake/examples/Valkyrie:models",
         "param_parsers/test/alias_groups.yaml",
         "param_parsers/test/params.yaml",
+        "//drake/examples/Valkyrie:models",
     ],
     deps = [
         ":param_parser",

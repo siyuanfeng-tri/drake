@@ -363,15 +363,6 @@ std::ostream& operator<<(std::ostream& out,
   return out;
 }
 
-QPInput::QPInput(const RigidBodyTree<double>& r) {
-  std::vector<std::string> names(r.get_num_velocities());
-  // strip out the "dot" part from name
-  for (int i = 0; i < r.get_num_velocities(); ++i)
-    names[i] =
-        r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
-  desired_dof_motions_ = DesiredDoFMotions(names);
-}
-
 bool QPInput::is_valid(int num_vd) const {
   if (num_vd != desired_dof_motions_.size()) {
     return false;
@@ -538,17 +529,6 @@ std::ostream& operator<<(std::ostream& out, const BodyAcceleration& acc) {
   out << acc.body_name() << " acc: " << acc.accelerations().transpose()
       << std::endl;
   return out;
-}
-
-QPOutput::QPOutput(const RigidBodyTree<double>& r) {
-  dof_names_.resize(r.get_num_velocities());
-  for (int i = 0; i < r.get_num_velocities(); ++i) {
-    // strip out the "dot" part from name
-    dof_names_[i] =
-        r.get_velocity_name(i).substr(0, r.get_velocity_name(i).size() - 3);
-  }
-  vd_.resize(r.get_num_velocities());
-  dof_torques_.resize(r.get_num_velocities());
 }
 
 bool QPOutput::is_valid(int num_vd) const {

@@ -15,12 +15,16 @@ namespace qp_inverse_dynamics {
  * The controller is set up to track a stationary fixed point assuming the
  * robot is in double support, and the desired set point is set by SetDesired.
  *
- * The plan is stored in the AbstractState in the Context. Plan's internal
- * states (e.g. desired trajectories) are modifed with DoCalcUnrestrictedUpdate,
- * and the output (QPInput) is generated with a const plan in DoCalcOutput.
+ * Conceptually, this block is a discrete time controller. In order to capture
+ * the discrete time nature, control is performed in DoCalcUnrestrictedUpdate,
+ * and the result is stored in AbstractState. DoCalcOutput merely copies the
+ * latest result from the AbstractState and sends it through the output port.
+ * Context's time must properly maintained. The internal states of the plan
+ * are also stored in the AbstractState, and can be modified in
+ * DoCalcUnrestrictedUpdate.
  *
  * Input: HumanoidStatus
- * Output: QPInput
+ * Output: lcmt_qp_input
  */
 class PlanEvalSystem : public systems::LeafSystem<double> {
  public:
@@ -29,8 +33,7 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   void DoCalcOutput(const systems::Context<double>& context,
                     systems::SystemOutput<double>* output) const override;
 
-  // This is used to trigger DoCalcUnrestrictedUpdate every control_dt_ when
-  // this is wired up with a Simulator.
+  // This is used to trigger DoCalcUnrestrictedUpdate every control_dt_.
   void DoCalcNextUpdateTime(
       const systems::Context<double>& context,
       systems::UpdateActions<double>* actions) const override;
@@ -41,14 +44,15 @@ class PlanEvalSystem : public systems::LeafSystem<double> {
   std::unique_ptr<systems::SystemOutput<double>> AllocateOutput(
       const systems::Context<double>& context) const override;
 
-  /**
-   * Set the set point for tracking.
-   * @param robot_status, desired robot state
-   */
-  void SetDesired(const VectorX<double>& q, systems::State<double>* state);
-
   std::unique_ptr<systems::AbstractState> AllocateAbstractState()
       const override;
+
+  /**
+   * Sets the desired setpoint and initializes the State that contains the plan.
+   * @param q Desired generalized position
+   * @param state State in the Context
+   */
+  void SetDesired(const VectorX<double>& q, systems::State<double>* state);
 
   /**
    * @return Port for the input: HumanoidStatus.

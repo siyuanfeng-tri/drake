@@ -17,6 +17,8 @@ RobotStateDecoderSystem::RobotStateDecoderSystem(
     : robot_(robot) {
   input_port_index_lcm_msg_ = DeclareAbstractInputPort().get_index();
   output_port_index_humanoid_status_ = DeclareAbstractOutputPort().get_index();
+
+  std::cout << input_port_index_lcm_msg_ << std::endl;
 }
 
 void RobotStateDecoderSystem::DoCalcOutput(

@@ -54,8 +54,8 @@ GTEST_TEST(testQPInverseDynamicsController, testBalancingStanding) {
   HumanoidStatus robot_status(*robot, alias_groups);
 
   QPController con;
-  QPInput input(*robot);
-  QPOutput output(*robot);
+  QPInput input(GetDoFNames(*robot));
+  QPOutput output(GetDoFNames(*robot));
 
   // Initialize QP input
   input.mutable_contact_information() =

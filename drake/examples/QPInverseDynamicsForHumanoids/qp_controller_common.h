@@ -418,7 +418,10 @@ std::ostream& operator<<(std::ostream& out,
  */
 class QPInput {
  public:
-  explicit QPInput(const RigidBodyTree<double>& r);
+  QPInput() {}
+
+  explicit QPInput(const std::vector<std::string>& dof_names)
+      : desired_dof_motions_(DesiredDoFMotions(dof_names)) {}
 
   inline bool is_valid() const { return is_valid(desired_dof_motions_.size()); }
 
@@ -481,7 +484,7 @@ class QPInput {
   // Desired task space accelerations for specific bodies
   std::unordered_map<std::string, DesiredBodyMotion> desired_body_motions_;
 
-  // Desired joint accelerations
+  // Desired DoF accelerations
   DesiredDoFMotions desired_dof_motions_;
 
   // Desired centroidal momentum change (change of overall linear and angular
@@ -617,7 +620,12 @@ std::ostream& operator<<(std::ostream& out, const BodyAcceleration& acc);
  */
 class QPOutput {
  public:
-  explicit QPOutput(const RigidBodyTree<double>& r);
+  QPOutput() {}
+
+  explicit QPOutput(const std::vector<std::string>& dof_names)
+      : dof_names_(dof_names),
+        vd_(VectorX<double>::Zero(dof_names.size())),
+        dof_torques_(VectorX<double>::Zero(dof_names.size())) {}
 
   bool is_valid(int num_vd) const;
 
@@ -685,7 +693,7 @@ class QPOutput {
   Vector6<double> centroidal_momentum_dot_;
   // Computed generalized coordinate accelerations
   VectorX<double> vd_;
-  // Computed joint torque, in dof's order, not robot.actuator's order.
+  // Computed DoF torque, in DoF's order, not robot.actuator's order.
   VectorX<double> dof_torques_;
 
   // Computed contact related information such as point contact forces
@@ -700,6 +708,17 @@ class QPOutput {
 };
 
 std::ostream& operator<<(std::ostream& out, const QPOutput& output);
+
+template <typename T>
+std::vector<std::string> GetDoFNames(const RigidBodyTree<T>& robot) {
+  std::vector<std::string> names(robot.get_num_velocities());
+  // strip out the "dot" part from name
+  for (int i = 0; i < robot.get_num_velocities(); ++i) {
+    names[i] = robot.get_velocity_name(i);
+    names[i] = names[i].substr(0, names[i].size() - 3);
+  }
+  return names;
+}
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples

@@ -32,7 +32,7 @@ void QPControllerSystem::DoCalcOutput(
   const lcmt_qp_input* qp_input_msg =
       EvalInputValue<lcmt_qp_input>(context, input_port_index_qp_input_);
 
-  QPInput qp_input(robot_);
+  QPInput qp_input;
   DecodeQPInput(robot_, *qp_input_msg, &qp_input);
 
   // Output:
@@ -52,9 +52,8 @@ QPControllerSystem::AllocateOutput(
     const systems::Context<double>& context) const {
   std::unique_ptr<systems::LeafSystemOutput<double>> output(
       new systems::LeafSystemOutput<double>);
-  QPOutput out(robot_);
   output->add_port(std::unique_ptr<systems::AbstractValue>(
-      new systems::Value<QPOutput>(out)));
+      new systems::Value<QPOutput>(QPOutput(GetDoFNames(robot_)))));
   return std::move(output);
 }
 

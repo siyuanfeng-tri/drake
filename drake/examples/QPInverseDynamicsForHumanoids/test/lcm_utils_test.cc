@@ -335,7 +335,7 @@ TEST_F(LcmUtilsTests, TestEncodeDecodeDesiredCentroidalMomentumDot) {
 // Test encoding and decoding of QPInput <-> lcmt_qp_input.
 TEST_F(LcmUtilsTests, TestEncodeDecodeQPInput) {
   // Initialize QP input
-  QPInput qp_input(*tree_);
+  QPInput qp_input(GetDoFNames(*tree_));
   ContactInformation contact(*tree_->FindBody("leftFoot"), 3);
   contact.mutable_contact_points() = Vector3<double>(1, 2, 3);
   contact.mutable_mu() = 0.2;
@@ -372,7 +372,7 @@ TEST_F(LcmUtilsTests, TestEncodeDecodeQPInput) {
   TestEncodeQPInput(qp_input, msg);
 
   // Test decode.
-  QPInput decoded_qp_input(*tree_);
+  QPInput decoded_qp_input;
   DecodeQPInput(*tree_, msg, &decoded_qp_input);
   EXPECT_EQ(qp_input, decoded_qp_input);
 }

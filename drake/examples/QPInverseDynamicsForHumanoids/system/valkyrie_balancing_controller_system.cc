@@ -26,8 +26,8 @@ namespace qp_inverse_dynamics {
 // This is an example qp based inverse dynamics controller loop for Valkyrie
 // built from the system2 blocks.
 //
-// The input is a lcm message of type bot_core::robot_state_t, and the output
-// is another lcm message of type bot_core::atlas_command_t.
+// The overall input and output is a lcm message of type
+// bot_core::robot_state_t and bot_core::atlas_command_t.
 void controller_loop() {
   // Loads model.
   std::string urdf =
@@ -83,11 +83,12 @@ void controller_loop() {
 
   auto context = diagram->CreateDefaultContext();
   auto output = diagram->AllocateOutput(*context);
+  systems::UpdateActions<double> actions;
 
   systems::Context<double>* plan_eval_context =
       diagram->GetMutableSubsystemContext(context.get(), plan_eval);
 
-  // Set plan eval's desired to the initial state.
+  // Set plan eval's desired to the nominal state.
   systems::State<double>* plan_eval_state =
       plan_eval_context->get_mutable_state();
   VectorX<double> desired_q =
@@ -99,14 +100,36 @@ void controller_loop() {
 
   std::cout << "controller started\n";
 
-  while (true) {
-    // Call controller.
-    systems::State<double>* plan_eval_state =
-        plan_eval_context->get_mutable_state();
-    plan_eval->DoCalcUnrestrictedUpdate(*plan_eval_context, plan_eval_state);
+  double control_time = 0;
+  double current_time = 0;
+  bool first_time = true;
 
-    // Send LCM msg.
-    diagram->Publish(*context);
+  while (true) {
+    // Sets Context's time to the timestamp in the bot_core::robot_state_t msg.
+    const bot_core::robot_state_t* msg =
+        rs_msg_to_rs->EvalInputValue<bot_core::robot_state_t>(
+            diagram->GetSubsystemContext(*context, rs_msg_to_rs), 0);
+
+    current_time = static_cast<double>(msg->utime) / 1e6;
+    context->set_time(current_time);
+
+    if (current_time >= control_time || first_time) {
+      // Calls the controller.
+      systems::State<double>* plan_eval_state =
+        plan_eval_context->get_mutable_state();
+      plan_eval->DoCalcUnrestrictedUpdate(*plan_eval_context, plan_eval_state);
+
+      // Computes the update time step.
+      actions.events.clear();
+      plan_eval->DoCalcNextUpdateTime(
+          diagram->GetSubsystemContext(*context, plan_eval), &actions);
+      control_time = actions.time;
+
+      first_time = false;
+
+      // Sends the bot_core::atlas_command_t msg.
+      diagram->Publish(*context);
+    }
   }
 }
 
