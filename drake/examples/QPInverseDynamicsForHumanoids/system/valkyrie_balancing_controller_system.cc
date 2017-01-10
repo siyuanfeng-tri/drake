@@ -2,6 +2,8 @@
 #include <memory>
 #include <thread>
 
+#include "bot_core/atlas_command_t.hpp"
+#include "bot_core/robot_state_t.hpp"
 #include "drake/common/drake_path.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/joint_level_controller_system.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/plan_eval_system.h"
@@ -17,12 +19,6 @@
 #include "drake/systems/primitives/constant_value_source.h"
 
 namespace drake {
-
-using systems::DiagramBuilder;
-using systems::Diagram;
-using systems::lcm::LcmSubscriberSystem;
-using systems::lcm::LcmPublisherSystem;
-
 namespace examples {
 namespace qp_inverse_dynamics {
 
@@ -42,7 +38,7 @@ void controller_loop() {
   parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
       urdf, multibody::joints::kRollPitchYaw, robot.get());
 
-  DiagramBuilder<double> builder;
+  systems::DiagramBuilder<double> builder;
 
   lcm::DrakeLcm lcm;
 
@@ -55,11 +51,11 @@ void controller_loop() {
   JointLevelControllerSystem* joint_con =
       builder.AddSystem<JointLevelControllerSystem>(*robot);
 
-  auto& robot_state_subscriber =
-      *builder.AddSystem(LcmSubscriberSystem::Make<bot_core::robot_state_t>(
+  auto& robot_state_subscriber = *builder.AddSystem(
+      systems::lcm::LcmSubscriberSystem::Make<bot_core::robot_state_t>(
           "EST_ROBOT_STATE", &lcm));
-  auto& atlas_command_publisher =
-      *builder.AddSystem(LcmPublisherSystem::Make<bot_core::atlas_command_t>(
+  auto& atlas_command_publisher = *builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<bot_core::atlas_command_t>(
           "ROBOT_COMMAND", &lcm));
 
   // lcm -> rs
@@ -82,7 +78,7 @@ void controller_loop() {
   builder.Connect(joint_con->get_output_port_atlas_command(),
                   atlas_command_publisher.get_input_port(0));
 
-  std::unique_ptr<Diagram<double>> diagram = builder.Build();
+  std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
 
   auto context = diagram->CreateDefaultContext();
   auto output = diagram->AllocateOutput(*context);
