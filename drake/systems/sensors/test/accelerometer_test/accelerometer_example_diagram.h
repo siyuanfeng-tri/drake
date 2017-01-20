@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "drake/lcm/drake_mock_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant_that_publishes_xdot.h"
 #include "drake/multibody/rigid_body_tree.h"
@@ -18,8 +17,7 @@ namespace sensors {
 /// TODO
 class AccelerometerExampleDiagram : public Diagram<double> {
  public:
-  /// Default constructor.
-  AccelerometerExampleDiagram();
+  explicit AccelerometerExampleDiagram(::drake::lcm::DrakeLcmInterface* lcm);
 
   /// Initializes this diagram.
   ///
@@ -43,7 +41,7 @@ class AccelerometerExampleDiagram : public Diagram<double> {
   //@}
 
  private:
-  ::drake::lcm::DrakeMockLcm mock_lcm_;
+  ::drake::lcm::DrakeLcmInterface* lcm_;
   DiagramBuilder<double> builder_;
   RigidBodyTree<double>* tree_{nullptr};
   int model_instance_id_{};

@@ -11,6 +11,8 @@
 namespace drake {
 namespace lcm {
 
+enum LoopbackSwitch { kWithoutLoopback = 0, kWithLoopback = 1 };
+
 /**
  * A *mock* LCM instance. This does not actually publish or subscribe to LCM
  * messages. It contains additional methods for accessing the most recent
@@ -29,7 +31,7 @@ class DrakeMockLcm : public DrakeLcmInterface {
    * behavior is enabled, a call to Publish() will result in subscriber callback
    * functions being called.
    */
-  explicit DrakeMockLcm(bool enable_loop_back);
+  explicit DrakeMockLcm(LoopbackSwitch loop_back_switch);
 
   // Disable copy and assign.
   DrakeMockLcm(const DrakeMockLcm&) = delete;
@@ -115,7 +117,7 @@ class DrakeMockLcm : public DrakeLcmInterface {
                                int data_size);
 
  private:
-  bool enable_loop_back_{false};
+  LoopbackSwitch loop_back_switch_{LoopbackSwitch::kWithoutLoopback};
   bool receive_thread_started_{false};
 
   struct LastPublishedMessage {

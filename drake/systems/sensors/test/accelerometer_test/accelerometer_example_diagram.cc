@@ -28,8 +28,9 @@ using lcm::LcmtDrakeSignalTranslator;
 
 namespace sensors {
 
-AccelerometerExampleDiagram::AccelerometerExampleDiagram()
-    : mock_lcm_(true /* enable_loop_back */) {
+AccelerometerExampleDiagram::AccelerometerExampleDiagram(
+    ::drake::lcm::DrakeLcmInterface* lcm)
+    : lcm_(lcm) {
   const std::string model_file_name =
       GetDrakePath() + "/systems/sensors/test/accelerometer_test/"
       "sideways_pendulum/sideways_pendulum.sdf";
@@ -59,13 +60,13 @@ AccelerometerExampleDiagram::AccelerometerExampleDiagram()
 
   plant_ =
       builder_.template AddSystem<RigidBodyPlantThatPublishesXdot<double>>(
-          move(tree), xdot_channel_name, &mock_lcm_);
+          move(tree), xdot_channel_name, lcm_);
 
   translator_ = make_unique<LcmtDrakeSignalTranslator>(
       plant_->get_num_states());
   lcm_subscriber_ =
       builder_.template AddSystem<LcmSubscriberSystem>(xdot_channel_name,
-                                                      *translator_, &mock_lcm_);
+                                                      *translator_, lcm_);
 
   accelerometer_ = Accelerometer::AttachAccelerometer(
       "my accelerometer",
@@ -100,7 +101,7 @@ void AccelerometerExampleDiagram::Initialize(
   }
 
   builder_.BuildInto(this);
-  mock_lcm_.StartReceiveThread();
+  lcm_->StartReceiveThread();
 }
 
 }  // namespace sensors

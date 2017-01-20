@@ -26,8 +26,7 @@ int main(int argc, char* argv[]) {
 
   DRAKE_DEMAND(FLAGS_simulation_sec > 0);
   ::drake::lcm::DrakeLcm real_lcm;
-
-  AccelerometerExampleDiagram diagram;
+  AccelerometerExampleDiagram diagram(&real_lcm);
   auto visualizer = make_unique<DrakeVisualizer>(diagram.get_tree(), &real_lcm);
   diagram.Initialize(move(visualizer));
 

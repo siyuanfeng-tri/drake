@@ -6,6 +6,7 @@
 
 #include "drake/common/drake_path.h"
 #include "drake/common/eigen_matrix_compare.h"
+#include "drake/lcm/drake_mock_lcm.h"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_tree.h"
@@ -116,7 +117,8 @@ GTEST_TEST(TestAccelerometer, TestFreeFall) {
 // to the end of the outboard link of a sideways pendulum whose based is fixed
 // to the world. This also tests method Accelerometer::AttachAccelerometer().
 GTEST_TEST(TestAccelerometer, TestSensorAttachedToSidewaysPendulum) {
-  AccelerometerExampleDiagram diagram;
+  ::drake::lcm::DrakeMockLcm lcm(::drake::lcm::LoopbackSwitch::kWithLoopback);
+  AccelerometerExampleDiagram diagram(&lcm);
   diagram.Initialize();
 
   // Prepares to integrate.
