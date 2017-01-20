@@ -75,7 +75,7 @@ cc_binary(
     data = ["//drake/multibody:models"],
     deps = [
         ":accelerometer",
-        "//drake/lcm:mock",
+        "//drake/lcm",
         "//drake/multibody/parsers",
         "@gflags//:gflags",
     ],
