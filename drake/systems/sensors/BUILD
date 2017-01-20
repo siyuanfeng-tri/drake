@@ -75,7 +75,9 @@ cc_binary(
     data = ["//drake/multibody:models"],
     deps = [
         ":accelerometer",
+        "//drake/lcm:mock",
         "//drake/multibody/parsers",
+        "@gflags//:gflags",
     ],
 )
 
@@ -94,10 +96,12 @@ cc_googletest(
     srcs = [
         "test/accelerometer_test/accelerometer_test.cc",
         "test/accelerometer_test/accelerometer_example_diagram.cc",
+        "test/accelerometer_test/accelerometer_example_diagram.h",
     ],
     data = ["//drake/multibody:models"],
     deps = [
         ":accelerometer",
+        "//drake/lcm:mock",
         "//drake/common:eigen_matrix_compare",
         "//drake/multibody/parsers",
     ],
