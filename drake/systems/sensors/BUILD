@@ -65,18 +65,38 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "accelerometer_example_diagram",
+    srcs = [
+        "test/accelerometer_test/accelerometer_example_diagram.cc",
+    ],
+    hdrs = [
+        "test/accelerometer_test/accelerometer_example_diagram.h",
+    ],
+    linkstatic = 1,
+    deps = [
+        ":accelerometer",
+        "//drake/multibody/parsers",
+        "//drake/multibody/rigid_body_plant:drake_visualizer",
+        "//drake/multibody/rigid_body_plant:rigid_body_plant_that_publishes_xdot",
+        "//drake/systems/lcm:lcmt_drake_signal_translator",
+        "//drake/systems/primitives:signal_logger",
+        "//drake/systems/primitives:constant_vector_source",
+    ],
+)
+
+
 cc_binary(
     name = "accelerometer_example",
     srcs = [
         "test/accelerometer_test/accelerometer_example.cc",
-        "test/accelerometer_test/accelerometer_example_diagram.cc",
-        "test/accelerometer_test/accelerometer_example_diagram.h",
     ],
     data = ["//drake/multibody:models"],
     deps = [
-        ":accelerometer",
+        ":accelerometer_example_diagram",
+        "//drake/common:text_logging_gflags",
         "//drake/lcm",
-        "//drake/multibody/parsers",
+        "//drake/systems/analysis:simulator",
         "@gflags//:gflags",
     ],
 )
@@ -100,10 +120,10 @@ cc_googletest(
     ],
     data = ["//drake/multibody:models"],
     deps = [
-        ":accelerometer",
+        ":accelerometer_example_diagram",
         "//drake/lcm:mock",
         "//drake/common:eigen_matrix_compare",
-        "//drake/multibody/parsers",
+        "//drake/systems/analysis:simulator",
     ],
 )
 
