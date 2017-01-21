@@ -73,6 +73,9 @@ cc_library(
     hdrs = [
         "test/accelerometer_test/accelerometer_example_diagram.h",
     ],
+    data = [
+        ":accelerometer_test_models",
+    ],
     linkstatic = 1,
     deps = [
         ":accelerometer",
@@ -133,6 +136,13 @@ cc_googletest(
     deps = [
         ":depth_sensor",
         "//drake/common:eigen_matrix_compare",
+    ],
+)
+
+filegroup(
+    name = "accelerometer_test_models",
+    srcs = [
+        "test/accelerometer_test/sideways_pendulum/sideways_pendulum.sdf",
     ],
 )
 
