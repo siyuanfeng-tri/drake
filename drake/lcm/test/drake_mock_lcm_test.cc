@@ -188,28 +188,12 @@ GTEST_TEST(DrakeMockLcmTest, WithLoopbackTest) {
 
   dut.Publish(kChannelName, &message_bytes[0], kMessageSize);
 
+  // Verifies that the message was received via loopback.
   EXPECT_EQ(kChannelName, handler.get_channel());
   EXPECT_EQ(kMessageSize, handler.get_buffer_size());
 
   const vector<uint8_t>& received_bytes = handler.get_buffer();
   EXPECT_EQ(message_bytes, received_bytes);
-
-  dut.StopReceiveThread();
-
-  // Verifies that no more messages are received by subscribers after the
-  // receive thread is stopped.
-  vector<uint8_t> message_bytes2;
-  message_bytes2.push_back(128);
-
-  dut.Publish(kChannelName, &message_bytes2[0],
-      message_bytes2.size());
-
-  // Verifies that the original message is returned, not the one that was
-  // sent after the receive thread was stopped.
-  EXPECT_EQ(kChannelName, handler.get_channel());
-  EXPECT_EQ(kMessageSize, handler.get_buffer_size());
-  const vector<uint8_t>& received_bytes2 = handler.get_buffer();
-  EXPECT_EQ(message_bytes, received_bytes2);
 }
 
 // Tests that DrakeMockLcm will not loopback a message when loopback is
@@ -239,6 +223,7 @@ GTEST_TEST(DrakeMockLcmTest, WithoutLoopbackTest) {
 
   dut.Publish(kChannelName, &message_bytes[0], kMessageSize);
 
+  // Verifies that the message was not received via loopback.
   EXPECT_NE(kChannelName, handler.get_channel());
   EXPECT_NE(kMessageSize, handler.get_buffer_size());
 }
