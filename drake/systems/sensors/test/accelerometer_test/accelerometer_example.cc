@@ -29,6 +29,7 @@ int main(int argc, char* argv[]) {
   AccelerometerExampleDiagram diagram(&real_lcm);
   auto visualizer = make_unique<DrakeVisualizer>(diagram.get_tree(), &real_lcm);
   diagram.Initialize(move(visualizer));
+  diagram.get_mutable_logger()->enable_log_to_console();
 
   unique_ptr<Context<double>> context = diagram.AllocateContext();
   diagram.SetDefaultState(*context, context->get_mutable_state());

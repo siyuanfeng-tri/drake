@@ -32,7 +32,8 @@ AccelerometerExampleDiagram::AccelerometerExampleDiagram(
     ::drake::lcm::DrakeLcmInterface* lcm)
     : lcm_(lcm) {
   const std::string model_file_name =
-      GetDrakePath() + "/systems/sensors/test/accelerometer_test/"
+      GetDrakePath() +
+      "/systems/sensors/test/accelerometer_test/"
       "sideways_pendulum/sideways_pendulum.sdf";
   const std::string model_name = "Sideways_Pendulum";
   const std::string xdot_channel_name = "xdot_channel";
@@ -42,9 +43,8 @@ AccelerometerExampleDiagram::AccelerometerExampleDiagram(
 
   // Adds a box to the RigidBodyTree and obtains its model instance ID.
   const parsers::ModelInstanceIdTable table =
-  AddModelInstancesFromSdfFileToWorld(
-          model_file_name,
-          drake::multibody::joints::kFixed, tree_);
+      AddModelInstancesFromSdfFileToWorld(
+          model_file_name, drake::multibody::joints::kFixed, tree_);
   model_instance_id_ = table.at(model_name);
 
   // Specifies the location of the accelerometer sensor.
@@ -58,45 +58,40 @@ AccelerometerExampleDiagram::AccelerometerExampleDiagram(
       tree->FindBody("swing_arm"), sensor_frame_transform);
   tree->addFrame(sensor_frame_);
 
-  plant_ =
-      builder_.template AddSystem<RigidBodyPlantThatPublishesXdot<double>>(
-          move(tree), xdot_channel_name, lcm_);
+  plant_ = builder_.template AddSystem<RigidBodyPlantThatPublishesXdot<double>>(
+      move(tree), xdot_channel_name, lcm_);
 
-  translator_ = make_unique<LcmtDrakeSignalTranslator>(
-      plant_->get_num_states());
-  lcm_subscriber_ =
-      builder_.template AddSystem<LcmSubscriberSystem>(xdot_channel_name,
-                                                      *translator_, lcm_);
+  translator_ =
+      make_unique<LcmtDrakeSignalTranslator>(plant_->get_num_states());
+  lcm_subscriber_ = builder_.template AddSystem<LcmSubscriberSystem>(
+      xdot_channel_name, *translator_, lcm_);
 
   accelerometer_ = Accelerometer::AttachAccelerometer(
-      "my accelerometer",
-      *sensor_frame_,
-      *plant_,
-      true /* include_gravity */,
+      "my accelerometer", *sensor_frame_, *plant_, true /* include_gravity */,
       &builder_);
 
-  signal_logger_ =
-      builder_.template AddSystem<SignalLogger<double>>(
-          accelerometer_->get_output_port().size());
+  logger_ = builder_.template AddSystem<AccelerometerTestLogger>(
+      plant_->get_num_states());
 
   auto constant_zero_source =
       builder_.template AddSystem<ConstantVectorSource<double>>(
           VectorX<double>::Zero(plant_->get_input_port(0).size()));
 
   builder_.Connect(lcm_subscriber_->get_output_port(0),
-                  accelerometer_->get_plant_state_derivative_input_port());
+                   accelerometer_->get_plant_state_derivative_input_port());
   builder_.Connect(constant_zero_source->get_output_port(),
-                  plant_->get_input_port(0));
+                   plant_->get_input_port(0));
+  builder_.Connect(plant_->state_output_port(),
+                   logger_->get_plant_state_input_port());
   builder_.Connect(accelerometer_->get_output_port(),
-                  signal_logger_->get_input_port(0));
+                   logger_->get_acceleration_input_port());
 }
 
 void AccelerometerExampleDiagram::Initialize(
     unique_ptr<DrakeVisualizer> visualizer) {
-
   if (visualizer != nullptr) {
-     visualizer_ = builder_.AddSystem(move(visualizer));
-     builder_.Connect(plant_->state_output_port(),
+    visualizer_ = builder_.AddSystem(move(visualizer));
+    builder_.Connect(plant_->state_output_port(),
                      visualizer_->get_input_port(0));
   }
 

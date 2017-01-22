@@ -120,6 +120,7 @@ GTEST_TEST(TestAccelerometer, TestSensorAttachedToSidewaysPendulum) {
   ::drake::lcm::DrakeMockLcm lcm(::drake::lcm::LoopbackSwitch::kWithLoopback);
   AccelerometerExampleDiagram diagram(&lcm);
   diagram.Initialize();
+  diagram.get_mutable_logger()->enable_log_to_console();
 
   // Prepares to integrate.
   unique_ptr<Context<double>> context = diagram.AllocateContext();
@@ -129,8 +130,8 @@ GTEST_TEST(TestAccelerometer, TestSensorAttachedToSidewaysPendulum) {
 
   simulator.StepTo(0.01);
 
-  auto measurements = diagram.get_signal_logger().data();
-  auto latest_measurement(measurements.col(measurements.cols() - 1));
+  auto latest_measurement = diagram.get_logger().get_acceleration();
+  // auto latest_measurement(measurements.col(measurements.cols() - 1));
   const double x_accel =
       latest_measurement(AccelerometerOutputConstants::kAccelXIndex);
   const double y_accel =
@@ -138,7 +139,8 @@ GTEST_TEST(TestAccelerometer, TestSensorAttachedToSidewaysPendulum) {
   const double z_accel =
       latest_measurement(AccelerometerOutputConstants::kAccelZIndex);
 
-  std::cout << "Acceleration measurements:\n" << measurements << std::endl;
+  std::cout << "Plant state:\n" << diagram.get_logger().get_plant_state()
+            << "\nAcceleration:\n" << latest_measurement << std::endl;
   EXPECT_DOUBLE_EQ(x_accel, 0);
   EXPECT_GT(y_accel, 0);
   EXPECT_LT(z_accel, 0);

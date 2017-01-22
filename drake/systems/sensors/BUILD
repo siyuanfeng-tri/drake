@@ -69,9 +69,11 @@ cc_library(
     name = "accelerometer_example_diagram",
     srcs = [
         "test/accelerometer_test/accelerometer_example_diagram.cc",
+        "test/accelerometer_test/accelerometer_test_logger.cc",
     ],
     hdrs = [
         "test/accelerometer_test/accelerometer_example_diagram.h",
+        "test/accelerometer_test/accelerometer_test_logger.h",
     ],
     data = [
         ":accelerometer_test_models",
@@ -79,6 +81,7 @@ cc_library(
     linkstatic = 1,
     deps = [
         ":accelerometer",
+        "//drake/common",
         "//drake/multibody/parsers",
         "//drake/multibody/rigid_body_plant:drake_visualizer",
         "//drake/multibody/rigid_body_plant:rigid_body_plant_that_publishes_xdot",

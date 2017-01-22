@@ -7,8 +7,8 @@
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/lcm/lcmt_drake_signal_translator.h"
-#include "drake/systems/primitives/signal_logger.h"
 #include "drake/systems/sensors/accelerometer.h"
+#include "drake/systems/sensors/test/accelerometer_test/accelerometer_test_logger.h"
 
 namespace drake {
 namespace systems {
@@ -35,9 +35,8 @@ class AccelerometerExampleDiagram : public Diagram<double> {
     return *sensor_frame_.get();
   }
 
-  const SignalLogger<double>& get_signal_logger() const {
-    return *signal_logger_;
-  }
+  const AccelerometerTestLogger& get_logger() const { return *logger_; }
+  AccelerometerTestLogger* get_mutable_logger() { return logger_; }
   //@}
 
  private:
@@ -50,7 +49,7 @@ class AccelerometerExampleDiagram : public Diagram<double> {
   std::unique_ptr<lcm::LcmtDrakeSignalTranslator> translator_;
   lcm::LcmSubscriberSystem* lcm_subscriber_{nullptr};
   Accelerometer* accelerometer_{nullptr};
-  SignalLogger<double>* signal_logger_{nullptr};
+  AccelerometerTestLogger* logger_{nullptr};
   DrakeVisualizer* visualizer_{nullptr};
 };
 
