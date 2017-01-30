@@ -466,7 +466,6 @@ cc_googletest(
     ],
 )
 
-
 cc_googletest(
     name = "symbolic_formula_test",
     deps = [
