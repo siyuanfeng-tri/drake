@@ -37,6 +37,16 @@ if(Bullet_FOUND)
         drakeRigidBodyPlant
         drakeSystemAnalysis)
   endif()
+
+  add_executable(sliding_brick sliding_brick.cc )
+  target_link_libraries(sliding_brick
+      drakeLCMSystem2
+      drakeMultibodyParsers
+      drakeRigidBodyPlant
+      drakeSystemAnalysis
+      drakeSystemFramework
+      drakeSystemPrimitives
+      )
 endif()
 
 drake_add_cc_test(contact_force_test)
