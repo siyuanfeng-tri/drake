@@ -1,5 +1,6 @@
-#include <memory>
+#include <iomanip>
 #include <limits>
+#include <memory>
 
 #include "drake/common/drake_path.h"
 #include "drake/common/eigen_types.h"
@@ -124,19 +125,21 @@ int main(int argc, const char**argv) {
 
   // Acquire access to bodies for output
   RigidBody<double>* brick = plant.get_rigid_body_tree().FindBody("brick", "", 0);
+  RigidBody<double>* xtrans = plant.get_rigid_body_tree().FindBody("xtrans", "", 0);
 
   auto output = plant.AllocateOutput(*plant_context);
   const int port_index = plant.kinematics_results_output_port().get_index();
 
-  std::cout << "Time " << brick->get_name() << " x\n";
+  std::cout << "Time,  " << brick->get_name() << " x, x velocity\n";
   double time = 0.0;
   while (time < 5.0) {
     time = context->get_time();
     SPDLOG_TRACE(drake::log(), "Time is now {}", time);
     plant.CalcOutput(*plant_context, output.get());
     auto results = output->get_data(port_index)->GetValue<KinematicsResults<double>>();
-    std::cout << time;
-    std::cout << " " << results.get_pose_in_world(*brick).translation()(0);
+    std::cout << std::setprecision(3) << time;
+    std::cout << " " << std::setprecision(15) << results.get_pose_in_world(*brick).translation()(0);
+    std::cout << " " << results.get_joint_velocity(*xtrans)(0);
     std::cout << "\n";
     std::cout.flush();
 #if 0
