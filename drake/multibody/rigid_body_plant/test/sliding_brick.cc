@@ -130,7 +130,7 @@ int main(int argc, const char**argv) {
   auto output = plant.AllocateOutput(*plant_context);
   const int port_index = plant.kinematics_results_output_port().get_index();
 
-  std::cout << "Time,  " << brick->get_name() << " x, x velocity\n";
+  std::cout << "Time,  " << brick->get_name() << " x, x velocity, |f_N|, |f_T|\n";
   double time = 0.0;
   while (time < 5.0) {
     time = context->get_time();
@@ -140,23 +140,26 @@ int main(int argc, const char**argv) {
     std::cout << std::setprecision(3) << time;
     std::cout << " " << std::setprecision(15) << results.get_pose_in_world(*brick).translation()(0);
     std::cout << " " << results.get_joint_velocity(*xtrans)(0);
+
+    auto contacts = output->get_data(plant.contact_results_output_port().get_index())->GetValue<ContactResults<double>>();
+    if ( contacts.get_num_contacts() > 0 ) {
+      // This assumes that all contacts are between the collision points on the
+      // box and the ground plane.  That they all share the same normal and
+      // can simply be summed up.
+      Vector3<double> net_force = Vector3<double>::Zero();
+      for (int i = 0; i < contacts.get_num_contacts(); ++i) {
+        const auto& info = contacts.get_contact_info(i);
+        const auto& force = info.get_resultant_force();
+        net_force += force.get_force();
+      }
+      std::cout << " " << std::abs(net_force(2));
+      std::cout << " " << net_force.template head<2>().norm();
+    } else {
+      std::cout << " 0 0";
+    }
+
     std::cout << "\n";
     std::cout.flush();
-#if 0
-    auto contacts = output->get_data(plant.contact_results_output_port().get_index())->GetValue<ContactResults<double>>();
-    std::cerr << "Contacts:\n";
-    std::cerr << "\tCount: " << contacts.get_num_contacts() << "\n";
-    for (int i = 0; i < contacts.get_num_contacts(); ++i ) {
-      const auto& info = contacts.get_contact_info(i);
-      const auto& e1 = plant.get_rigid_body_tree().FindCollisionElement(info.get_element_id_1());
-      const auto& e2 = plant.get_rigid_body_tree().FindCollisionElement(info.get_element_id_2());
-      std::cerr << "\t" << (i + 1) << ": " << e1->get_body()->get_name() << " <-> " << e2->get_body()->get_name() << "\n";
-      const auto& force = info.get_resultant_force();
-      std::cout << "\t\tForce:  " << force.get_force().transpose() << "\n";
-      std::cout << "\t\tNormal: " << force.get_normal().transpose() << "\n";
-      std::cout << "\t\tPoint:  " << force.get_application_point().transpose() << "\n";
-    }
-#endif
     simulator->StepTo(time + 0.01);
   }
 
