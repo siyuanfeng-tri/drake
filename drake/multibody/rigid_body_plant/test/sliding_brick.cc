@@ -23,27 +23,80 @@ using drake::multibody::joints::kFixed;
 using Eigen::VectorXd;
 using std::make_unique;
 
+// Simulation parameters
+double xdot_0 = 0;
+double timestep = 0.001;
+double push = 1.0;
+double stiffness = 100000;
+double static_coeff = 1.5;
+double dynamic_coeff = 1.0;
+double slip_threshold = 0.01;
+double dissipation = 1.0;
+double maxT = 2.5;
+bool low_center_of_mass = false;  // if true, uses SlidingBrickLowCOm.urdf instead
+
+void printUsage() {
+  std::cout << "Pushes a sliding block across the ground.\n";
+  std::cout << "\nParamters:\n";
+  std::cout << "  -v [float]    Block initial velocity\n";
+  std::cout << "  -dt [float]   Simulation time step\n";
+  std::cout << "  -p [float]    Magnitude of pushing force\n";
+  std::cout << "  -k [float]    Contact stiffness\n";
+  std::cout << "  -us [float]   Static coefficient of friciton\n";
+  std::cout << "  -ud [float]   Dynamic coefficient of friction\n";
+  std::cout << "  -d [float]    Dissipation\n";
+  std::cout << "  -vs [float]   Slip velocity threshold\n";
+  std::cout << "  -T [float]    Maximum simulation duration\n";
+  std::cout << "  -low          Use the brick with a *low* center of mass\n";
+  std::cout << "  -h            Display this information\n";
+}
+
+
+void parseArgs(int argc, const char** argv) {
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "-v") == 0) {
+      ++i;
+      xdot_0 = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-p") == 0) {
+      ++i;
+      push = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-dt") == 0) {
+      ++i;
+      timestep = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-k") == 0) {
+      ++i;
+      stiffness = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-us") == 0) {
+      ++i;
+      static_coeff = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-ud") == 0) {
+      ++i;
+      dynamic_coeff = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-vs") == 0) {
+      ++i;
+      slip_threshold = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-d") == 0) {
+      ++i;
+      dissipation = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-T") == 0) {
+      ++i;
+      maxT = std::atof(argv[i]);
+    } else if (std::strcmp(argv[i], "-low") == 0) {
+      low_center_of_mass = true;
+    } else if (std::strcmp(argv[i], "-h") == 0) {
+      printUsage();
+      exit(0);
+    } else {
+      std::cout << "Unrecognized command line parameter: " << argv[i] << ".\n";
+      exit(1);
+    }
+  }
+}
+
 // Simple scenario of one block sliding down another block.
 int main(int argc, const char**argv) {
 
-  // Process arguments
-  double xdot_0 = 0;
-  double timestep = 0.001;
-  double push = 1.0;
-  double stiffness = 100000;
-  double static_coeff = 1.5;
-  double dynamic_coeff = 1.0;
-  double slip_threshold = 0.01;
-  double dissipation = 1.0;
-  if ( argc == 4 ) {
-    timestep = std::atof(argv[1]);
-    push = std::atof(argv[2]);
-    xdot_0 = std::atof(argv[3]);
-  } else {
-    std::cout << "Expected three command-line arguments: time step, push "
-    "magnitude, and initial speed in push direction. In the absence of those "
-    "values, using defaults.\n";
-  }
+  parseArgs(argc, argv);
   std::cout << "Paramters:\n";
   std::cout << "\tTimetep:          " << timestep << "\n";
   std::cout << "\tPush:             " << push << "\n";
@@ -53,15 +106,23 @@ int main(int argc, const char**argv) {
   std::cout << "\tDynamic friction: " << dynamic_coeff << "\n";
   std::cout << "\tSlip Threshold:   " << slip_threshold << "\n";
   std::cout << "\tDissipation:      " << dissipation << "\n";
+  std::cout << "\tUsing low CoM:    " << low_center_of_mass << "\n";
 
   DiagramBuilder<double> builder;
 
   // Create RigidBodyTree.
   auto tree_ptr = make_unique<RigidBodyTree<double>>();
-  drake::parsers::urdf::AddModelInstanceFromUrdfFile(
-      drake::GetDrakePath() +
-          "/multibody/rigid_body_plant/test/SlidingBrick.urdf",
-      kFixed, nullptr /* weld to frame */, tree_ptr.get());
+  if (!low_center_of_mass) {
+    drake::parsers::urdf::AddModelInstanceFromUrdfFile(
+        drake::GetDrakePath() +
+            "/multibody/rigid_body_plant/test/SlidingBrick.urdf",
+        kFixed, nullptr /* weld to frame */, tree_ptr.get());
+  } else {
+    drake::parsers::urdf::AddModelInstanceFromUrdfFile(
+        drake::GetDrakePath() +
+            "/multibody/rigid_body_plant/test/SlidingBrickLowCom.urdf",
+        kFixed, nullptr /* weld to frame */, tree_ptr.get());
+  }
   multibody::AddFlatTerrainToWorld(tree_ptr.get(), 100., 10.);
 
   // Instantiate a RigidBodyPlant from the RigidBodyTree.
@@ -126,20 +187,22 @@ int main(int argc, const char**argv) {
   // Acquire access to bodies for output
   RigidBody<double>* brick = plant.get_rigid_body_tree().FindBody("brick", "", 0);
   RigidBody<double>* xtrans = plant.get_rigid_body_tree().FindBody("xtrans", "", 0);
+  RigidBody<double>* yrot = plant.get_rigid_body_tree().FindBody("yrot", "", 0);
 
   auto output = plant.AllocateOutput(*plant_context);
   const int port_index = plant.kinematics_results_output_port().get_index();
 
-  std::cout << "Time,  " << brick->get_name() << " x, x velocity, |f_N|, |f_T|\n";
+  std::cout << "Time,  " << brick->get_name() << " x, x velocity, y rot, |f_N|, |f_T|\n";
   double time = 0.0;
-  while (time < 5.0) {
+  while (time < maxT) {
     time = context->get_time();
     SPDLOG_TRACE(drake::log(), "Time is now {}", time);
     plant.CalcOutput(*plant_context, output.get());
     auto results = output->get_data(port_index)->GetValue<KinematicsResults<double>>();
-    std::cout << std::setprecision(3) << time;
-    std::cout << " " << std::setprecision(15) << results.get_pose_in_world(*brick).translation()(0);
+    std::cout << std::setprecision(16) << time;
+    std::cout << " " << std::setprecision(16) << results.get_pose_in_world(*brick).translation()(0);
     std::cout << " " << results.get_joint_velocity(*xtrans)(0);
+    std::cout << " " << results.get_joint_position(*yrot)(0);
 
     auto contacts = output->get_data(plant.contact_results_output_port().get_index())->GetValue<ContactResults<double>>();
     if ( contacts.get_num_contacts() > 0 ) {
@@ -160,7 +223,7 @@ int main(int argc, const char**argv) {
 
     std::cout << "\n";
     std::cout.flush();
-    simulator->StepTo(time + 0.01);
+    simulator->StepTo(time + timestep);
   }
 
   return 0;
