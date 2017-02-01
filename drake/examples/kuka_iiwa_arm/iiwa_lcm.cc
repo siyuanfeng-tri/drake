@@ -14,6 +14,58 @@ using systems::SystemOutput;
 
 static const int kNumJoints = 7;
 
+IiwaDebugMsgGen::IiwaDebugMsgGen() {
+  in_idx_cmd_ = DeclareInputPort(systems::kVectorValued, kNumJoints * 2).get_index();
+  in_idx_state_ = DeclareInputPort(systems::kVectorValued, kNumJoints * 2).get_index();
+
+  out_idx_msg_ = DeclareAbstractOutputPort().get_index();
+}
+
+void IiwaDebugMsgGen::DoCalcOutput(const systems::Context<double>& context,
+    systems::SystemOutput<double>* output) const {
+  lcmt_iiwa_status& msg = output->GetMutableData(out_idx_msg_)
+          ->GetMutableValue<lcmt_iiwa_status>();
+
+  const systems::BasicVector<double>* state =
+      this->EvalVectorInput(context, in_idx_state_);
+
+  const systems::BasicVector<double>* command =
+      this->EvalVectorInput(context, in_idx_cmd_);
+
+  msg.utime = context.get_time() * 1e6;
+  msg.num_joints = kNumJoints;
+  msg.joint_position_measured.resize(msg.num_joints, 0);
+  msg.joint_position_commanded.resize(msg.num_joints, 0);
+  msg.joint_position_ipo.resize(msg.num_joints, 0);
+  msg.joint_torque_measured.resize(msg.num_joints, 0);
+  msg.joint_torque_commanded.resize(msg.num_joints, 0);
+  msg.joint_torque_external.resize(msg.num_joints, 0);
+
+  for (int i = 0; i < kNumJoints; i++) {
+    msg.joint_position_measured[i] = state->GetAtIndex(i);
+    msg.joint_position_commanded[i] = command->GetAtIndex(i);
+
+    msg.joint_torque_measured[i] = state->GetAtIndex(i + 7);
+    msg.joint_torque_commanded[i] = command->GetAtIndex(i + 7);
+  }
+}
+
+std::unique_ptr<systems::AbstractValue> IiwaDebugMsgGen::AllocateOutputAbstract(
+    const systems::OutputPortDescriptor<double>& descriptor) const {
+
+  lcmt_iiwa_status msg{};
+  msg.num_joints = kNumJoints;
+  msg.joint_position_measured.resize(msg.num_joints, 0);
+  msg.joint_position_commanded.resize(msg.num_joints, 0);
+  msg.joint_position_ipo.resize(msg.num_joints, 0);
+  msg.joint_torque_measured.resize(msg.num_joints, 0);
+  msg.joint_torque_commanded.resize(msg.num_joints, 0);
+  msg.joint_torque_external.resize(msg.num_joints, 0);
+
+  return systems::AbstractValue::Make<lcmt_iiwa_status>(msg);
+}
+
+
 // This value is chosen to match the value in getSendPeriodMilliSec()
 // when initializing the FRI configuration on the iiwa's control
 // cabinet.

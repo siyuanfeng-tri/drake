@@ -12,6 +12,36 @@ namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 
+class IiwaDebugMsgGen : public systems::LeafSystem<double> {
+ public:
+  IiwaDebugMsgGen();
+
+  inline const systems::OutputPortDescriptor<double>& get_output_port_msg() const {
+      return get_output_port(out_idx_msg_);
+  }
+
+  inline const systems::InputPortDescriptor<double>& get_input_port_state()
+      const {
+    return get_input_port(in_idx_state_);
+  }
+
+  inline const systems::InputPortDescriptor<double>& get_input_port_cmd()
+      const {
+    return get_input_port(in_idx_cmd_);
+  }
+
+ protected:
+  void DoCalcOutput(const systems::Context<double>& context,
+                    systems::SystemOutput<double>* output) const override;
+
+  std::unique_ptr<systems::AbstractValue> AllocateOutputAbstract(
+      const systems::OutputPortDescriptor<double>& descriptor) const override;
+
+  int out_idx_msg_;
+  int in_idx_cmd_;
+  int in_idx_state_;
+};
+
 /// Handles lcmt_iiwa_command messages from a LcmSubscriberSystem.
 /// Has a single output port which publishes the commanded position
 /// for each joint along with an estimate of the commanded velocity

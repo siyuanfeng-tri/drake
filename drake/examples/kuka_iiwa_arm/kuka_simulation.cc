@@ -161,6 +161,11 @@ int DoMain() {
           "IIWA_STATUS", &lcm));
   auto status_sender = builder.AddSystem<IiwaStatusSender>();
 
+  auto debugger = builder.AddSystem<IiwaDebugMsgGen>();
+  auto debugger_pub = builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>(
+          "DEBUG", &lcm));
+
   builder.Connect(command_sub->get_output_port(0),
                   command_receiver->get_input_port(0));
   builder.Connect(command_receiver->get_output_port(0),
@@ -173,6 +178,14 @@ int DoMain() {
                   status_sender->get_command_input_port());
   builder.Connect(status_sender->get_output_port(0),
                   status_pub->get_input_port(0));
+
+  builder.Connect(command_receiver->get_output_port(0),
+                  debugger->get_input_port_cmd());
+  builder.Connect(model->get_output_port(0),
+                  debugger->get_input_port_state());
+  builder.Connect(debugger->get_output_port_msg(),
+                  debugger_pub->get_input_port(0));
+
   auto sys = builder.Build();
 
   Simulator<double> simulator(*sys);
@@ -184,7 +197,6 @@ int DoMain() {
       sys->GetMutableSubsystemContext(simulator.get_mutable_context(),
                                       command_receiver),
       VectorX<double>::Zero(tree.get_num_positions()));
-
 
   // Simulate for a very long time.
   simulator.StepTo(FLAGS_simulation_sec);
