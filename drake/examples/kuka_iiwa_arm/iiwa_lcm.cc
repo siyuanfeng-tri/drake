@@ -13,6 +13,8 @@ using systems::DiscreteState;
 using systems::SystemOutput;
 
 static const int kNumJoints = 7;
+template <typename Scalar, int dim>
+using Vector = Eigen::Matrix<Scalar, dim, 1>;
 
 IiwaDebugMsgGen::IiwaDebugMsgGen() {
   in_idx_cmd_ = DeclareInputPort(systems::kVectorValued, kNumJoints * 2).get_index();
@@ -75,7 +77,9 @@ IiwaCommandReceiver::IiwaCommandReceiver() {
   this->DeclareAbstractInputPort();
   this->DeclareOutputPort(systems::kVectorValued, kNumJoints * 2);
   this->DeclareDiscreteUpdatePeriodSec(kReceiverUpdatePeriod);
-  this->DeclareDiscreteState(kNumJoints * 2);
+  // command
+  // last message time
+  this->DeclareDiscreteState(kNumJoints * 2 + 1);
 }
 
 void IiwaCommandReceiver::set_initial_position(
@@ -84,8 +88,8 @@ void IiwaCommandReceiver::set_initial_position(
   auto state_value =
       context->get_mutable_discrete_state(0)->get_mutable_value();
   DRAKE_ASSERT(x.size() == kNumJoints);
-  state_value.head(kNumJoints) = x;
-  state_value.tail(kNumJoints) = VectorX<double>::Zero(kNumJoints);
+  // Init the last message receive time to -1
+  state_value << x, Vector<double, kNumJoints>::Zero(), -1;
 }
 
 void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
@@ -97,21 +101,34 @@ void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
   // TODO(sam.creasey) Support torque control.
   DRAKE_ASSERT(command.num_torques == 0);
 
-
   // If we're using a default constructed message (haven't received
   // a command yet), keep using the initial state.
   if (command.num_joints != 0) {
-    DRAKE_DEMAND(command.num_joints == kNumJoints);
-    VectorX<double> new_positions(kNumJoints);
-    for (int i = 0; i < command.num_joints; ++i) {
-      new_positions(i) = command.joint_position[i];
-    }
-
+    // Gets last desired state.
     BasicVector<double>* state = discrete_state->get_mutable_discrete_state(0);
     auto state_value = state->get_mutable_value();
-    state_value.tail(kNumJoints) =
-        (new_positions - state_value.head(kNumJoints)) / kReceiverUpdatePeriod;
-    state_value.head(kNumJoints) = new_positions;
+
+    // Gets the last time when a different lcm message is received.
+    double last_msg_time = state_value[2 * kNumJoints];
+
+    DRAKE_DEMAND(command.num_joints == kNumJoints);
+    Vector<double, kNumJoints> pos_d;
+
+    for (int i = 0; i < command.num_joints; ++i) {
+      pos_d(i) = command.joint_position[i];
+    }
+
+    double cur_time = command.utime / 1e6;
+    // first real message
+    if (last_msg_time == -1) {
+      state_value << pos_d, Vector<double, kNumJoints>::Zero(), cur_time;
+    }
+
+    if (cur_time != last_msg_time) {
+      Vector<double, kNumJoints> vel_d =
+          (pos_d - state_value.head<kNumJoints>()) / (cur_time - last_msg_time);
+      state_value << pos_d, vel_d, cur_time;
+    }
   }
 }
 

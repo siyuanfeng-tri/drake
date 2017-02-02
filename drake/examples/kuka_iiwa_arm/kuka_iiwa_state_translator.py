@@ -4,7 +4,6 @@ from director import robotstate
 
 import drake as lcmdrake
 
-
 def onIiwaStatus(msg):
     q = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + list(msg.joint_position_measured)
     stateMsg = robotstate.drakePoseToRobotState(q)
