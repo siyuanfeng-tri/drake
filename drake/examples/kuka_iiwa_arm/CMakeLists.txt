@@ -3,12 +3,13 @@ if(lcm_FOUND)
 
   # Defines a shared library for use by KUKA iiwa demos based on System 2.0.
   add_library_with_exports(LIB_NAME drakeKukaIiwaArmCommon SOURCE_FILES
-      iiwa_common.cc iiwa_lcm.cc)
+      iiwa_common.cc iiwa_lcm.cc kuka_ik_planner.cc)
   target_link_libraries(drakeKukaIiwaArmCommon
     drakeIK
     drakeLcmSystem
     drakeRBM
-    drakeMultibodyParsers)
+    drakeMultibodyParsers
+    robotlocomotion-lcmtypes-cpp)
   drake_install_libraries(drakeKukaIiwaArmCommon)
   drake_install_headers(
       iiwa_common.h iiwa_lcm.h)
@@ -39,6 +40,11 @@ if(lcm_FOUND)
     robotlocomotion-lcmtypes-cpp
     lcm)
 
+  add_executable(kuka_ik_demo1 kuka_ik_demo1.cc)
+  target_link_libraries(kuka_ik_demo1
+    drakeKukaIiwaArmCommon
+    lcm)
+
   add_executable(kuka_plan_runner kuka_plan_runner.cc)
   target_link_libraries(kuka_plan_runner
     drakeKukaIiwaArmCommon
@@ -56,6 +62,7 @@ if(lcm_FOUND)
     drakeMultibodyParsers
     drakeRigidBodyPlant
     drakeSystemAnalysis
+    kuka_traj_follower_system
     drakeSystemControllers)
   drake_add_test(
       NAME kuka_simulation COMMAND kuka_simulation -simulation_sec 0.1)

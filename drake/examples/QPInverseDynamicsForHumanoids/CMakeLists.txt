@@ -1,3 +1,5 @@
+add_definitions(-g)
+
 add_library(drakeQPControllerCommon qp_controller_common.cc)
 target_link_libraries(drakeQPControllerCommon
   drakeRBM

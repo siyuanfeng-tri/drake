@@ -34,9 +34,6 @@ DiscreteTimePlanEvalSystem::DiscreteTimePlanEvalSystem(
 
   paramset_.LoadFromYAMLConfigFile(YAML::LoadFile(param_file_name),
                                    alias_groups_);
-
-  abstract_state_qp_input_index_ = 0;
-  abstract_state_plan_index_ = 1;
 }
 
 void DiscreteTimePlanEvalSystem::DoCalcOutput(

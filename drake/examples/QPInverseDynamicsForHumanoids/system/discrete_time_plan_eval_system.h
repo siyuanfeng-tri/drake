@@ -92,8 +92,8 @@ class DiscreteTimePlanEvalSystem : public systems::LeafSystem<double> {
 
   int input_port_index_humanoid_status_{0};
   int output_port_index_qp_input_{0};
-  int abstract_state_qp_input_index_{0};
-  int abstract_state_plan_index_{0};
+  const int abstract_state_qp_input_index_;
+  const int abstract_state_plan_index_;
 };
 
 }  // namespace qp_inverse_dynamics
