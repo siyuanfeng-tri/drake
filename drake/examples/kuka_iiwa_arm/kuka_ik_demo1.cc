@@ -24,12 +24,54 @@ int main(int argc, const char* argv[]) {
   KukaIkPlanner planner(path);
 
   KukaIkPlanner::IkResult ik_res;
-  std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints(2);
-  waypoints[0].time = 1;
-  waypoints[0].pose.translation() << 0.8, 0, 0.1;
+  std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
 
-  waypoints[1].time = 2;
-  waypoints[1].pose.translation() << 0, 0.8, 0.1;
+  KukaIkPlanner::IkCartesianWaypoint wp;
+
+  int N = 3;
+  double z_high = 0.3;
+  double z_low = 0.1;
+
+  wp.time = 1;
+  wp.pose.translation() << 0.8, 0, z_high;
+  wp.enforce_quat = true;
+  waypoints.push_back(wp);
+
+  double dz = (z_high - z_low) / N;
+  double dt = 0.3;
+
+  // down
+  for (int i = 0; i < N; i++) {
+    wp.time += dt;
+    wp.pose.translation()[2] -= dz;
+    waypoints.push_back(wp);
+  }
+
+  // up
+  for (int i = 0; i < N; i++) {
+    wp.time += dt;
+    wp.pose.translation()[2] += dz;
+    waypoints.push_back(wp);
+  }
+
+  wp.time += 1;
+  wp.pose.translation() << 0, 0.8, z_high;
+  wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
+  waypoints.push_back(wp);
+
+  // down
+  for (int i = 0; i < N; i++) {
+    wp.time += dt;
+    wp.pose.translation()[2] -= dz;
+    waypoints.push_back(wp);
+  }
+
+  // up
+  for (int i = 0; i < N; i++) {
+    wp.time += dt;
+    wp.pose.translation()[2] += dz;
+    waypoints.push_back(wp);
+  }
 
   planner.PlanTrajectory(waypoints, VectorX<double>::Zero(7), &ik_res);
 

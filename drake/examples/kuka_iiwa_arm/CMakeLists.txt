@@ -73,7 +73,6 @@ if(lcm_FOUND)
     drakeMultibodyParsers
     drakeRigidBodyPlant
     drakeSystemAnalysis
-    kuka_traj_follower_system
     drakeSystemControllers)
   drake_add_test(
       NAME kuka_simulation COMMAND kuka_simulation -simulation_sec 0.1)

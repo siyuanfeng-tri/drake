@@ -62,9 +62,15 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     // this could be better
     q0.col(i) = q_current;
 
+    if (waypoint.pose.translation()[1] > 0.2) {
+      q0(0, i) = M_PI / 2.;
+    } else if (waypoint.pose.translation()[1] < -0.2) {
+      q0(0, i) = -M_PI / 2.;
+    }
+
     // make position constraint
-    Vector3<double> pos_lb = waypoint.pose.translation() - Vector3<double>::Constant(0.05);
-    Vector3<double> pos_ub = waypoint.pose.translation() + Vector3<double>::Constant(0.05);
+    Vector3<double> pos_lb = waypoint.pose.translation() - Vector3<double>::Constant(0.005);
+    Vector3<double> pos_ub = waypoint.pose.translation() + Vector3<double>::Constant(0.005);
     // need to make sure time doesnt overlap
     Vector2<double> tspan(waypoint.time - 0.1, waypoint.time + 0.1);
 
@@ -81,7 +87,7 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     if (waypoints[i].enforce_quat) {
       std::unique_ptr<WorldQuatConstraint> quat_con =
           std::make_unique<WorldQuatConstraint>(robot_.get(), end_effector_body_idx_,
-                                                math::rotmat2quat(waypoint.pose.linear()), 0.05, tspan);
+                                                math::rotmat2quat(waypoint.pose.linear()), 0.005, tspan);
       constraints.push_back(std::move(quat_con));
       constraint_array.push_back(constraints.back().get());
     }
