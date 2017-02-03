@@ -43,7 +43,6 @@ void QPControllerSystem::DoCalcUnrestrictedUpdate(
 
   // Calls the controller.
   QpOutput& qp_output = get_mutable_qp_output(state);
-
   if (qp_controller_.Control(*rs, *qp_input, &qp_output) < 0) {
     std::stringstream err;
     err << rs->position().transpose() << "\n";

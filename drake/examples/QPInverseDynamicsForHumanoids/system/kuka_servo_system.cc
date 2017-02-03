@@ -76,7 +76,6 @@ void KukaServoSystem::DoCalcUnrestrictedUpdate(
 
 std::unique_ptr<systems::AbstractState>
 KukaServoSystem::AllocateAbstractState() const {
-  std::cout << "alloc abs state\n";
   std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(2);
   abstract_vals[abstract_state_plan_index_] =
       std::unique_ptr<systems::AbstractValue>(

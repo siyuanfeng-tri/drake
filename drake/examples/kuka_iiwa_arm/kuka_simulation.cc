@@ -33,8 +33,6 @@
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
 
-#include "drake/examples/QPInverseDynamicsForHumanoids/system/kuka_inverse_dynamics_servo.h"
-
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
 
@@ -143,21 +141,8 @@ class SimulatedKuka : public systems::Diagram<T> {
 };
 
 int DoMain() {
-  std::string model_path =
-      GetDrakePath() +
-      "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision.urdf";
-  std::string alias_group_path = GetDrakePath() +
-                                 "/examples/kuka_iiwa_arm/controlled_kuka/"
-                                 "inverse_dynamics_controller_config/"
-                                 "kuka_alias_groups.yaml";
-  std::string controller_config_path =
-      GetDrakePath() +
-      "/examples/kuka_iiwa_arm/controlled_kuka/"
-      "inverse_dynamics_controller_config/kuka_controller.yaml";
-
   systems::DiagramBuilder<double> builder;
-  //auto model = builder.AddSystem<SimulatedKuka<double>>();
-  auto model = builder.AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(model_path, alias_group_path, controller_config_path);
+  auto model = builder.AddSystem<SimulatedKuka<double>>();
 
   const RigidBodyTree<double>& tree =
       model->get_plant().get_rigid_body_tree();
@@ -213,8 +198,6 @@ int DoMain() {
       sys->GetMutableSubsystemContext(simulator.get_mutable_context(),
                                       command_receiver),
       VectorX<double>::Zero(tree.get_num_positions()));
-
-  model->Initialize(sys->GetMutableSubsystemContext(simulator.get_mutable_context(), model));
 
   // Simulate for a very long time.
   simulator.StepTo(FLAGS_simulation_sec);

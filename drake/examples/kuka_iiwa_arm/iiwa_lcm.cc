@@ -80,6 +80,8 @@ IiwaCommandReceiver::IiwaCommandReceiver() {
   // command
   // last message time
   this->DeclareDiscreteState(kNumJoints * 2 + 1);
+
+  set_name("CMD_RECEIVER");
 }
 
 void IiwaCommandReceiver::set_initial_position(
@@ -87,7 +89,7 @@ void IiwaCommandReceiver::set_initial_position(
     const Eigen::Ref<const VectorX<double>> x) const {
   auto state_value =
       context->get_mutable_discrete_state(0)->get_mutable_value();
-  DRAKE_ASSERT(x.size() == kNumJoints);
+  DRAKE_DEMAND(x.size() == kNumJoints);
   // Init the last message receive time to -1
   state_value << x, Vector<double, kNumJoints>::Zero(), -1;
 }

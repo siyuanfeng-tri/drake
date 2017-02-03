@@ -25,11 +25,11 @@ int main(int argc, const char* argv[]) {
 
   KukaIkPlanner::IkResult ik_res;
   std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints(2);
-  waypoints[0].time = 0.5;
-  waypoints[0].pose.translation() << 0.6, 0, 0.325;
+  waypoints[0].time = 1;
+  waypoints[0].pose.translation() << 0.8, 0, 0.1;
 
-  waypoints[1].time = 1;
-  waypoints[1].pose.translation() << 0.5, 0.5, 0.3;
+  waypoints[1].time = 2;
+  waypoints[1].pose.translation() << 0, 0.8, 0.1;
 
   planner.PlanTrajectory(waypoints, VectorX<double>::Zero(7), &ik_res);
 

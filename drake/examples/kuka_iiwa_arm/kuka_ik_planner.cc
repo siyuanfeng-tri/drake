@@ -42,6 +42,7 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
   std::vector<std::string> infeasible_constraint;
   std::vector<RigidBodyConstraint*> constraint_array;
   IKoptions ikoptions(robot_.get());
+  ikoptions.setDebug(true);
 
   std::list<std::unique_ptr<RigidBodyConstraint>> constraints;
 
@@ -103,6 +104,10 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     }
   }
   printf("\n");
+
+  for (const auto& s : infeasible_constraint) {
+    std::cout << "haha: " << s << std::endl;
+  }
 
   ik_res->time.resize(num_steps + 1);
   ik_res->info.resize(num_steps + 1);

@@ -11,6 +11,7 @@ set(sources
     matrix_gain.cc
     multiplexer.cc
     pass_through.cc
+    selector.cc
     saturation.cc
     signal_logger.cc
     trajectory_source.cc
@@ -32,6 +33,7 @@ drake_install_headers(
   pass_through.h
   pass_through-inl.h
   random_source.h
+  selector.h
   saturation.h
   signal_logger.h
   trajectory_source.h
