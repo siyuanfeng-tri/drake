@@ -26,51 +26,75 @@ int main(int argc, const char* argv[]) {
   KukaIkPlanner::IkResult ik_res;
   std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
 
+  DRAKE_DEMAND(argc == 2);
+  int move = atoi(argv[1]);
+
   KukaIkPlanner::IkCartesianWaypoint wp;
 
   int N = 3;
   double z_high = 0.3;
   double z_low = 0.1;
-
-  wp.time = 1;
-  wp.pose.translation() << 0.8, 0, z_high;
-  wp.enforce_quat = true;
-  waypoints.push_back(wp);
-
   double dz = (z_high - z_low) / N;
   double dt = 0.3;
 
-  // down
-  for (int i = 0; i < N; i++) {
-    wp.time += dt;
-    wp.pose.translation()[2] -= dz;
-    waypoints.push_back(wp);
-  }
+  // approach
+  wp.time = 1;
+  wp.pose.translation() << 0.68, 0, z_high;
+  wp.enforce_quat = true;
 
-  // up
-  for (int i = 0; i < N; i++) {
-    wp.time += dt;
-    wp.pose.translation()[2] += dz;
-    waypoints.push_back(wp);
-  }
+  switch (move) {
+    case 0:
+      waypoints.push_back(wp);
+      break;
+    case 1:
+      // down
+      wp.pose.translation()[2] = z_high;
+      for (int i = 0; i < N; i++) {
+        wp.time += dt;
+        wp.pose.translation()[2] -= dz;
+        waypoints.push_back(wp);
+      }
+      break;
 
-  wp.time += 1;
-  wp.pose.translation() << 0, 0.8, z_high;
-  wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
-  waypoints.push_back(wp);
+    case 2:
+      // up
+      wp.pose.translation()[2] = z_low;
+      for (int i = 0; i < N; i++) {
+        wp.time += dt;
+        wp.pose.translation()[2] += dz;
+        waypoints.push_back(wp);
+      }
+      break;
 
-  // down
-  for (int i = 0; i < N; i++) {
-    wp.time += dt;
-    wp.pose.translation()[2] -= dz;
-    waypoints.push_back(wp);
-  }
+    case 3:
+      // approach other
+      wp.time += 1;
+      wp.pose.translation() << 0, 0.68, z_high;
+      wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
+      waypoints.push_back(wp);
+      break;
 
-  // up
-  for (int i = 0; i < N; i++) {
-    wp.time += dt;
-    wp.pose.translation()[2] += dz;
-    waypoints.push_back(wp);
+    case 4:
+      // down
+      wp.pose.translation() << 0, 0.68, z_high;
+      wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
+      for (int i = 0; i < N; i++) {
+        wp.time += dt;
+        wp.pose.translation()[2] -= dz;
+        waypoints.push_back(wp);
+      }
+      break;
+
+    case 5:
+      // up
+      wp.pose.translation() << 0, 0.68, z_low;
+      wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
+      for (int i = 0; i < N; i++) {
+        wp.time += dt;
+        wp.pose.translation()[2] += dz;
+        waypoints.push_back(wp);
+      }
+      break;
   }
 
   planner.PlanTrajectory(waypoints, VectorX<double>::Zero(7), &ik_res);

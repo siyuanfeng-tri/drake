@@ -64,6 +64,7 @@ if(lcm_FOUND)
     drakeSystemAnalysis
     kuka_traj_follower_system
     drakeKukaIiwaWorld
+    drakeSchunkWsg
     drakeSystemControllers)
 
   add_executable(kuka_simulation kuka_simulation.cc)
@@ -76,6 +77,16 @@ if(lcm_FOUND)
     drakeSystemControllers)
   drake_add_test(
       NAME kuka_simulation COMMAND kuka_simulation -simulation_sec 0.1)
+
+  add_executable(send_wsg_cmd send_wsg_cmd.cc)
+  target_link_libraries(send_wsg_cmd
+    drakeKukaIiwaArmCommon
+    drakeKukaIiwaWorld
+    drakeLcmSystem
+    drakeRigidBodyPlant
+    drakeSchunkWsg
+    drakeSystemAnalysis
+    drakeSystemControllers)
 
   add_executable(iiwa_wsg_simulation iiwa_wsg_simulation.cc)
   target_link_libraries(iiwa_wsg_simulation

@@ -36,6 +36,10 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/kuka_inverse_dynamics_servo.h"
 
+#include "drake/examples/schunk_wsg/schunk_wsg_lcm.h"
+#include "drake/lcmt_schunk_wsg_command.hpp"
+#include "drake/lcmt_schunk_wsg_status.hpp"
+
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
 
@@ -55,18 +59,21 @@ class IdControlledPlantWithRobot : public systems::Diagram<double> {
  public:
   IdControlledPlantWithRobot(
       std::unique_ptr<RigidBodyTree<double>> world_tree,
-      int robot_model_instance_id,
+      int iiwa_instance_id,
+      int wsg_instance_id,
+      const std::string& iiwa_path,
       const std::string& alias_group_path,
       const std::string& controller_config_path,
       lcm::DrakeLcmInterface* lcm);
 
-  qp_inverse_dynamics::KukaInverseDynamicsServo* get_controlled_kuka() { return controlled_kuka_; }
+  qp_inverse_dynamics::KukaInverseDynamicsServo* get_controlled_kuka() { return iiwa_controller_; }
   IiwaCommandReceiver* get_command_receiver() { return command_receiver_; }
 
  private:
   systems::Multiplexer<double>* input_mux_{nullptr};
   systems::DrakeVisualizer* visualizer_{nullptr};
-  qp_inverse_dynamics::KukaInverseDynamicsServo* controlled_kuka_{nullptr};
+  qp_inverse_dynamics::KukaInverseDynamicsServo* iiwa_controller_{nullptr};
+  systems::RigidBodyPlant<double>* plant_{nullptr};
 
   IiwaCommandReceiver* command_receiver_{nullptr};
   systems::lcm::LcmSubscriberSystem* command_sub_{nullptr};
@@ -77,19 +84,22 @@ class IdControlledPlantWithRobot : public systems::Diagram<double> {
 
 IdControlledPlantWithRobot::IdControlledPlantWithRobot(
     std::unique_ptr<RigidBodyTree<double>> world_tree,
-    int robot_instance_id,
+    int iiwa_instance_id,
+    int wsg_instance_id,
+    const std::string& iiwa_path,
     const std::string& alias_group_path,
     const std::string& controller_config_path,
     lcm::DrakeLcmInterface* lcm) {
   DiagramBuilder<double> builder;
 
-  controlled_kuka_ =
-      builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
-          std::move(world_tree), robot_instance_id,
-          alias_group_path, controller_config_path);
+  // Makes rbp first.
+  plant_ = builder.AddSystem<systems::RigidBodyPlant<double>>(std::move(world_tree));
+  const RigidBodyTree<double>& tree = plant_->get_rigid_body_tree();
+  plant_->set_contact_parameters(10000., 100., 10.);
 
-  const RigidBodyPlant<double>& plant = controlled_kuka_->get_plant();
-  const RigidBodyTree<double>& tree = plant.get_rigid_body_tree();
+  iiwa_controller_ =
+      builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
+          iiwa_path, alias_group_path, controller_config_path);
 
   visualizer_ = builder.AddSystem<DrakeVisualizer>(tree, lcm);
   command_sub_ = builder.AddSystem(systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IIWA_COMMAND", lcm));
@@ -97,23 +107,103 @@ IdControlledPlantWithRobot::IdControlledPlantWithRobot(
   status_pub_ = builder.AddSystem(systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>("IIWA_STATUS", lcm));
   status_sender_ = builder.AddSystem<IiwaStatusSender>();
 
+  // LCM input
   builder.Connect(command_sub_->get_output_port(0),
                   command_receiver_->get_input_port(0));
 
+  // command -> controller
   builder.Connect(command_receiver_->get_output_port(0),
-                  controlled_kuka_->get_input_port(0));
+                  iiwa_controller_->get_input_port_nominal_iiwa_state());
 
-  builder.Connect(controlled_kuka_->get_output_port(0),
+  // iiwa q, qd -> controller
+  builder.Connect(plant_->model_instance_state_output_port(iiwa_instance_id),
+                  iiwa_controller_->get_input_port_iiwa_state());
+
+  // controller -> plant
+  builder.Connect(iiwa_controller_->get_output_port_torque(),
+                  plant_->model_instance_actuator_command_input_port(iiwa_instance_id));
+
+  // plant -> viz
+  builder.Connect(plant_->state_output_port(),
                   visualizer_->get_input_port(0));
 
-  builder.Connect(controlled_kuka_->get_output_port(1),
+  // status pub
+  builder.Connect(plant_->model_instance_state_output_port(iiwa_instance_id),
                   status_sender_->get_state_input_port());
-
   builder.Connect(command_receiver_->get_output_port(0),
                   status_sender_->get_command_input_port());
-
   builder.Connect(status_sender_->get_output_port(0),
                   status_pub_->get_input_port(0));
+
+  ///////////////////////////////////////////////////////////////////
+  // WSG CRAP
+  const auto& wsg_input_port =
+      plant_->model_instance_actuator_command_input_port(wsg_instance_id);
+  const auto& wsg_output_port =
+      plant_->model_instance_state_output_port(wsg_instance_id);
+
+  auto wsg_command_sub = builder.AddSystem(
+      systems::lcm::LcmSubscriberSystem::Make<lcmt_schunk_wsg_command>(
+          "SCHUNK_WSG_COMMAND", lcm));
+  auto wsg_trajectory_generator =
+      builder.AddSystem<schunk_wsg::SchunkWsgTrajectoryGenerator>(
+          wsg_output_port.size(), 0);
+
+  auto wsg_status_pub = builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<lcmt_schunk_wsg_status>(
+          "SCHUNK_WSG_STATUS", lcm));
+  auto wsg_status_sender = builder.AddSystem<schunk_wsg::SchunkWsgStatusSender>(
+      wsg_output_port.size(), 0, 1);
+
+  const std::map<std::string, int> index_map =
+      tree.computePositionNameToIndexMap();
+  const int left_finger_position_index =
+      index_map.at("left_finger_sliding_joint");
+  const int position_index = plant_->FindInstancePositionIndexFromWorldIndex(
+      wsg_instance_id, left_finger_position_index);
+  const int velocity_index = position_index +
+      plant_->get_num_positions(wsg_instance_id);
+
+  Eigen::MatrixXd feedback_matrix = Eigen::MatrixXd::Zero(
+      2 * plant_->get_num_actuators(wsg_instance_id),
+      2 * plant_->get_num_positions(wsg_instance_id));
+  feedback_matrix(0, position_index) = 1.;
+  feedback_matrix(1, velocity_index) = 1.;
+  std::unique_ptr<systems::MatrixGain<double>> feedback_selector =
+      std::make_unique<systems::MatrixGain<double>>(feedback_matrix);
+
+  // TODO(sam.creasey) The choice of constants below is completely
+  // arbitrary and may not match the performance of the actual
+  // gripper.
+  const double wsg_kp = 3000.0;  // This seems very high, for some grasps
+  // it's actually in the right power of
+  // two.  We'll need to revisit this once
+  // we're using the force command sent to
+  // the gripper properly.
+  const double wsg_ki = 0.0;
+  const double wsg_kd = 5.0;
+  const VectorX<double> wsg_v = VectorX<double>::Ones(wsg_input_port.size());
+  auto wsg_pid_ports = systems::PidControlledSystem<double>::ConnectController(
+      wsg_input_port, wsg_output_port, std::move(feedback_selector),
+      wsg_v * wsg_kp, wsg_v * wsg_ki, wsg_v * wsg_kd,
+      &builder);
+
+  auto wsg_zero_source = builder.template AddSystem<systems::ConstantVectorSource<double>>(
+      Eigen::VectorXd::Zero(1));
+  builder.Connect(wsg_zero_source->get_output_port(),
+      wsg_pid_ports.control_input_port);
+  builder.Connect(wsg_command_sub->get_output_port(0),
+                  wsg_trajectory_generator->get_command_input_port());
+  builder.Connect(wsg_trajectory_generator->get_output_port(0),
+                  wsg_pid_ports.state_input_port);
+  builder.Connect(wsg_output_port,
+                  wsg_status_sender->get_input_port(0));
+  builder.Connect(wsg_output_port,
+                  wsg_trajectory_generator->get_state_input_port());
+  builder.Connect(*wsg_status_sender, *wsg_status_pub);
+
+  ///////////////////////////////////////////////////////////////////
+
 
   log()->info("IdControlledPlantWithRobot Diagram built.");
   builder.BuildInto(this);
@@ -144,6 +234,8 @@ int DoMain() {
   world_sim_tree_builder->StoreModel(
       "cylinder",
       "/examples/kuka_iiwa_arm/models/objects/simple_cylinder.urdf");
+  world_sim_tree_builder->StoreModel(
+      "wsg", "/examples/schunk_wsg/models/schunk_wsg_50.sdf");
 
   // The `z` coordinate of the top of the table in the world frame.
   // The quantity 0.736 is the `z` coordinate of the frame associated with the
@@ -166,6 +258,7 @@ int DoMain() {
   world_sim_tree_builder->AddFixedModelInstance(
       "table", Eigen::Vector3d(kTableTopXInWorld + 0.8, kTableTopYInWorld, 0),
       Eigen::Vector3d::Zero());
+
   // end table
   world_sim_tree_builder->AddFixedModelInstance(
       "table", Eigen::Vector3d(kTableTopXInWorld, kTableTopYInWorld + 0.83, 0),
@@ -200,18 +293,20 @@ int DoMain() {
   std::cout << "end " << kCylinderEnd.transpose() << std::endl;
 
   // Adding each model to the Tree builder.
-  int robot_model_instance =
+  int iiwa_instance_id =
       world_sim_tree_builder->AddFixedModelInstance("iiwa", Vector3<double>(0, 0, kTableTopZInWorld));
-  std::cout << robot_model_instance << std::endl;
 
   world_sim_tree_builder->AddFloatingModelInstance("cylinder",
                                                    kCylinderStart);
 
-  world_sim_tree_builder->AddFloatingModelInstance("cylinder",
-                                                   kCylinderEnd);
+//  world_sim_tree_builder->AddFloatingModelInstance("cylinder",
+//                                                   kCylinderEnd);
+  int wsg_instance_id = world_sim_tree_builder->AddModelInstanceToFrame(
+      "wsg", Eigen::Vector3d::Zero(),  Eigen::Vector3d::Zero(),
+      world_sim_tree_builder->tree().findFrame("iiwa_frame_ee"),
+      drake::multibody::joints::kFixed);
 
   drake::lcm::DrakeLcm lcm;
-
   ///////////////////////////////
   /*
   std::unique_ptr<RigidBodyTree<double>> tree = std::make_unique<RigidBodyTree<double>>();
@@ -226,10 +321,15 @@ int DoMain() {
   ///////////////////////////////
   */
 
+  std::string iiwa_w_wsg_model_path =
+      GetDrakePath() +
+      "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision_gripper_inertia.urdf";
+
   IdControlledPlantWithRobot system(
       world_sim_tree_builder->Build(),
-      robot_model_instance,
-      alias_group_path, controller_config_path, &lcm);
+      iiwa_instance_id,
+      wsg_instance_id,
+      iiwa_w_wsg_model_path, alias_group_path, controller_config_path, &lcm);
 
   Simulator<double> simulator(system);
 

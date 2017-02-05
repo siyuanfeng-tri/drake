@@ -62,6 +62,7 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     // this could be better
     q0.col(i) = q_current;
 
+    // TODO: THIS IS A BIG HACK
     if (waypoint.pose.translation()[1] > 0.2) {
       q0(0, i) = M_PI / 2.;
     } else if (waypoint.pose.translation()[1] < -0.2) {
