@@ -320,12 +320,6 @@ class RigidBodyPlant : public LeafSystem<T> {
   }
   ///@}
 
-  int get_model_position_index_start(int model_instance_id) const;
-  int get_model_velocity_index_start(int model_instance_id) const;
-
-  int get_model_num_positions(int model_instance_id) const;
-  int get_model_num_velocities(int model_instance_id) const;
-
  protected:
   // LeafSystem<T> override.
   std::unique_ptr<ContinuousState<T>> AllocateContinuousState() const override;

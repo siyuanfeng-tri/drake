@@ -44,26 +44,6 @@ RigidBodyPlant<T>::RigidBodyPlant(std::unique_ptr<const RigidBodyTree<T>> tree)
 }
 
 template <typename T>
-int RigidBodyPlant<T>::get_model_position_index_start(int model_instance_id) const {
-  return position_map_.at(model_instance_id).first;
-}
-
-template <typename T>
-int RigidBodyPlant<T>::get_model_velocity_index_start(int model_instance_id) const {
-  return velocity_map_.at(model_instance_id).first;
-}
-
-template <typename T>
-int RigidBodyPlant<T>::get_model_num_positions(int model_instance_id) const {
-  return position_map_.at(model_instance_id).second;
-}
-
-template <typename T>
-int RigidBodyPlant<T>::get_model_num_velocities(int model_instance_id) const {
-  return velocity_map_.at(model_instance_id).second;
-}
-
-template <typename T>
 void RigidBodyPlant<T>::ExportModelInstanceCentricPorts() {
 const int num_instances = tree_->get_num_model_instances();
   const std::pair<int, int> default_entry =
