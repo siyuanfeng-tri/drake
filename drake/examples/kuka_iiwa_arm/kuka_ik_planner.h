@@ -31,6 +31,8 @@ class KukaIkPlanner {
     }
   };
 
+  const RigidBodyTree<double>& get_robot() const { return *robot_; }
+
   bool PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q0, IkResult* ik_res);
   robotlocomotion::robot_plan_t EncodeMessage(const IkResult& ik_res);
 

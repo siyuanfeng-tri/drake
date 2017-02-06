@@ -43,6 +43,7 @@ if(lcm_FOUND)
   add_executable(kuka_ik_demo1 kuka_ik_demo1.cc)
   target_link_libraries(kuka_ik_demo1
     drakeKukaIiwaArmCommon
+    drakeLCMUtil
     lcm)
 
   add_executable(kuka_plan_runner kuka_plan_runner.cc)
@@ -59,6 +60,7 @@ if(lcm_FOUND)
   target_link_libraries(kuka_id_simulation
     drakeKukaIiwaArmCommon
     drakeLcmSystem
+    drakeLCMUtil
     drakeMultibodyParsers
     drakeRigidBodyPlant
     drakeSystemAnalysis

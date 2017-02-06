@@ -40,6 +40,8 @@
 #include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/lcmt_schunk_wsg_status.hpp"
 
+#include "drake/examples/kuka_iiwa_arm/fake_state_estimator.h"
+
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
 
@@ -55,15 +57,17 @@ using systems::DrakeVisualizer;
 using systems::RigidBodyPlant;
 using systems::Simulator;
 
-class IdControlledPlantWithRobot : public systems::Diagram<double> {
+class PickAndPlaceDemoDiagram : public systems::Diagram<double> {
  public:
-  IdControlledPlantWithRobot(
+  PickAndPlaceDemoDiagram(
       std::unique_ptr<RigidBodyTree<double>> world_tree,
       int iiwa_instance_id,
       int wsg_instance_id,
+      int obj_instance_id,
       const std::string& iiwa_path,
       const std::string& alias_group_path,
       const std::string& controller_config_path,
+      const std::string& obj_path,
       lcm::DrakeLcmInterface* lcm);
 
   qp_inverse_dynamics::KukaInverseDynamicsServo* get_controlled_kuka() { return iiwa_controller_; }
@@ -80,16 +84,23 @@ class IdControlledPlantWithRobot : public systems::Diagram<double> {
   IiwaStatusSender* status_sender_{nullptr};
   systems::lcm::LcmPublisherSystem* status_pub_{nullptr};
 
+  std::unique_ptr<RigidBodyTree<double>> object_{nullptr};
 };
 
-IdControlledPlantWithRobot::IdControlledPlantWithRobot(
+PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
     std::unique_ptr<RigidBodyTree<double>> world_tree,
     int iiwa_instance_id,
     int wsg_instance_id,
+    int obj_instance_id,
     const std::string& iiwa_path,
     const std::string& alias_group_path,
     const std::string& controller_config_path,
+    const std::string& object_path,
     lcm::DrakeLcmInterface* lcm) {
+  for (int i = 0; i < world_tree->get_num_bodies(); i++) {
+    std::cout << "i: " << i << ", " << world_tree->get_body(i).get_name() << std::endl;
+  }
+
   DiagramBuilder<double> builder;
 
   // Makes rbp first.
@@ -97,8 +108,10 @@ IdControlledPlantWithRobot::IdControlledPlantWithRobot(
   const RigidBodyTree<double>& tree = plant_->get_rigid_body_tree();
   plant_->set_contact_parameters(10000., 100., 10.);
 
+  ///////////////////////////////////////////////////////////////////
+  // Controller crap
   iiwa_controller_ =
-      builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
+      builder.AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
           iiwa_path, alias_group_path, controller_config_path);
 
   visualizer_ = builder.AddSystem<DrakeVisualizer>(tree, lcm);
@@ -134,6 +147,31 @@ IdControlledPlantWithRobot::IdControlledPlantWithRobot(
                   status_sender_->get_command_input_port());
   builder.Connect(status_sender_->get_output_port(0),
                   status_pub_->get_input_port(0));
+
+  auto iiwa_state_est = builder.AddSystem(
+      std::make_unique<FakeStateEstimator>(iiwa_controller_->get_robot_for_control()));
+  auto iiwa_state_pub = builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>(
+          "IIWA_STATE_EST", lcm));
+  builder.Connect(plant_->model_instance_state_output_port(iiwa_instance_id),
+                  iiwa_state_est->get_input_port_state());
+  builder.Connect(iiwa_state_est->get_output_port_msg(),
+                  iiwa_state_pub->get_input_port(0));
+
+  ///////////////////////////////////////////////////////////////////
+  // Objector sensor
+  object_ = std::make_unique<RigidBodyTree<double>>();
+  parsers::urdf::AddModelInstanceFromUrdfFileToWorld(object_path,
+      multibody::joints::kQuaternion, object_.get());
+  auto object_state_est = builder.AddSystem(std::make_unique<FakeStateEstimator>(*object_));
+  auto object_state_pub = builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>(
+          "OBJECT_STATE_EST", lcm));
+
+  builder.Connect(plant_->model_instance_state_output_port(obj_instance_id),
+                  object_state_est->get_input_port_state());
+  builder.Connect(object_state_est->get_output_port_msg(),
+                  object_state_pub->get_input_port(0));
 
   ///////////////////////////////////////////////////////////////////
   // WSG CRAP
@@ -205,7 +243,7 @@ IdControlledPlantWithRobot::IdControlledPlantWithRobot(
   ///////////////////////////////////////////////////////////////////
 
 
-  log()->info("IdControlledPlantWithRobot Diagram built.");
+  log()->info("PickAndPlaceDemoDiagram Diagram built.");
   builder.BuildInto(this);
 }
 
@@ -233,7 +271,7 @@ int DoMain() {
                                      "collision.sdf");
   world_sim_tree_builder->StoreModel(
       "cylinder",
-      "/examples/kuka_iiwa_arm/models/objects/simple_cylinder.urdf");
+      "/examples/kuka_iiwa_arm/models/objects/simple_cuboid.urdf");
   world_sim_tree_builder->StoreModel(
       "wsg", "/examples/schunk_wsg/models/schunk_wsg_50.sdf");
 
@@ -266,11 +304,6 @@ int DoMain() {
 
   world_sim_tree_builder->AddGround();
 
-
-//  const double kTableSurfaceSizeX = 0.7112;
-//  const double kTableSurfaceSizeY = 0.762;
-//  const double kGapToEdge = 0.05;
-
   // The positions of the iiwa robot and the 3 cylinders are distributed
   // over the surface of the heavy duty table. Only the positions are set; the
   // default orientations are used in each case. While 2 of the cylinders
@@ -284,27 +317,17 @@ int DoMain() {
       0,
       kTableTopZInWorld + 0.1);
 
-  const Eigen::Vector3d kCylinderEnd(
-      0,
-      0.83,
-      kTableTopZInWorld + 0.1);
-
-  std::cout << "start " << kCylinderStart.transpose() << std::endl;
-  std::cout << "end " << kCylinderEnd.transpose() << std::endl;
-
   // Adding each model to the Tree builder.
   int iiwa_instance_id =
       world_sim_tree_builder->AddFixedModelInstance("iiwa", Vector3<double>(0, 0, kTableTopZInWorld));
 
-  world_sim_tree_builder->AddFloatingModelInstance("cylinder",
-                                                   kCylinderStart);
-
-//  world_sim_tree_builder->AddFloatingModelInstance("cylinder",
-//                                                   kCylinderEnd);
   int wsg_instance_id = world_sim_tree_builder->AddModelInstanceToFrame(
       "wsg", Eigen::Vector3d::Zero(),  Eigen::Vector3d::Zero(),
       world_sim_tree_builder->tree().findFrame("iiwa_frame_ee"),
       drake::multibody::joints::kFixed);
+
+  int object_instance_id = world_sim_tree_builder->AddFloatingModelInstance("cylinder",
+                                                   kCylinderStart);
 
   drake::lcm::DrakeLcm lcm;
   ///////////////////////////////
@@ -314,7 +337,7 @@ int DoMain() {
           model_path,
           drake::multibody::joints::kFixed,
           nullptr, tree.get());
-  IdControlledPlantWithRobot system(
+  PickAndPlaceDemoDiagram system(
       std::move(tree),
       RigidBodyTreeConstants::kFirstNonWorldModelInstanceId,
       alias_group_path, controller_config_path, &lcm);
@@ -325,11 +348,20 @@ int DoMain() {
       GetDrakePath() +
       "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision_gripper_inertia.urdf";
 
-  IdControlledPlantWithRobot system(
+  std::string object_model_path =
+      GetDrakePath() +
+      "/examples/kuka_iiwa_arm/models/objects/simple_cuboid.urdf";
+
+  PickAndPlaceDemoDiagram system(
       world_sim_tree_builder->Build(),
       iiwa_instance_id,
       wsg_instance_id,
-      iiwa_w_wsg_model_path, alias_group_path, controller_config_path, &lcm);
+      object_instance_id,
+      iiwa_w_wsg_model_path,
+      alias_group_path,
+      controller_config_path,
+      object_model_path,
+      &lcm);
 
   Simulator<double> simulator(system);
 
