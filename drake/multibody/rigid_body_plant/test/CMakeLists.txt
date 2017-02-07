@@ -40,7 +40,7 @@ if(Bullet_FOUND)
 
   add_executable(sliding_brick sliding_brick.cc )
   target_link_libraries(sliding_brick
-      drakeLCMSystem2
+      drakeLcmSystem
       drakeMultibodyParsers
       drakeRigidBodyPlant
       drakeSystemAnalysis

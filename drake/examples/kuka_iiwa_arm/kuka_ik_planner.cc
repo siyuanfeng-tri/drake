@@ -66,8 +66,9 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     q0(0, i) = atan2(waypoint.pose.translation()[1], waypoint.pose.translation()[0]);
 
     // make position constraint
-    Vector3<double> pos_lb = waypoint.pose.translation() - Vector3<double>::Constant(0.005);
-    Vector3<double> pos_ub = waypoint.pose.translation() + Vector3<double>::Constant(0.005);
+    Vector3<double> bound(0.001, 0.001, 0.001);
+    Vector3<double> pos_lb = waypoint.pose.translation() - bound;
+    Vector3<double> pos_ub = waypoint.pose.translation() + bound;
     // need to make sure time doesnt overlap
     Vector2<double> tspan(waypoint.time - 0.1, waypoint.time + 0.1);
 

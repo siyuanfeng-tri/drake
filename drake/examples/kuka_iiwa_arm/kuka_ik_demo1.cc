@@ -125,12 +125,15 @@ class Action {
 class IiwaMoveCartesian : public Action {
  public:
   IiwaMoveCartesian(lcm::LCM* lcm, const std::string& channel, const std::string& iiwa_model_path)
-      : planner_(iiwa_model_path), iiwa_(planner_.get_robot()), cache_(iiwa_.CreateKinematicsCache()), lcm_(lcm), channel_(channel) {}
+      : planner_(iiwa_model_path), iiwa_(planner_.get_robot()), cache_(iiwa_.CreateKinematicsCache()), lcm_(lcm), channel_(channel) {
+    end_effector_ = iiwa_.FindBody("iiwa_link_ee_kuka");
+  }
 
   void HandleIiwaStatus(const lcm::ReceiveBuffer* rbuf, const std::string& chan, const lcmt_iiwa_status* iiwa_msg) {
     Action::HandleIiwaStatus(rbuf, chan, iiwa_msg);
     cache_.initialize(iiwa_q_, iiwa_v_);
     iiwa_.doKinematics(cache_, true);
+    mid_finger_pose_ = iiwa_.CalcBodyPoseInWorldFrame(cache_, *end_effector_);
   }
 
   void MoveEnedEffectorThroughWaypoints(const std::vector<KukaIkPlanner::IkCartesianWaypoint>& waypoints) {
@@ -146,6 +149,8 @@ class IiwaMoveCartesian : public Action {
     waypoints_.clear();
   }
 
+  const Isometry3<double>& get_mid_finger_pose() const { return mid_finger_pose_; }
+
   // TODO
   bool ActionFailed() const {
     return false;
@@ -155,7 +160,7 @@ class IiwaMoveCartesian : public Action {
     if (!ActionStarted())
       return false;
 
-    if (iiwa_time_ - act_start_time_ > waypoints_.back().time && iiwa_v_.norm() < 1e-2) {
+    if (iiwa_time_ - act_start_time_ > waypoints_.back().time && iiwa_v_.norm() < 3e-2) {
       return true;
     } else {
       return false;
@@ -171,6 +176,8 @@ class IiwaMoveCartesian : public Action {
   lcm::LCM* lcm_;
   const std::string channel_;
 
+  const RigidBody<double>* end_effector_;
+  Isometry3<double> mid_finger_pose_;
   std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints_;
 };
 
@@ -201,7 +208,7 @@ class WsgAction : public Action {
     if (!ActionStarted())
       return false;
 
-    if (std::abs(wsg_v_) < 1e-2 && wsg_time_ - act_start_time_ > 0.5)
+    if (std::abs(wsg_v_) < 1e-2 && (wsg_time_ - act_start_time_ > 0.5))
       return true;
     return false;
   }
@@ -246,6 +253,7 @@ int main(int argc, const char* argv[]) {
           state = 0;
           wsg_act.Reset();
         }
+        break;
 
       case 0:
         if (!iiwa_move.ActionStarted()) {
@@ -253,7 +261,7 @@ int main(int argc, const char* argv[]) {
           KukaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 2;
           std::cout << "obj: " << iiwa_move.get_object_pose().translation().transpose() << std::endl;
-          wp.pose.translation() << 0.68, 0, z_high;
+          wp.pose.translation() << 0.69, 0, z_high;
           wp.enforce_quat = true;
           waypoints.push_back(wp);
 
@@ -265,7 +273,6 @@ int main(int argc, const char* argv[]) {
           state = 1;
           iiwa_move.Reset();
         }
-
         break;
 
       case 1:
@@ -273,7 +280,7 @@ int main(int argc, const char* argv[]) {
           std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
           KukaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 0;
-          wp.pose.translation() << 0.68, 0, z_high;
+          wp.pose.translation() << 0.69, 0, z_high;
           wp.enforce_quat = true;
 
           for (int i = 0; i < N; i++) {
@@ -289,8 +296,8 @@ int main(int argc, const char* argv[]) {
         if (iiwa_move.ActionFinished()) {
           state = 2;
           iiwa_move.Reset();
+          std::cout << "obj z: " << iiwa_move.get_object_pose().translation()[2];
         }
-
         break;
 
       case 2:
@@ -309,7 +316,7 @@ int main(int argc, const char* argv[]) {
           std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
           KukaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 0;
-          wp.pose.translation() << 0.68, 0, z_low;
+          wp.pose.translation() << 0.69, 0, z_low;
           wp.enforce_quat = true;
 
           for (int i = 0; i < N; i++) {
@@ -333,7 +340,7 @@ int main(int argc, const char* argv[]) {
           std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
           KukaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 2;
-          wp.pose.translation() << 0, 0.68, z_high;
+          wp.pose.translation() << 0, 0.69, z_high;
           wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
           wp.enforce_quat = true;
 
@@ -344,7 +351,7 @@ int main(int argc, const char* argv[]) {
         }
 
         if (iiwa_move.ActionFinished() &&
-            iiwa_move.get_object_velocity().head<2>().norm() < 1e-2) {
+            iiwa_move.get_object_velocity().head<2>().norm() < 5e-2) {
           std::cout << "obj: " << iiwa_move.get_object_pose().translation().transpose() << std::endl;
           state = 5;
           iiwa_move.Reset();
@@ -356,13 +363,29 @@ int main(int argc, const char* argv[]) {
           std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
           KukaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 0;
-          wp.pose.translation() << 0, 0.68, z_high;
+          wp.pose.translation() << 0, 0.69, z_high;
           wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
           wp.enforce_quat = true;
 
-          z_low = 0.1 + (0.2 - iiwa_move.get_object_pose().translation()[2] + 0.01);
+          std::cout << "gripper: " << iiwa_move.get_mid_finger_pose().translation().transpose() << std::endl;
+          std::cout << "obj: " << iiwa_move.get_object_pose().translation().transpose() << std::endl;
+
+          Isometry3<double> center_to_bottom = Isometry3<double>::Identity();
+          const Vector3<double> offsets[4] = {Vector3<double>(0.03, 0.03, -0.1), Vector3<double>(0.03, -0.03, -0.1), Vector3<double>(-0.03, 0.03, -0.1), Vector3<double>(-0.03, -0.03, -0.1)};
+          double min_z = 1100;
+          for (int i = 0; i < 4; i++) {
+            center_to_bottom.translation() = offsets[i];
+            double z = (iiwa_move.get_object_pose() * center_to_bottom).translation()[2];
+            if (z < min_z)
+              min_z = z;
+          }
+
+          // on the table, the bottom is at -0.1
+          double z_delta = -0.1 - min_z + 0.01;
+          dz = - z_delta / N;
+          z_low = z_high + z_delta;
+
           std::cout << "new z low: " << z_low << std::endl;
-          dz = (z_high - z_low) / N;
 
           for (int i = 0; i < N; i++) {
             wp.time += dt;
@@ -390,13 +413,14 @@ int main(int argc, const char* argv[]) {
           state = 7;
           wsg_act.Reset();
         }
+        break;
 
       case 7:
         if (!iiwa_move.ActionStarted()) {
           std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
           KukaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 0;
-          wp.pose.translation() << 0, 0.68, z_low;
+          wp.pose.translation() << 0, 0.69, z_low;
           wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
           wp.enforce_quat = true;
 
@@ -420,93 +444,6 @@ int main(int argc, const char* argv[]) {
 
   return 0;
 }
-
-/*
-int main(int argc, const char* argv[]) {
-  std::string path = GetDrakePath() + "/examples/kuka_iiwa_arm/urdf/iiwa14.urdf";
-  KukaIkPlanner planner(path);
-
-  KukaIkPlanner::IkResult ik_res;
-  std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
-
-  DRAKE_DEMAND(argc == 2);
-  int move = atoi(argv[1]);
-
-  KukaIkPlanner::IkCartesianWaypoint wp;
-
-  int N = 3;
-  double z_high = 0.3;
-  double z_low = 0.1;
-  double dz = (z_high - z_low) / N;
-  double dt = 0.3;
-
-  // approach
-  wp.time = 1;
-  wp.pose.translation() << 0.68, 0, z_high;
-  wp.enforce_quat = true;
-
-  switch (move) {
-    case 0:
-      waypoints.push_back(wp);
-      break;
-    case 1:
-      // down
-      wp.pose.translation()[2] = z_high;
-      for (int i = 0; i < N; i++) {
-        wp.time += dt;
-        wp.pose.translation()[2] -= dz;
-        waypoints.push_back(wp);
-      }
-      break;
-
-    case 2:
-      // up
-      wp.pose.translation()[2] = z_low;
-      for (int i = 0; i < N; i++) {
-        wp.time += dt;
-        wp.pose.translation()[2] += dz;
-        waypoints.push_back(wp);
-      }
-      break;
-
-    case 3:
-      // approach other
-      wp.time += 1;
-      wp.pose.translation() << 0, 0.68, z_high;
-      wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
-      waypoints.push_back(wp);
-      break;
-
-    case 4:
-      // down
-      wp.pose.translation() << 0, 0.68, z_high;
-      wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
-      for (int i = 0; i < N; i++) {
-        wp.time += dt;
-        wp.pose.translation()[2] -= dz;
-        waypoints.push_back(wp);
-      }
-      break;
-
-    case 5:
-      // up
-      wp.pose.translation() << 0, 0.68, z_low;
-      wp.pose.linear() = Matrix3<double>(AngleAxis<double>(M_PI / 2., Vector3<double>::UnitZ()));
-      for (int i = 0; i < N; i++) {
-        wp.time += dt;
-        wp.pose.translation()[2] += dz;
-        waypoints.push_back(wp);
-      }
-      break;
-  }
-
-  planner.PlanTrajectory(waypoints, VectorX<double>::Zero(7), &ik_res);
-
-  robotlocomotion::robot_plan_t plan = planner.EncodeMessage(ik_res);
-  lcm::LCM lcm;
-  return lcm.publish(kLcmPlanChannel, &plan);
-}
-*/
 
 }  // namespace
 }  // namespace kuka_iiwa_arm

@@ -8,14 +8,15 @@
           izz="0.020833" />
     </inertial>
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0" />git
+      <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
         <box size="0.06 0.06 0.2" />
       </geometry>
       <material name="dark blue">
-        <color rgba="0.1 0.1 0.9 1" />
+        <color rgba="0.1 0.1 0.9 0.9" />
       </material>
     </visual>
+
     <collision>
       <geometry>
         <box size="0.06 0.06 0.2" />

@@ -41,6 +41,7 @@
 #include "drake/lcmt_schunk_wsg_status.hpp"
 
 #include "drake/examples/kuka_iiwa_arm/fake_state_estimator.h"
+#include "drake/systems/analysis/explicit_euler_integrator.h"
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
@@ -106,7 +107,8 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   // Makes rbp first.
   plant_ = builder.AddSystem<systems::RigidBodyPlant<double>>(std::move(world_tree));
   const RigidBodyTree<double>& tree = plant_->get_rigid_body_tree();
-  plant_->set_contact_parameters(10000., 100., 10.);
+  //plant_->set_contact_parameters(10000., 100., 10.);
+  plant_->set_contact_parameters(10000, 1, 0.8, 0.0001, 1);
 
   ///////////////////////////////////////////////////////////////////
   // Controller crap
@@ -350,7 +352,7 @@ int DoMain() {
 
   std::string object_model_path =
       GetDrakePath() +
-      "/examples/kuka_iiwa_arm/models/objects/simple_cuboid.urdf";
+      "/examples/kuka_iiwa_arm/models/objects/simple_cylinder.urdf";
 
   PickAndPlaceDemoDiagram system(
       world_sim_tree_builder->Build(),
@@ -364,6 +366,8 @@ int DoMain() {
       &lcm);
 
   Simulator<double> simulator(system);
+  simulator.reset_integrator<systems::RungeKutta2Integrator<double>>(system, 3e-4, simulator.get_mutable_context());
+  //simulator.reset_integrator<systems::ExplicitEulerIntegrator<double>>(system, 3e-4, simulator.get_mutable_context());
 
   lcm.StartReceiveThread();
   simulator.Initialize();
