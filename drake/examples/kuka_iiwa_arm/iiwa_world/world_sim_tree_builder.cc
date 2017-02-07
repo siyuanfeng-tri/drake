@@ -96,6 +96,7 @@ int WorldSimTreeBuilder<T>::AddModelInstanceToFrame(
         weld_to_frame, rigid_body_tree_.get());
   }
   const int model_instance_id = table.begin()->second;
+  instance_id_to_world_offset_[model_instance_id] = weld_to_frame;
   return model_instance_id;
 }
 

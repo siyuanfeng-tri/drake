@@ -58,17 +58,21 @@ using systems::DrakeVisualizer;
 using systems::RigidBodyPlant;
 using systems::Simulator;
 
+struct MinimalModelInfo {
+  std::string model_path;
+  int instance_id;
+  std::shared_ptr<RigidBodyFrame<double>> world_offset;
+};
+
 class PickAndPlaceDemoDiagram : public systems::Diagram<double> {
  public:
   PickAndPlaceDemoDiagram(
       std::unique_ptr<RigidBodyTree<double>> world_tree,
-      int iiwa_instance_id,
-      int wsg_instance_id,
-      int obj_instance_id,
-      const std::string& iiwa_path,
+      const MinimalModelInfo& iiwa,
+      const MinimalModelInfo& wsg,
+      const MinimalModelInfo& obj,
       const std::string& alias_group_path,
       const std::string& controller_config_path,
-      const std::string& obj_path,
       lcm::DrakeLcmInterface* lcm);
 
   qp_inverse_dynamics::KukaInverseDynamicsServo* get_controlled_kuka() { return iiwa_controller_; }
@@ -90,13 +94,11 @@ class PickAndPlaceDemoDiagram : public systems::Diagram<double> {
 
 PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
     std::unique_ptr<RigidBodyTree<double>> world_tree,
-    int iiwa_instance_id,
-    int wsg_instance_id,
-    int obj_instance_id,
-    const std::string& iiwa_path,
+    const MinimalModelInfo& iiwa,
+    const MinimalModelInfo& wsg,
+    const MinimalModelInfo& obj,
     const std::string& alias_group_path,
     const std::string& controller_config_path,
-    const std::string& object_path,
     lcm::DrakeLcmInterface* lcm) {
   for (int i = 0; i < world_tree->get_num_bodies(); i++) {
     std::cout << "i: " << i << ", " << world_tree->get_body(i).get_name() << std::endl;
@@ -114,7 +116,7 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   // Controller crap
   iiwa_controller_ =
       builder.AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
-          iiwa_path, alias_group_path, controller_config_path);
+          iiwa.model_path, iiwa.world_offset, alias_group_path, controller_config_path);
 
   visualizer_ = builder.AddSystem<DrakeVisualizer>(tree, lcm);
   command_sub_ = builder.AddSystem(systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IIWA_COMMAND", lcm));
@@ -131,19 +133,19 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
                   iiwa_controller_->get_input_port_nominal_iiwa_state());
 
   // iiwa q, qd -> controller
-  builder.Connect(plant_->model_instance_state_output_port(iiwa_instance_id),
+  builder.Connect(plant_->model_instance_state_output_port(iiwa.instance_id),
                   iiwa_controller_->get_input_port_iiwa_state());
 
   // controller -> plant
   builder.Connect(iiwa_controller_->get_output_port_torque(),
-                  plant_->model_instance_actuator_command_input_port(iiwa_instance_id));
+                  plant_->model_instance_actuator_command_input_port(iiwa.instance_id));
 
   // plant -> viz
   builder.Connect(plant_->state_output_port(),
                   visualizer_->get_input_port(0));
 
   // status pub
-  builder.Connect(plant_->model_instance_state_output_port(iiwa_instance_id),
+  builder.Connect(plant_->model_instance_state_output_port(iiwa.instance_id),
                   status_sender_->get_state_input_port());
   builder.Connect(command_receiver_->get_output_port(0),
                   status_sender_->get_command_input_port());
@@ -155,7 +157,7 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   auto iiwa_state_pub = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>(
           "IIWA_STATE_EST", lcm));
-  builder.Connect(plant_->model_instance_state_output_port(iiwa_instance_id),
+  builder.Connect(plant_->model_instance_state_output_port(iiwa.instance_id),
                   iiwa_state_est->get_input_port_state());
   builder.Connect(iiwa_state_est->get_output_port_msg(),
                   iiwa_state_pub->get_input_port(0));
@@ -163,14 +165,14 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   ///////////////////////////////////////////////////////////////////
   // Objector sensor
   object_ = std::make_unique<RigidBodyTree<double>>();
-  parsers::urdf::AddModelInstanceFromUrdfFileToWorld(object_path,
-      multibody::joints::kQuaternion, object_.get());
+  parsers::urdf::AddModelInstanceFromUrdfFile(obj.model_path,
+      multibody::joints::kQuaternion, obj.world_offset, object_.get());
   auto object_state_est = builder.AddSystem(std::make_unique<FakeStateEstimator>(*object_));
   auto object_state_pub = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>(
           "OBJECT_STATE_EST", lcm));
 
-  builder.Connect(plant_->model_instance_state_output_port(obj_instance_id),
+  builder.Connect(plant_->model_instance_state_output_port(obj.instance_id),
                   object_state_est->get_input_port_state());
   builder.Connect(object_state_est->get_output_port_msg(),
                   object_state_pub->get_input_port(0));
@@ -178,9 +180,9 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   ///////////////////////////////////////////////////////////////////
   // WSG CRAP
   const auto& wsg_input_port =
-      plant_->model_instance_actuator_command_input_port(wsg_instance_id);
+      plant_->model_instance_actuator_command_input_port(wsg.instance_id);
   const auto& wsg_output_port =
-      plant_->model_instance_state_output_port(wsg_instance_id);
+      plant_->model_instance_state_output_port(wsg.instance_id);
 
   auto wsg_command_sub = builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<lcmt_schunk_wsg_command>(
@@ -200,13 +202,13 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   const int left_finger_position_index =
       index_map.at("left_finger_sliding_joint");
   const int position_index = plant_->FindInstancePositionIndexFromWorldIndex(
-      wsg_instance_id, left_finger_position_index);
+      wsg.instance_id, left_finger_position_index);
   const int velocity_index = position_index +
-      plant_->get_num_positions(wsg_instance_id);
+      plant_->get_num_positions(wsg.instance_id);
 
   Eigen::MatrixXd feedback_matrix = Eigen::MatrixXd::Zero(
-      2 * plant_->get_num_actuators(wsg_instance_id),
-      2 * plant_->get_num_positions(wsg_instance_id));
+      2 * plant_->get_num_actuators(wsg.instance_id),
+      2 * plant_->get_num_positions(wsg.instance_id));
   feedback_matrix(0, position_index) = 1.;
   feedback_matrix(1, velocity_index) = 1.;
   std::unique_ptr<systems::MatrixGain<double>> feedback_selector =
@@ -244,15 +246,11 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
 
   ///////////////////////////////////////////////////////////////////
 
-
   log()->info("PickAndPlaceDemoDiagram Diagram built.");
   builder.BuildInto(this);
 }
 
 int DoMain() {
-  std::string model_path =
-      GetDrakePath() +
-      "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision.urdf";
   std::string alias_group_path = GetDrakePath() +
                                  "/examples/kuka_iiwa_arm/controlled_kuka/"
                                  "inverse_dynamics_controller_config/"
@@ -319,50 +317,35 @@ int DoMain() {
       0,
       kTableTopZInWorld + 0.1);
 
-  // Adding each model to the Tree builder.
-  int iiwa_instance_id =
-      world_sim_tree_builder->AddFixedModelInstance("iiwa", Vector3<double>(0, 0, kTableTopZInWorld));
 
-  int wsg_instance_id = world_sim_tree_builder->AddModelInstanceToFrame(
+  drake::lcm::DrakeLcm lcm;
+
+  MinimalModelInfo iiwa, wsg, obj;
+  iiwa.model_path = GetDrakePath() +
+      "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision_gripper_inertia.urdf";
+  iiwa.instance_id =
+      world_sim_tree_builder->AddFixedModelInstance("iiwa", Vector3<double>(0, 0, kTableTopZInWorld));
+  iiwa.world_offset = world_sim_tree_builder->get_world_offset_for_instance(iiwa.instance_id);
+
+  wsg.model_path = GetDrakePath() +
+      "/examples/schunk_wsg/models/schunk_wsg_50.sdf";
+  wsg.instance_id = world_sim_tree_builder->AddModelInstanceToFrame(
       "wsg", Eigen::Vector3d::Zero(),  Eigen::Vector3d::Zero(),
       world_sim_tree_builder->tree().findFrame("iiwa_frame_ee"),
       drake::multibody::joints::kFixed);
+  wsg.world_offset = world_sim_tree_builder->get_world_offset_for_instance(wsg.instance_id);
 
-  int object_instance_id = world_sim_tree_builder->AddFloatingModelInstance("cylinder",
-                                                   kCylinderStart);
-
-  drake::lcm::DrakeLcm lcm;
-  ///////////////////////////////
-  /*
-  std::unique_ptr<RigidBodyTree<double>> tree = std::make_unique<RigidBodyTree<double>>();
-  drake::parsers::urdf::AddModelInstanceFromUrdfFile(
-          model_path,
-          drake::multibody::joints::kFixed,
-          nullptr, tree.get());
-  PickAndPlaceDemoDiagram system(
-      std::move(tree),
-      RigidBodyTreeConstants::kFirstNonWorldModelInstanceId,
-      alias_group_path, controller_config_path, &lcm);
-  ///////////////////////////////
-  */
-
-  std::string iiwa_w_wsg_model_path =
-      GetDrakePath() +
-      "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision_gripper_inertia.urdf";
-
-  std::string object_model_path =
-      GetDrakePath() +
-      "/examples/kuka_iiwa_arm/models/objects/simple_cylinder.urdf";
+  obj.model_path = GetDrakePath() + "/examples/kuka_iiwa_arm/models/objects/simple_cylinder.urdf";
+  obj.instance_id = world_sim_tree_builder->AddFloatingModelInstance("cylinder", kCylinderStart);
+  obj.world_offset = world_sim_tree_builder->get_world_offset_for_instance(obj.instance_id);
 
   PickAndPlaceDemoDiagram system(
       world_sim_tree_builder->Build(),
-      iiwa_instance_id,
-      wsg_instance_id,
-      object_instance_id,
-      iiwa_w_wsg_model_path,
+      iiwa,
+      wsg,
+      obj,
       alias_group_path,
       controller_config_path,
-      object_model_path,
       &lcm);
 
   Simulator<double> simulator(system);

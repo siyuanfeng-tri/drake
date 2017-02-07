@@ -100,6 +100,11 @@ class WorldSimTreeBuilder {
     return *rigid_body_tree_;
   }
 
+  std::shared_ptr<RigidBodyFrame<T>> get_world_offset_for_instance(int id)
+      const {
+    return instance_id_to_world_offset_.at(id);
+  }
+
  private:
   std::unique_ptr<RigidBodyTree<T>> rigid_body_tree_{
       std::make_unique<RigidBodyTree<T>>()};
@@ -110,6 +115,8 @@ class WorldSimTreeBuilder {
   // user-supplied names (keys in the map). Instances of these models can be
   // loaded into the simulation.
   std::map<std::string, std::string> model_map_;
+
+  std::map<int, std::shared_ptr<RigidBodyFrame<T>>> instance_id_to_world_offset_;
 };
 
 }  // namespace kuka_iiwa_arm

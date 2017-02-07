@@ -16,7 +16,7 @@ class FakeStateEstimator : public systems::LeafSystem<double> {
  public:
   FakeStateEstimator(const RigidBodyTree<double>& robot)
     : robot_(robot),
-      floating_body_(robot.bodies[1]->getJoint().is_floating() ? robot.bodies[1].get() : nullptr) {
+      base_body_(robot.bodies[1].get()) {
     input_port_index_state_ = DeclareInputPort(systems::kVectorValued, robot.get_num_positions() + robot.get_num_velocities()).get_index();
     output_port_index_msg_ = DeclareAbstractOutputPort().get_index();
   }
@@ -30,15 +30,15 @@ class FakeStateEstimator : public systems::LeafSystem<double> {
 
     bot_core::robot_state_t& msg = output->GetMutableData(output_port_index_msg_)->GetMutableValue<bot_core::robot_state_t>();
     msg.utime = static_cast<int64_t>(context.get_time() * 1e6);
-    Isometry3<double> floating_body_to_world = Isometry3<double>::Identity();
-    TwistVector<double> floating_body_velocity = Vector6<double>::Zero();
-    if (floating_body_) {
+    Isometry3<double> base_body_to_world = Isometry3<double>::Identity();
+    TwistVector<double> base_body_velocity = Vector6<double>::Zero();
+    if (base_body_) {
       // Pose of floating body with respect to world.
-      floating_body_to_world = robot_.CalcBodyPoseInWorldFrame(cache, *floating_body_);
-      floating_body_velocity = robot_.CalcBodySpatialVelocityInWorldFrame(cache, *floating_body_);
+      base_body_to_world = robot_.CalcBodyPoseInWorldFrame(cache, *base_body_);
+      base_body_velocity = robot_.CalcBodySpatialVelocityInWorldFrame(cache, *base_body_);
     }
-    EncodePose(floating_body_to_world, msg.pose);
-    EncodeTwist(floating_body_velocity, msg.twist);
+    EncodePose(base_body_to_world, msg.pose);
+    EncodeTwist(base_body_velocity, msg.twist);
 
     // Joint names, positions, velocities, and efforts.
     // Note: the order of the actuators in the rigid body tree determines the
@@ -81,7 +81,7 @@ class FakeStateEstimator : public systems::LeafSystem<double> {
 
  private:
   const RigidBodyTree<double>& robot_;
-  const RigidBody<double>* const floating_body_{nullptr};
+  const RigidBody<double>* const base_body_{nullptr};
   int input_port_index_state_{0};
   int output_port_index_msg_{0};
 };

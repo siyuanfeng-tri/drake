@@ -30,11 +30,12 @@ class KukaInverseDynamicsServo : public systems::Diagram<double> {
  public:
   KukaInverseDynamicsServo(
       const std::string& model_path,
+      std::shared_ptr<RigidBodyFrame<double>> world_offset,
       const std::string& alias_group_path,
       const std::string& controller_config_path) {
     robot_for_control_ = std::make_unique<RigidBodyTree<double>>();
-    parsers::urdf::AddModelInstanceFromUrdfFileToWorld(model_path,
-        multibody::joints::kFixed, robot_for_control_.get());
+    parsers::urdf::AddModelInstanceFromUrdfFile(model_path,
+        multibody::joints::kFixed, world_offset, robot_for_control_.get());
     const RigidBodyTree<double>& robot = *robot_for_control_;
 
     this->set_name("KukaInverseDynamicsServo");

@@ -23,19 +23,53 @@ namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 
-KukaIkPlanner::KukaIkPlanner(const std::string& model_path) {
+KukaIkPlanner::KukaIkPlanner(const std::string& model_path, std::shared_ptr<RigidBodyFrame<double>> base) {
   robot_ = std::make_unique<RigidBodyTree<double>>();
-  parsers::urdf::AddModelInstanceFromUrdfFileToWorld(model_path,
-      multibody::joints::kFixed, robot_.get());
+  parsers::urdf::AddModelInstanceFromUrdfFile(model_path,
+      multibody::joints::kFixed, base, robot_.get());
 
   end_effector_body_idx_ = robot_->FindBodyIndex("iiwa_link_ee");
 }
 
 bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, IkResult* ik_res) {
-  DRAKE_DEMAND(ik_res);
   int num_dof = robot_->get_num_positions();
   int num_steps = static_cast<int>(waypoints.size());
   MatrixX<double> q0(num_dof, num_steps);
+
+  for (int i = 0; i < num_steps; i++) {
+    const auto& waypoint = waypoints[i];
+    // this could be better
+    q0.col(i) = q_current;
+
+    // TODO: THIS IS A BIG HACK
+    q0(0, i) = atan2(waypoint.pose.translation()[1], waypoint.pose.translation()[0]);
+  }
+
+  Vector3<double> pos_tol(1, 1, 1);
+  double ang_tol = 0.5;
+  bool ret;
+
+  while (pos_tol.norm() > 0.001 || ang_tol > 0.01) {
+    ret = PlanTrajectory(waypoints, q_current, q0, ik_res, pos_tol, ang_tol);
+    // success, reduce pos
+    if (ret) {
+      q0 = ik_res->q.block(0, 1, num_dof, num_steps);
+      pos_tol *= 0.5;
+      ang_tol *= 0.5;
+    } else {
+      pos_tol *= 1.5;
+      ang_tol *= 1.5;
+      std::cout << "failed at: " << pos_tol.transpose() << ", " << ang_tol << std::endl;
+    }
+  }
+
+  return true;
+}
+
+bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, const MatrixX<double>& q0, IkResult* ik_res, const Vector3<double>& position_tol, double rot_tolerance) {
+  DRAKE_DEMAND(ik_res);
+  int num_dof = robot_->get_num_positions();
+  int num_steps = static_cast<int>(waypoints.size());
   MatrixX<double> q_nom(q0), q_sol(q0);
   std::vector<double> times(num_steps);
   std::vector<int> info(num_steps);
@@ -59,16 +93,10 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
   for (int i = 0; i < num_steps; i++) {
     const auto& waypoint = waypoints[i];
     times[i] = waypoint.time;
-    // this could be better
-    q0.col(i) = q_current;
-
-    // TODO: THIS IS A BIG HACK
-    q0(0, i) = atan2(waypoint.pose.translation()[1], waypoint.pose.translation()[0]);
 
     // make position constraint
-    Vector3<double> bound(0.001, 0.001, 0.001);
-    Vector3<double> pos_lb = waypoint.pose.translation() - bound;
-    Vector3<double> pos_ub = waypoint.pose.translation() + bound;
+    Vector3<double> pos_lb = waypoint.pose.translation() - position_tol;
+    Vector3<double> pos_ub = waypoint.pose.translation() + position_tol;
     // need to make sure time doesnt overlap
     Vector2<double> tspan(waypoint.time - 0.1, waypoint.time + 0.1);
 
@@ -85,13 +113,13 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     if (waypoints[i].enforce_quat) {
       std::unique_ptr<WorldQuatConstraint> quat_con =
           std::make_unique<WorldQuatConstraint>(robot_.get(), end_effector_body_idx_,
-                                                math::rotmat2quat(waypoint.pose.linear()), 0.005, tspan);
+                                                math::rotmat2quat(waypoint.pose.linear()), rot_tolerance, tspan);
       constraints.push_back(std::move(quat_con));
       constraint_array.push_back(constraints.back().get());
     }
   }
 
-  std::cout << constraint_array.size() << std::endl;
+  std::cout << "num constraints: " << constraint_array.size() << ", num wp: " << num_steps << std::endl;
 
   // this could be better
   q_nom.setZero();

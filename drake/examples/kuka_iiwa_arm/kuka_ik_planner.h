@@ -11,7 +11,7 @@ namespace kuka_iiwa_arm {
 
 class KukaIkPlanner {
  public:
-  KukaIkPlanner(const std::string& model_path);
+  KukaIkPlanner(const std::string& model_path, std::shared_ptr<RigidBodyFrame<double>> base);
 
   struct IkResult {
     std::vector<double> time;
@@ -33,10 +33,12 @@ class KukaIkPlanner {
 
   const RigidBodyTree<double>& get_robot() const { return *robot_; }
 
-  bool PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q0, IkResult* ik_res);
+  bool PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, IkResult* ik_res);
   robotlocomotion::robot_plan_t EncodeMessage(const IkResult& ik_res);
 
  private:
+  bool PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, const MatrixX<double>& q0, IkResult* ik_res, const Vector3<double>& pos_tol, double rot_tol);
+
   std::unique_ptr<RigidBodyTree<double>> robot_;
   int end_effector_body_idx_;
 };
