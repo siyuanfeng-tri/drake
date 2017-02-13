@@ -12,11 +12,23 @@ namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 
-class FakeStateEstimator : public systems::LeafSystem<double> {
+/**
+ * A class that takes state vector and output a bot_core::robot_state_t message.
+ * Note that the joint_effort part will be set to zero.
+ */
+class OracularStateEstimation : public systems::LeafSystem<double> {
  public:
-  FakeStateEstimator(const RigidBodyTree<double>& robot)
-    : robot_(robot),
-      base_body_(robot.bodies[1].get()) {
+  /**
+   * Constructor for OracularStateEstimation.
+   * @param robot, Reference to the RigidBodyTree. The life span of @p robot
+   * needs to be longer than this instance. Also note that the generated LCM
+   * messages will contain every joint in @p robot.
+   * @param base_body, Reference to the base link in @p robot. Can be either
+   * floating base or a fixed base. @p base_body must be part of @p robot,
+   * and it needs to have a longer life span than this instance.
+   */
+  OracularStateEstimation(const RigidBodyTree<double>& robot, const RigidBody<double>& base_body)
+    : robot_(robot), base_body_(base_body) {
     input_port_index_state_ = DeclareInputPort(systems::kVectorValued, robot.get_num_positions() + robot.get_num_velocities()).get_index();
     output_port_index_msg_ = DeclareAbstractOutputPort().get_index();
   }
@@ -24,23 +36,22 @@ class FakeStateEstimator : public systems::LeafSystem<double> {
   void DoCalcOutput(const systems::Context<double>& context,
                     systems::SystemOutput<double>* output) const override {
     const systems::BasicVector<double>* state = EvalVectorInput(context, input_port_index_state_);
+
     VectorX<double> q = state->get_value().head(robot_.get_num_positions());
     VectorX<double> v = state->get_value().tail(robot_.get_num_velocities());
     KinematicsCache<double> cache = robot_.doKinematics(q, v);
 
     bot_core::robot_state_t& msg = output->GetMutableData(output_port_index_msg_)->GetMutableValue<bot_core::robot_state_t>();
     msg.utime = static_cast<int64_t>(context.get_time() * 1e6);
-    Isometry3<double> base_body_to_world = Isometry3<double>::Identity();
-    TwistVector<double> base_body_velocity = Vector6<double>::Zero();
-    if (base_body_) {
-      // Pose of floating body with respect to world.
-      base_body_to_world = robot_.CalcBodyPoseInWorldFrame(cache, *base_body_);
-      base_body_velocity = robot_.CalcBodySpatialVelocityInWorldFrame(cache, *base_body_);
-    }
+
+    // Pose and velocity of floating body in the world frame.
+    Isometry3<double> base_body_to_world = robot_.CalcBodyPoseInWorldFrame(cache, base_body_);
+    Vector6<double> base_body_velocity = robot_.CalcBodySpatialVelocityInWorldFrame(cache, base_body_);
+
     EncodePose(base_body_to_world, msg.pose);
     EncodeTwist(base_body_velocity, msg.twist);
 
-    // Joint names, positions, velocities, and efforts.
+    // Encodes joint names, positions, velocities and efforts.
     // Note: the order of the actuators in the rigid body tree determines the
     // order of the joint_name, joint_position, joint_velocity, and
     // joint_effort fields.
@@ -81,7 +92,7 @@ class FakeStateEstimator : public systems::LeafSystem<double> {
 
  private:
   const RigidBodyTree<double>& robot_;
-  const RigidBody<double>* const base_body_{nullptr};
+  const RigidBody<double>& base_body_;
   int input_port_index_state_{0};
   int output_port_index_msg_{0};
 };

@@ -40,7 +40,7 @@
 #include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/lcmt_schunk_wsg_status.hpp"
 
-#include "drake/examples/kuka_iiwa_arm/fake_state_estimator.h"
+#include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/systems/analysis/explicit_euler_integrator.h"
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
@@ -153,7 +153,7 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
                   status_pub_->get_input_port(0));
 
   auto iiwa_state_est = builder.AddSystem(
-      std::make_unique<FakeStateEstimator>(iiwa_controller_->get_robot_for_control()));
+      std::make_unique<OracularStateEstimation>(iiwa_controller_->get_robot_for_control(), iiwa_controller_->get_robot_for_control().get_body(1)));
   auto iiwa_state_pub = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>(
           "IIWA_STATE_EST", lcm));
@@ -167,7 +167,7 @@ PickAndPlaceDemoDiagram::PickAndPlaceDemoDiagram(
   object_ = std::make_unique<RigidBodyTree<double>>();
   parsers::urdf::AddModelInstanceFromUrdfFile(obj.model_path,
       multibody::joints::kQuaternion, obj.world_offset, object_.get());
-  auto object_state_est = builder.AddSystem(std::make_unique<FakeStateEstimator>(*object_));
+  auto object_state_est = builder.AddSystem(std::make_unique<OracularStateEstimation>(*object_, object_->get_body(1)));
   auto object_state_pub = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<bot_core::robot_state_t>(
           "OBJECT_STATE_EST", lcm));
