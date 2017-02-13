@@ -12,8 +12,10 @@
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/examples/kuka_iiwa_arm/controlled_kuka/kuka_demo_plant_builder.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
+#include "drake/examples/kuka_iiwa_arm/kuka_ik_planner.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/context.h"
+
 
 DEFINE_double(simulation_sec, 0.1, "Number of seconds to simulate.");
 
@@ -31,6 +33,9 @@ namespace {
 int DoMain() {
   DRAKE_DEMAND(FLAGS_simulation_sec > 0);
 
+  RigidBodyTreed tree;
+  CreateTreedFromFixedModelAtPose(kUrdfPath, &tree);
+
   Eigen::Vector3d kSquareCorner1(0.3, -0.3, 0.3);
   Eigen::Vector3d kSquareCorner2(0.3, -0.3, 0.6);
   Eigen::Vector3d kSquareCorner3(0.3, 0.3, 0.6);
@@ -45,12 +50,16 @@ int DoMain() {
 
   std::vector<double> time_stamps{1.0, 2.0, 3.0, 4.0, 5.0};
 
-  RigidBodyTreed tree;
-  CreateTreedFromFixedModelAtPose(kUrdfPath, &tree);
-
+  /*
   std::unique_ptr<PiecewisePolynomialTrajectory> cartesian_trajectory =
       SimpleCartesianWayPointPlanner(tree, "iiwa_link_ee", way_points,
                                      time_stamps);
+  */
+
+  KukaIkPlanner ik(GetDrakePath() + kUrdfPath, nullptr);
+  ik.SetEndEffector("iiwa_link_ee");
+  std::unique_ptr<PiecewisePolynomialTrajectory> cartesian_trajectory =
+      ik.GenerateFirstOrderHoldTrajectoryFromCartesianWaypoints(time_stamps, way_points);
 
   KukaDemo<double> model(std::move(cartesian_trajectory));
   Simulator<double> simulator(model);

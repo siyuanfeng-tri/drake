@@ -5,6 +5,7 @@
 /// robot_plan_t message.
 
 #include "drake/examples/kuka_iiwa_arm/kuka_ik_planner.h"
+#include "drake/multibody/inverse_kinematics_backend.h"
 
 #include <list>
 #include <iostream>
@@ -18,23 +19,57 @@
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_ik.h"
+#include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
+
+KukaIkPlanner::KukaIkPlanner(const std::string& model_path, const Isometry3<double>& base_to_world) {
+  auto base_frame = std::allocate_shared<RigidBodyFrame<double>>(
+      Eigen::aligned_allocator<RigidBodyFrame<double>>(), "world", nullptr, base_to_world);
+
+  robot_ = std::make_unique<RigidBodyTree<double>>();
+  parsers::urdf::AddModelInstanceFromUrdfFile(model_path,
+      multibody::joints::kFixed, base_frame, robot_.get());
+
+  SetEndEffector("iiwa_link_ee");
+}
 
 KukaIkPlanner::KukaIkPlanner(const std::string& model_path, std::shared_ptr<RigidBodyFrame<double>> base) {
   robot_ = std::make_unique<RigidBodyTree<double>>();
   parsers::urdf::AddModelInstanceFromUrdfFile(model_path,
       multibody::joints::kFixed, base, robot_.get());
 
-  end_effector_body_idx_ = robot_->FindBodyIndex("iiwa_link_ee");
+  SetEndEffector("iiwa_link_ee");
+}
+
+std::unique_ptr<PiecewisePolynomialTrajectory> KukaIkPlanner::GenerateFirstOrderHoldTrajectoryFromCartesianWaypoints(
+    const std::vector<double>& time_stamps,
+    const std::vector<Vector3<double>>& way_point_list) {
+  DRAKE_DEMAND(way_point_list.size() == time_stamps.size());
+  std::vector<IkCartesianWaypoint> waypoints(time_stamps.size());
+  for (int i = 0; i < static_cast<int>(time_stamps.size()); ++i) {
+    waypoints[i].time = time_stamps[i];
+    waypoints[i].pose.translation() = way_point_list[i];
+  }
+
+  IkResult ik_res;
+  PlanTrajectory(waypoints, robot_->getZeroConfiguration(), &ik_res);
+  return GenerateFirstOrderHoldTrajectory(ik_res);
 }
 
 bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, IkResult* ik_res) {
   int num_dof = robot_->get_num_positions();
   int num_steps = static_cast<int>(waypoints.size());
   MatrixX<double> q0(num_dof, num_steps);
+
+  ///////////////////////
+  KinematicsCache<double> cache = robot_->CreateKinematicsCache();
+  cache.initialize(VectorX<double>::Zero(7), VectorX<double>::Zero(7));
+  robot_->doKinematics(cache, true);
+  std::cout << "hand: " << robot_->CalcBodyPoseInWorldFrame(cache, *robot_->FindBody("iiwa_link_ee")).translation().transpose() << std::endl;
+  ///////////////////////
 
   for (int i = 0; i < num_steps; i++) {
     const auto& waypoint = waypoints[i];
@@ -45,22 +80,40 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     q0(0, i) = atan2(waypoint.pose.translation()[1], waypoint.pose.translation()[0]);
   }
 
-  Vector3<double> pos_tol(1, 1, 1);
+  Vector3<double> pos_tol(0.05, 0.05, 0.05);
+  //Vector3<double> pos_tol(0.1, 0.1, 0.1);
   double ang_tol = 0.5;
   bool ret;
 
-  while (pos_tol.norm() > 0.001 || ang_tol > 0.01) {
+  bool done = false;
+  int last_opt = 0;
+
+  while (!done) {
     ret = PlanTrajectory(waypoints, q_current, q0, ik_res, pos_tol, ang_tol);
     // success, reduce pos
     if (ret) {
       q0 = ik_res->q.block(0, 1, num_dof, num_steps);
-      pos_tol *= 0.5;
-      ang_tol *= 0.5;
+
+      // Opted pos, now shrink rot.
+      if (last_opt == 0) {
+        ang_tol *= 0.5;
+        last_opt = 1;
+      } else {
+        pos_tol *= 0.5;
+        last_opt = 0;
+      }
     } else {
-      pos_tol *= 1.5;
-      ang_tol *= 1.5;
       std::cout << "failed at: " << pos_tol.transpose() << ", " << ang_tol << std::endl;
+      if (last_opt == 0) {
+        ang_tol *= 1.5;
+      } else {
+        pos_tol *= 1.5;
+      }
+      std::cout << "relax to: " << pos_tol.transpose() << ", " << ang_tol << std::endl;
     }
+
+    if (pos_tol.norm() <= 0.005 && ang_tol <= 0.05)
+      done = true;
   }
 
   return true;
@@ -70,7 +123,7 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
   DRAKE_DEMAND(ik_res);
   int num_dof = robot_->get_num_positions();
   int num_steps = static_cast<int>(waypoints.size());
-  MatrixX<double> q_nom(q0), q_sol(q0);
+  MatrixX<double> q_nom(q0), q_sol(q0), qd_sol(q0), qdd_sol(q0);
   std::vector<double> times(num_steps);
   std::vector<int> info(num_steps);
   std::vector<std::string> infeasible_constraint;
@@ -88,7 +141,12 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
   for (int i = 0; i < num_dof; i++)
     joint_idx[i] = i;
   pc1.setJointLimits(joint_idx, joint_lb, joint_ub);
-  constraint_array.push_back(&pc1);
+  //constraint_array.push_back(&pc1);
+
+  for (int i = 0; i < num_steps; i++) {
+    times[i] = waypoints[i].time;
+  }
+  std::vector<Eigen::Vector2d> time_window_list = TimeWindowBuilder(times);
 
   for (int i = 0; i < num_steps; i++) {
     const auto& waypoint = waypoints[i];
@@ -100,11 +158,18 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     // need to make sure time doesnt overlap
     Vector2<double> tspan(waypoint.time - 0.1, waypoint.time + 0.1);
 
+    // tspan = time_window_list.at(i);
+
     // pos constraints
     std::unique_ptr<WorldPositionConstraint> pos_con =
         std::make_unique<WorldPositionConstraint>(
             robot_.get(), end_effector_body_idx_, Vector3<double>::Zero(), pos_lb, pos_ub,
             tspan);
+
+    std::cout << "ts: " << tspan.transpose() << std::endl;
+    std::cout << "lb: " << pos_lb.transpose() << std::endl;
+    std::cout << "ub: " << pos_ub.transpose() << std::endl;
+
     constraints.push_back(std::move(pos_con));
 
     constraint_array.push_back(constraints.back().get());
@@ -127,6 +192,16 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
   inverseKinPointwise(robot_.get(), num_steps, times.data(), q0, q_nom,
                       constraint_array.size(), constraint_array.data(),
                       ikoptions, &q_sol, info.data(), &infeasible_constraint);
+  /*
+  systems::plants::inverseKinTrajBackend(robot_.get(), num_steps, times.data(),
+      q0, q_nom,
+      constraint_array.size(), constraint_array.data(),
+      ikoptions, &q_sol, &qd_sol, &qdd_sol, info.data(), &infeasible_constraint);
+  */
+
+  std::cout << "q0: " << q0 << std::endl;
+  std::cout << "q_nom: " << q_nom << std::endl;
+  std::cout << "q_sol: " << q_sol << std::endl;
 
   bool info_good = true;
   for (int i = 0; i < num_steps; ++i) {
@@ -158,6 +233,8 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     std::cerr << "Solution failed, not sending." << std::endl;
     return false;
   }
+
+  // exit(-1);
 
   return true;
 }

@@ -55,6 +55,12 @@ std::unique_ptr<PiecewisePolynomialTrajectory> SimpleCartesianWayPointPlanner(
     const RigidBodyTreed& tree, const std::string& link_to_constrain,
     const std::vector<Eigen::Vector3d>& way_point_list,
     const std::vector<double>& time_stamps) {
+
+  KinematicsCache<double> cache = tree.CreateKinematicsCache();
+  cache.initialize(VectorX<double>::Zero(7), VectorX<double>::Zero(7));
+  tree.doKinematics(cache, true);
+  std::cout << "hand: " << tree.CalcBodyPoseInWorldFrame(cache, *tree.FindBody(link_to_constrain)).translation().transpose() << std::endl;
+
   DRAKE_DEMAND(way_point_list.size() == time_stamps.size());
 
   VectorXd zero_conf = tree.getZeroConfiguration();
@@ -85,6 +91,10 @@ std::unique_ptr<PiecewisePolynomialTrajectory> SimpleCartesianWayPointPlanner(
             tree_ptr, tree.FindBodyIndex(link_to_constrain), Vector3d::Zero(),
             pos_lb, pos_ub, time_window_list.at(i));
 
+    std::cout << "ts: " << time_window_list.at(i).transpose() << std::endl;
+    std::cout << "lb: " << pos_lb.transpose() << std::endl;
+    std::cout << "ub: " << pos_ub.transpose() << std::endl;
+
     // Stores the unique_ptr
     constraint_unique_ptr_list.push_back(std::move(wpc));
     constraint_ptr_list.push_back(constraint_unique_ptr_list.at(i).get());
@@ -97,6 +107,7 @@ std::unique_ptr<PiecewisePolynomialTrajectory> SimpleCartesianWayPointPlanner(
 
   // TODO(naveenoid) : inverseKinPointwise needs fixing to accept a reference
   // to the RigidBodyTree instead of a pointer.
+  std::cout << "num constraints: " << constraint_ptr_list.size() << std::endl;
   inverseKinPointwise(tree_ptr, time_stamps.size(), time_stamps.data(), q0, q0,
                       constraint_ptr_list.size(), constraint_ptr_list.data(),
                       ikoptions, &q_sol, info.data(), &infeasible_constraint);
@@ -118,6 +129,10 @@ std::unique_ptr<PiecewisePolynomialTrajectory> SimpleCartesianWayPointPlanner(
     // so we write a vector.
     knots[i] = q_sol.col(i);
   }
+
+  std::cout << "q0: " << q0 << std::endl;
+  std::cout << "q_nom: " << q0 << std::endl;
+  std::cout << "q_sol: " << q_sol << std::endl;
 
   return make_unique<PiecewisePolynomialTrajectory>(
       PiecewisePolynomial<double>::FirstOrderHold(time_stamps, knots));
