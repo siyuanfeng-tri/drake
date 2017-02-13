@@ -5,7 +5,6 @@
 /// robot_plan_t message.
 
 #include "drake/examples/kuka_iiwa_arm/kuka_ik_planner.h"
-#include "drake/multibody/inverse_kinematics_backend.h"
 
 #include <list>
 #include <iostream>
@@ -59,6 +58,7 @@ std::unique_ptr<PiecewisePolynomialTrajectory> KukaIkPlanner::GenerateFirstOrder
   return GenerateFirstOrderHoldTrajectory(ik_res);
 }
 
+/*
 bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, IkResult* ik_res) {
   int num_dof = robot_->get_num_positions();
   int num_steps = static_cast<int>(waypoints.size());
@@ -118,7 +118,127 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
 
   return true;
 }
+*/
 
+bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, IkResult* ik_res) {
+  DRAKE_DEMAND(ik_res);
+  int num_dof = robot_->get_num_positions();
+  int num_steps = static_cast<int>(waypoints.size());
+
+  VectorX<double> q_start = q_current;
+  VectorX<double> q_end = q_current;
+
+  ik_res->time.resize(num_steps + 1);
+  ik_res->info.resize(num_steps + 1);
+  ik_res->q.resize(num_dof, num_steps + 1);
+  ik_res->time[0] = 0;
+  ik_res->info[0] = 1;
+  ik_res->q.col(0) = q_current;
+
+  int ctr = 0;
+  for (const auto& waypoint : waypoints) {
+    Vector3<double> pos_tol(0.05, 0.05, 0.05);
+    double rot_tol = 0.5;
+
+    // reduce pos
+    int mode = 0;
+    int itr = 0;
+
+    // Solve point IK with constraint fiddling.
+    while (true) {
+      bool res = SolveIk(waypoint, q_start, pos_tol, rot_tol, &q_end);
+      itr++;
+
+      if (res) {
+        if (mode == 0) {
+          rot_tol /= 2.;
+          mode = 1;
+        } else {
+          pos_tol /= 2.;
+          mode = 0;
+        }
+      } else {
+        if (mode == 0) {
+          rot_tol *= 1.5;
+        } else {
+          pos_tol *= 1.5;
+        }
+      }
+
+      if (pos_tol.norm() < 0.005 && rot_tol < 0.05)
+        break;
+
+      if (itr > 100) {
+        std::cout << "FAILED AT MAX ITR\n";
+        break;
+      }
+    }
+
+    // Set next IK's initial and bias to current solution.
+    q_start = q_end;
+
+    ik_res->time[ctr + 1] = waypoint.time;
+    ik_res->info[ctr + 1] = 1;
+
+    std::cout << "q_end: " << q_end << std::endl;
+    ik_res->q.col(ctr + 1) = q_end;
+    ctr++;
+  }
+
+  return true;
+}
+
+bool KukaIkPlanner::SolveIk(const IkCartesianWaypoint& waypoint, const VectorX<double>& q_current, const Vector3<double>& pos_tol, double rot_tol, VectorX<double>* q_res) {
+  DRAKE_DEMAND(q_res);
+  std::vector<RigidBodyConstraint*> constraint_array;
+  std::vector<int> info(1);
+  std::vector<std::string> infeasible_constraint;
+  IKoptions ikoptions(robot_.get());
+  ikoptions.setDebug(true);
+
+  // make position constraint
+  Vector3<double> pos_lb = waypoint.pose.translation() - pos_tol;
+  Vector3<double> pos_ub = waypoint.pose.translation() + pos_tol;
+
+  WorldPositionConstraint pos_con(
+      robot_.get(),
+      end_effector_body_idx_,
+      Vector3<double>::Zero(),
+      pos_lb, pos_ub, Vector2<double>::Zero());
+
+  std::cout << "lb: " << pos_lb.transpose() << std::endl;
+  std::cout << "ub: " << pos_ub.transpose() << std::endl;
+
+  constraint_array.push_back(&pos_con);
+
+  // rot constraints
+  if (waypoint.enforce_quat) {
+    WorldQuatConstraint quat_con(
+        robot_.get(),
+        end_effector_body_idx_,
+        math::rotmat2quat(waypoint.pose.linear()),
+        rot_tol, Vector2<double>::Zero());
+    constraint_array.push_back(&quat_con);
+  }
+
+  VectorX<double> q0 = q_current;
+  VectorX<double> q_sol = q0;
+
+  inverseKin(robot_.get(), q0, q_current,
+      constraint_array.size(), constraint_array.data(),
+      ikoptions, &q_sol, info.data(), &infeasible_constraint);
+
+  *q_res = q_sol;
+
+  printf("INFO[%d] = %d ", 0, info[0]);
+  if (info[0] != 1) {
+    return false;
+  }
+
+  return true;
+}
+
+/*
 bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypoints, const VectorX<double>& q_current, const MatrixX<double>& q0, IkResult* ik_res, const Vector3<double>& position_tol, double rot_tolerance) {
   DRAKE_DEMAND(ik_res);
   int num_dof = robot_->get_num_positions();
@@ -192,12 +312,6 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
   inverseKinPointwise(robot_.get(), num_steps, times.data(), q0, q_nom,
                       constraint_array.size(), constraint_array.data(),
                       ikoptions, &q_sol, info.data(), &infeasible_constraint);
-  /*
-  systems::plants::inverseKinTrajBackend(robot_.get(), num_steps, times.data(),
-      q0, q_nom,
-      constraint_array.size(), constraint_array.data(),
-      ikoptions, &q_sol, &qd_sol, &qdd_sol, info.data(), &infeasible_constraint);
-  */
 
   std::cout << "q0: " << q0 << std::endl;
   std::cout << "q_nom: " << q_nom << std::endl;
@@ -234,10 +348,9 @@ bool KukaIkPlanner::PlanTrajectory(const std::vector<IkCartesianWaypoint>& waypo
     return false;
   }
 
-  // exit(-1);
-
   return true;
 }
+*/
 
 robotlocomotion::robot_plan_t KukaIkPlanner::EncodeMessage(const IkResult& ik_res) {
   DRAKE_DEMAND(ik_res.q.cols() == static_cast<int>(ik_res.time.size()));
