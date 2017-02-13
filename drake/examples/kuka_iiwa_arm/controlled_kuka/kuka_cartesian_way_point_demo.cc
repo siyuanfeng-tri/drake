@@ -56,8 +56,7 @@ int DoMain() {
                                      time_stamps);
   */
 
-  KukaIkPlanner ik(GetDrakePath() + kUrdfPath, nullptr);
-  ik.SetEndEffector("iiwa_link_ee");
+  KukaIkPlanner ik(GetDrakePath() + kUrdfPath, "iiwa_link_ee", nullptr);
   std::unique_ptr<PiecewisePolynomialTrajectory> cartesian_trajectory =
       ik.GenerateFirstOrderHoldTrajectoryFromCartesianWaypoints(time_stamps, way_points);
 

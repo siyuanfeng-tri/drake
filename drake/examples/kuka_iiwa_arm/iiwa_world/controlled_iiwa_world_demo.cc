@@ -126,7 +126,7 @@ int DoMain() {
       Eigen::Vector3d(-0.05, 0, 0.5));
 
   // Way point time vectors were hand crafted to obtain a nice demo.
-  vector<double> target_time_vector = {1.0, 1.75, 2.25, 3.0, 3.75};
+  vector<double> target_time_vector = {1.0, 2.5, 4, 4.5, 6};
 
   // Initializes a robot tree for use in the inverse kinematics and
   // in the gravity compensation control.
@@ -142,8 +142,7 @@ int DoMain() {
 
   Isometry3<double> base_frame(Isometry3<double>::Identity());
   base_frame.translation() = kRobotBase;
-  KukaIkPlanner ik(GetDrakePath() + kRobotName, base_frame);
-  ik.SetEndEffector("iiwa_link_ee");
+  KukaIkPlanner ik(GetDrakePath() + kRobotName, "iiwa_link_ee", base_frame);
   std::unique_ptr<PiecewisePolynomialTrajectory> polynomial_trajectory =
       ik.GenerateFirstOrderHoldTrajectoryFromCartesianWaypoints(target_time_vector, target_position_vector);
 

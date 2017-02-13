@@ -38,6 +38,9 @@ drake_install_pkg_config_file(drake-rbm
         drake-joints
         eigen3)
 
+
+add_definitions(-g)
+
 add_library_with_exports(LIB_NAME drakeIKoptions SOURCE_FILES ik_options.cc)
 target_link_libraries(drakeIKoptions drakeRBM)
 drake_install_pkg_config_file(drake-ik-options

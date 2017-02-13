@@ -137,8 +137,8 @@ class Action {
 class IiwaMoveCartesian : public Action {
  public:
   IiwaMoveCartesian(lcm::LCM* lcm, const std::string& channel, const std::string& iiwa_model_path, std::shared_ptr<RigidBodyFrame<double>> iiwa_base)
-      : planner_(iiwa_model_path, iiwa_base), iiwa_(planner_.get_robot()), cache_(iiwa_.CreateKinematicsCache()), lcm_(lcm), channel_(channel) {
-    end_effector_ = iiwa_.FindBody("iiwa_link_ee_kuka");
+      : planner_(iiwa_model_path, "iiwa_link_ee", iiwa_base), iiwa_(planner_.get_robot()), cache_(iiwa_.CreateKinematicsCache()), lcm_(lcm), channel_(channel) {
+    end_effector_ = iiwa_.FindBody("iiwa_link_ee");
   }
 
   void HandleIiwaStatus(const lcm::ReceiveBuffer* rbuf, const std::string& chan, const bot_core::robot_state_t* iiwa_msg) {
@@ -364,11 +364,17 @@ int main(int argc, const char* argv[]) {
         if (!iiwa_move.ActionStarted()) {
           std::vector<KukaIkPlanner::IkCartesianWaypoint> waypoints;
           KukaIkPlanner::IkCartesianWaypoint wp;
+
+          wp.time = 1;
+          wp.pose.translation() = (pick.translation() + place.translation()) / 2.;
+          wp.pose.translation()[2] += 0.5;
+          wp.enforce_quat = false;
+          waypoints.push_back(wp);
+
           wp.time = 2;
           wp.pose = place;
           wp.pose.translation()[2] += 0.2;
           wp.enforce_quat = true;
-
           waypoints.push_back(wp);
 
           iiwa_move.MoveEnedEffectorThroughWaypoints(waypoints);
