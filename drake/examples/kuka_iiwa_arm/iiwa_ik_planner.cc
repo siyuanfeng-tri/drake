@@ -66,15 +66,13 @@ bool IiwaIkPlanner::PlanTrajectory(
     const std::vector<IkCartesianWaypoint>& waypoints,
     const VectorX<double>& q_current, const Vector3<double>& position_tol,
     double rotation_tol, IkResult* ik_res) {
-  std::cout << "stff\n";
   DRAKE_DEMAND(ik_res);
   int num_dof = robot_->get_num_positions();
   int num_steps = static_cast<int>(waypoints.size());
 
-  std::cout << "num_dof " << num_dof << "num_steps " << num_steps << std::endl;
-
-  VectorX<double> q_start = q_current;
-  VectorX<double> q_end = q_current;
+  VectorX<double> q_prev = q_current;
+  VectorX<double> q0 = q_current;
+  VectorX<double> q_sol = q_current;
 
   ik_res->time.resize(num_steps + 1);
   ik_res->info.resize(num_steps + 1);
@@ -87,47 +85,69 @@ bool IiwaIkPlanner::PlanTrajectory(
   for (const auto& waypoint : waypoints) {
     Vector3<double> pos_tol = position_tol;
     double rot_tol = rotation_tol;
+    if (!waypoint.enforce_quat)
+      rot_tol = 0;
 
     // reduce pos
     int mode = 0;
-    int itr = 0;
+
+    int random_ctr = 0;
+    int failed_ctr = 0;
 
     // Solve point IK with constraint fiddling.
     while (true) {
-      bool res = SolveIk(waypoint, q_start, pos_tol, rot_tol, &q_end);
-      itr++;
+      if (!waypoint.enforce_quat)
+        DRAKE_DEMAND(mode == 0);
+
+      bool res = SolveIk(waypoint, q0, q_prev, pos_tol, rot_tol, &q_sol);
 
       if (res) {
-        if (mode == 0) {
+        if (mode == 0 && waypoint.enforce_quat) {
           rot_tol /= 2.;
           mode = 1;
         } else {
           pos_tol /= 2.;
           mode = 0;
         }
+        q0 = q_sol;
       } else {
-        if (mode == 0) {
+        if (mode == 0 && waypoint.enforce_quat) {
           rot_tol *= 1.5;
         } else {
           pos_tol *= 1.5;
         }
+        failed_ctr++;
       }
 
       if (pos_tol.norm() < 0.005 && rot_tol < 0.05) break;
 
-      if (itr > 100) {
+      if (failed_ctr > 10) {
+        q0 = VectorX<double>::Random(7);
+        pos_tol = position_tol;
+        rot_tol = rotation_tol;
+        if (!waypoint.enforce_quat)
+          rot_tol = 0;
+        mode = 0;
+
         std::cout << "FAILED AT MAX ITR\n";
+        failed_ctr = 0;
+        random_ctr ++;
+      }
+
+      if (random_ctr > 10) {
+        std::cout << "FAILED AT MAX ITR and MAX random iter\n";
         return false;
       }
     }
 
     // Set next IK's initial and bias to current solution.
-    q_start = q_end;
+    q_prev = q_sol;
+    q0 = q_sol;
 
     ik_res->time[ctr + 1] = waypoint.time;
     ik_res->info[ctr + 1] = 1;
 
-    ik_res->q.col(ctr + 1) = q_end;
+    ik_res->q.col(ctr + 1) = q_sol;
     ctr++;
   }
 
@@ -135,7 +155,8 @@ bool IiwaIkPlanner::PlanTrajectory(
 }
 
 bool IiwaIkPlanner::SolveIk(const IkCartesianWaypoint& waypoint,
-                            const VectorX<double>& q_current,
+                            const VectorX<double>& q0,
+                            const VectorX<double>& q_nom,
                             const Vector3<double>& pos_tol, double rot_tol,
                             VectorX<double>* q_res) {
   DRAKE_DEMAND(q_res);
@@ -163,14 +184,9 @@ bool IiwaIkPlanner::SolveIk(const IkCartesianWaypoint& waypoint,
     constraint_array.push_back(&quat_con);
   }
 
-  VectorX<double> q0 = q_current;
-  VectorX<double> q_sol = q0;
-
-  inverseKin(robot_.get(), q0, q_current, constraint_array.size(),
-             constraint_array.data(), ikoptions, &q_sol, info.data(),
+  inverseKin(robot_.get(), q0, q_nom, constraint_array.size(),
+             constraint_array.data(), ikoptions, q_res, info.data(),
              &infeasible_constraint);
-
-  *q_res = q_sol;
 
   if (info[0] != 1) {
     return false;

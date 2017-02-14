@@ -21,14 +21,22 @@ void main() {
 
   Vector3<double> low(-0.5, -0.5, 0);
   Vector3<double> high(0.5, 0.5, 1);
-  int xN = 10;
-  int yN = 10;
-  int zN = 10;
+  int xN = 2;
+  int yN = 2;
+  int zN = 2;
   double dx = (high(0) - low(0)) / xN;
   double dy = (high(1) - low(1)) / yN;
   double dz = (high(2) - low(2)) / zN;
 
   std::vector<std::vector<std::vector<std::pair<bool, VectorX<double>>>>> workspace;
+  workspace.resize(xN);
+  for (int xi = 0; xi < xN; xi++) {
+    workspace[xi].resize(yN);
+    for (int yi = 0; yi < yN; yi++) {
+      workspace[xi][yi].resize(zN);
+    }
+  }
+
   VectorX<double> zero7 = VectorX<double>::Zero(7);
 
   Vector3<double> pos_tol(0.005, 0.005, 0.005);

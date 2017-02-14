@@ -24,6 +24,8 @@ class IiwaIkPlanner {
     std::vector<double> time;
     std::vector<int> info;
     MatrixX<double> q;
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
 
   struct IkCartesianWaypoint {
@@ -77,7 +79,8 @@ class IiwaIkPlanner {
 
  private:
   bool SolveIk(const IkCartesianWaypoint& waypoint,
-               const VectorX<double>& q_current,
+               const VectorX<double>& q0,
+               const VectorX<double>& q_nom,
                const Vector3<double>& position_tol, double rot_tolerance,
                VectorX<double>* ik_res);
 
