@@ -13,6 +13,7 @@
 #include "drake/common/eigen_types.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
+#include "drake/examples/kuka_iiwa_arm/iiwa_ik_planner.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_diagram_factory.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
 #include "drake/lcm/drake_lcm.h"
@@ -125,17 +126,19 @@ int DoMain() {
       Eigen::Vector3d(-0.05, 0, 0.5));
 
   // Way point time vectors were hand crafted to obtain a nice demo.
-  vector<double> target_time_vector = {1.0, 1.75, 2.25, 3.0, 3.75};
+  vector<double> target_time_vector = {1.0, 2.5, 4, 4.5, 6};
 
   // Initializes a robot tree for use in the inverse kinematics and
   // in the gravity compensation control.
   RigidBodyTreed robot_tree;
   CreateTreedFromFixedModelAtPose(kRobotName, &robot_tree, kRobotBase);
 
-  unique_ptr<PiecewisePolynomialTrajectory> polynomial_trajectory =
-      SimpleCartesianWayPointPlanner(robot_tree, "iiwa_link_ee",
-                                     target_position_vector,
-                                     target_time_vector);
+  Isometry3<double> base_frame(Isometry3<double>::Identity());
+  base_frame.translation() = kRobotBase;
+  KukaIkPlanner ik(GetDrakePath() + kRobotName, "iiwa_link_ee", base_frame);
+  std::unique_ptr<PiecewisePolynomialTrajectory> polynomial_trajectory =
+      ik.GenerateFirstOrderHoldTrajectoryFromCartesianWaypoints(
+          target_time_vector, target_position_vector);
 
   lcm::DrakeLcm lcm;
   auto demo_plant = std::make_unique<PositionControlledPlantWithRobot<double>>(

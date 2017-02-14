@@ -22,8 +22,14 @@ filegroup(
 
 drake_cc_library(
     name = "iiwa_common",
-    srcs = ["iiwa_common.cc"],
-    hdrs = ["iiwa_common.h"],
+    srcs = [
+        "iiwa_common.cc",
+        "iiwa_ik_planner.cc",
+    ],
+    hdrs = [
+        "iiwa_common.h",
+        "iiwa_ik_planner.h",
+    ],
     deps = [
         "//drake/common/trajectories:piecewise_polynomial_trajectory",
         "//drake/multibody:inverse_kinematics",
