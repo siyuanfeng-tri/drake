@@ -1,9 +1,3 @@
-/// @file
-///
-/// Generates a canned IK demo plan for an iiwa arm starting from the
-/// zero configuration and sends that plan over lcm using the
-/// robot_plan_t message.
-
 #include "drake/examples/kuka_iiwa_arm/iiwa_ik_planner.h"
 
 #include <iostream>
@@ -43,6 +37,11 @@ IiwaIkPlanner::IiwaIkPlanner(const std::string& model_path,
       model_path, multibody::joints::kFixed, base, robot_.get());
 
   SetEndEffector(end_effector_link_name);
+
+  KinematicsCache<double> cache = robot_->CreateKinematicsCache();
+  cache.initialize(VectorX<double>::Zero(7), VectorX<double>::Zero(7));
+  robot_->doKinematics(cache);
+  std::cout << robot_->CalcBodyPoseInWorldFrame(cache, *robot_->FindBody(end_effector_link_name)).translation() << std::endl;
 }
 
 std::unique_ptr<PiecewisePolynomialTrajectory>
@@ -67,9 +66,12 @@ bool IiwaIkPlanner::PlanTrajectory(
     const std::vector<IkCartesianWaypoint>& waypoints,
     const VectorX<double>& q_current, const Vector3<double>& position_tol,
     double rotation_tol, IkResult* ik_res) {
+  std::cout << "stff\n";
   DRAKE_DEMAND(ik_res);
   int num_dof = robot_->get_num_positions();
   int num_steps = static_cast<int>(waypoints.size());
+
+  std::cout << "num_dof " << num_dof << "num_steps " << num_steps << std::endl;
 
   VectorX<double> q_start = q_current;
   VectorX<double> q_end = q_current;
@@ -115,7 +117,7 @@ bool IiwaIkPlanner::PlanTrajectory(
 
       if (itr > 100) {
         std::cout << "FAILED AT MAX ITR\n";
-        break;
+        return false;
       }
     }
 

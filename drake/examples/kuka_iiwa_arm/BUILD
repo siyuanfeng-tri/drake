@@ -6,6 +6,7 @@ load(
     "//tools:drake.bzl",
     "drake_cc_library",
     "drake_cc_binary",
+    "drake_cc_googletest",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -35,6 +36,8 @@ drake_cc_library(
         "//drake/multibody:inverse_kinematics",
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/parsers",
+        "@bot_core_lcmtypes//:lib",
+        "@robotlocomotion_lcmtypes//:lib",
     ],
 )
 
@@ -98,6 +101,22 @@ cc_binary(
         "//drake/solvers:mathematical_program",
         "@bot_core_lcmtypes//:lib",
         "@robotlocomotion_lcmtypes//:lib",
+    ],
+)
+
+
+
+drake_cc_googletest(
+    name = "iiwa_ik_test",
+    srcs = ["test/iiwa_ik_test.cc"],
+    tags = [
+        "exclusive",
+        "snopt",
+        "local",
+    ],
+    deps = [
+        ":iiwa_common",
+        "//drake/common:eigen_matrix_compare",
     ],
 )
 

@@ -135,7 +135,7 @@ int DoMain() {
 
   Isometry3<double> base_frame(Isometry3<double>::Identity());
   base_frame.translation() = kRobotBase;
-  KukaIkPlanner ik(GetDrakePath() + kRobotName, "iiwa_link_ee", base_frame);
+  IiwaIkPlanner ik(GetDrakePath() + kRobotName, "iiwa_link_ee", base_frame);
   std::unique_ptr<PiecewisePolynomialTrajectory> polynomial_trajectory =
       ik.GenerateFirstOrderHoldTrajectoryFromCartesianWaypoints(
           target_time_vector, target_position_vector);

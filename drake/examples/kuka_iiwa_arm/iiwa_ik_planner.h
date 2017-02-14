@@ -36,6 +36,8 @@ class IiwaIkPlanner {
       pose.setIdentity();
       enforce_quat = false;
     }
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
 
   void SetEndEffector(const RigidBody<double>& end_effector_body) {
