@@ -82,6 +82,10 @@ bool IiwaIkPlanner::PlanTrajectory(
   ik_res->q.col(0) = q_current;
 
   int ctr = 0;
+
+  const int kRelaxPosTol = 0;
+  const int kRelaxRotTol = 1;
+
   for (const auto& waypoint : waypoints) {
     Vector3<double> pos_tol = position_tol;
     double rot_tol = rotation_tol;
@@ -89,29 +93,32 @@ bool IiwaIkPlanner::PlanTrajectory(
       rot_tol = 0;
 
     // reduce pos
-    int mode = 0;
+    int mode = kRelaxPosTol;
 
     int random_ctr = 0;
     int failed_ctr = 0;
 
-    // Solve point IK with constraint fiddling.
+    // Solve point IK with constraint fiddling and random start.
     while (true) {
       if (!waypoint.enforce_quat)
-        DRAKE_DEMAND(mode == 0);
+        DRAKE_DEMAND(mode == kRelaxPosTol);
 
       bool res = SolveIk(waypoint, q0, q_prev, pos_tol, rot_tol, &q_sol);
 
       if (res) {
-        if (mode == 0 && waypoint.enforce_quat) {
+        // Alternates between kRelaxPosTol and kRelaxRotTol
+        if (mode == kRelaxPosTol && waypoint.enforce_quat) {
           rot_tol /= 2.;
-          mode = 1;
+          mode = kRelaxRotTol;
         } else {
           pos_tol /= 2.;
-          mode = 0;
+          mode = kRelaxPosTol;
         }
+        // Sets the initial guess to the current solution.
         q0 = q_sol;
       } else {
-        if (mode == 0 && waypoint.enforce_quat) {
+        // Relaxes the constraints no solution is found.
+        if (mode == kRelaxRotTol && waypoint.enforce_quat) {
           rot_tol *= 1.5;
         } else {
           pos_tol *= 1.5;
@@ -121,19 +128,23 @@ bool IiwaIkPlanner::PlanTrajectory(
 
       if (pos_tol.norm() < 0.005 && rot_tol < 0.05) break;
 
+      // Switch to a different initial guess and start over if we have relaxed
+      // the constraints for max times.
       if (failed_ctr > 10) {
         q0 = VectorX<double>::Random(7);
+        // Resets constraints.
         pos_tol = position_tol;
         rot_tol = rotation_tol;
         if (!waypoint.enforce_quat)
           rot_tol = 0;
-        mode = 0;
+        mode = kRelaxPosTol;
 
         std::cout << "FAILED AT MAX ITR\n";
         failed_ctr = 0;
         random_ctr ++;
       }
 
+      // Admits failure and returns false.
       if (random_ctr > 10) {
         std::cout << "FAILED AT MAX ITR and MAX random iter\n";
         return false;

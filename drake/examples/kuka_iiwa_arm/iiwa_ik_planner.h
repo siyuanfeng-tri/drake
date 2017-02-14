@@ -33,13 +33,14 @@ class IiwaIkPlanner {
     Isometry3<double> pose;
     bool enforce_quat;
 
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     IkCartesianWaypoint() {
       time = 0;
       pose.setIdentity();
       enforce_quat = false;
     }
 
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
 
   void SetEndEffector(const RigidBody<double>& end_effector_body) {

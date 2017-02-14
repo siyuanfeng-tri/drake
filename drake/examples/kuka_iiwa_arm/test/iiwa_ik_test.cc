@@ -1,5 +1,6 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_ik_planner.h"
 
+#include <fstream>
 #include <string>
 #include <unordered_map>
 
@@ -39,6 +40,9 @@ void main() {
 
   VectorX<double> zero7 = VectorX<double>::Zero(7);
 
+  std::ofstream ofs;
+  ofs.open ("/home/sfeng/workspace.txt", std::ofstream::out);
+
   Vector3<double> pos_tol(0.005, 0.005, 0.005);
   double rot_tol = 0.05;
 
@@ -59,10 +63,12 @@ void main() {
           workspace[xi][yi][zi] = std::pair<bool, VectorX<double>>(false, zero7);
           std::cout << "fail: " << waypoints[0].pose.translation().transpose() << std::endl;
         }
+
+        ofs << waypoints[0].pose.translation().transpose() << " " << workspace[xi][yi][zi].second.transpose() << std::endl;
       }
     }
   }
-
+  ofs.close();
 }
 
 }  // namespace kuka_iiwa_arm
