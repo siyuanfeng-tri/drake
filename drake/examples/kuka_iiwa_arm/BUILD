@@ -111,4 +111,13 @@ cc_binary(
     ],
 )
 
+drake_cc_binary(
+    name = "weld_gripper",
+    srcs = ["weld_gripper.cc"],
+    deps = [
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+    ],
+)
+
 cpplint()
