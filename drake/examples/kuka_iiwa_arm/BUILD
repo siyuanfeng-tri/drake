@@ -64,6 +64,10 @@ drake_cc_library(
 drake_cc_binary(
     name = "iiwa_wsg_simulation",
     srcs = ["iiwa_wsg_simulation.cc"],
+    data = [
+        ":models",
+        "//drake/examples/schunk_wsg:models",
+    ],
     deps = [
         ":iiwa_lcm",
         ":oracular_state_estimator",
@@ -83,6 +87,7 @@ drake_cc_binary(
 drake_cc_binary(
     name = "kuka_simulation",
     srcs = ["kuka_simulation.cc"],
+    data = [":models"],
     deps = [
         ":iiwa_common",
         ":iiwa_lcm",
@@ -99,6 +104,7 @@ drake_cc_binary(
 drake_cc_binary(
     name = "kuka_plan_runner",
     srcs = ["kuka_plan_runner.cc"],
+    data = [":models"],
     deps = [
         ":iiwa_common",
         ":iiwa_lcm",
@@ -110,6 +116,7 @@ drake_cc_binary(
 cc_binary(
     name = "kuka_ik_demo",
     srcs = ["kuka_ik_demo.cc"],
+    data = [":models"],
     deps = [
         "//drake/lcm",
         "//drake/multibody:inverse_kinematics",
