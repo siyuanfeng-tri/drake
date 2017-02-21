@@ -24,18 +24,6 @@ filegroup(
 )
 
 drake_cc_library(
-    name = "iiwa_ik_planner",
-    srcs = ["iiwa_ik_planner.cc"],
-    hdrs = ["iiwa_ik_planner.h"],
-    deps = [
-        "//drake/common/trajectories:piecewise_polynomial_trajectory",
-        "//drake/multibody:inverse_kinematics",
-        "//drake/multibody:rigid_body_tree",
-        "//drake/multibody/parsers",
-    ],
-)
-
-drake_cc_library(
     name = "iiwa_common",
     srcs = [
         "iiwa_common.cc",

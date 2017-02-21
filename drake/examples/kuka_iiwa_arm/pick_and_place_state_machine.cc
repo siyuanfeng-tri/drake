@@ -149,7 +149,7 @@ int main(int argc, const char* argv[]) {
           waypoints.front().time = 2;
           waypoints.front().pose = X_WEndEffector0;
           waypoints.front().pose.translation()[2] += kObjHeight;
-          waypoints.front().enforce_quat = true;
+          waypoints.front().constrain_orientation = true;
 
           bool res = planner.PlanSequentialTrajectory(waypoints, env_state.get_iiwa_q(), &ik_res);
           DRAKE_DEMAND(res);
@@ -173,7 +173,7 @@ int main(int argc, const char* argv[]) {
           wp.time = 0;
           wp.pose = X_WEndEffector0;
           wp.pose.translation()[2] += kObjHeight;
-          wp.enforce_quat = true;
+          wp.constrain_orientation = true;
           double dz = -kObjHeight / kNumLinearMotionSegments;
 
           for (int i = 0; i < kNumLinearMotionSegments; i++) {
@@ -215,7 +215,7 @@ int main(int argc, const char* argv[]) {
           IiwaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 0;
           wp.pose = X_WEndEffector0;
-          wp.enforce_quat = true;
+          wp.constrain_orientation = true;
           double dz = kObjHeight / kNumLinearMotionSegments;
 
           for (int i = 0; i < kNumLinearMotionSegments; i++) {
@@ -294,14 +294,14 @@ int main(int argc, const char* argv[]) {
             wp.pose.linear() = Matrix3<double>(rot_traj.orientation(wp.time));
             wp.pos_tol = Vector3<double>(0.02, 0.02, 0.02);
             wp.rot_tol = 0.5;
-            wp.enforce_quat = true;
+            wp.constrain_orientation = true;
             waypoints.push_back(wp);
           }
 
           wp.time = duration;
           wp.pose = X_WEndEffector1;
           wp.pose.translation()[2] += kObjHeight;
-          wp.enforce_quat = true;
+          wp.constrain_orientation = true;
           waypoints.push_back(wp);
 
           bool res = planner.PlanSequentialTrajectory(waypoints, env_state.get_iiwa_q(), &ik_res);
@@ -337,7 +337,7 @@ int main(int argc, const char* argv[]) {
           // we have guarded moves supported by the controller side.
           const double z_shift = 0.02;
           wp.pose.translation()[2] += kObjHeight + z_shift;
-          wp.enforce_quat = true;
+          wp.constrain_orientation = true;
 
           double dz = -kObjHeight / kNumLinearMotionSegments;
 
@@ -381,7 +381,7 @@ int main(int argc, const char* argv[]) {
           IiwaIkPlanner::IkCartesianWaypoint wp;
           wp.time = 0;
           wp.pose = X_WEndEffector1;
-          wp.enforce_quat = true;
+          wp.constrain_orientation = true;
 
           double dz = 2 * kObjHeight / kNumLinearMotionSegments;
 
