@@ -93,12 +93,6 @@ class SimulatedKuka : public systems::Diagram<T> {
     controller_ =
         builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(model_path, alias_path, id_config_path, nullptr);
 
-    auto zero_source =
-        builder.template AddSystem<systems::ConstantVectorSource<T>>(
-            Eigen::VectorXd::Zero(plant_->get_num_velocities()));
-
-    builder.Connect(zero_source->get_output_port(), controller_->get_input_port_desired_acceleration());
-
     // Connects plant and controller.
     builder.Connect(plant_->state_output_port(),
                     controller_->get_estimated_state_input_port());
@@ -107,6 +101,8 @@ class SimulatedKuka : public systems::Diagram<T> {
 
     // Exposes desired state input port.
     builder.ExportInput(controller_->get_desired_state_input_port());
+    builder.ExportInput(controller_->get_input_port_desired_acceleration());
+
     builder.ExportOutput(plant_->state_output_port());
     builder.BuildInto(this);
   }
@@ -149,8 +145,13 @@ int DoMain() {
 
   builder.Connect(command_sub->get_output_port(0),
                   command_receiver->get_input_port(0));
+  // Desired state.
   builder.Connect(command_receiver->get_output_port(0),
                   model->get_input_port(0));
+  // Desired acceleration.
+  builder.Connect(command_receiver->get_output_port(1),
+                  model->get_input_port(1));
+
   builder.Connect(model->get_output_port(0),
                   visualizer->get_input_port(0));
   builder.Connect(model->get_output_port(0),
