@@ -89,6 +89,16 @@ if(lcm_FOUND)
   drake_add_test(
       NAME iiwa_wsg_simulation COMMAND iiwa_wsg_simulation -simulation_sec 0.01)
 
+  add_executable(pick_and_place_demo
+    pick_and_place_state_machine.cc
+    pick_and_place_state.cc)
+  target_link_libraries(pick_and_place_demo
+    drakeKukaIiwaArmCommon
+    drakeKukaIiwaArmIK
+    drakeLCMUtil
+    drakeRigidBodyPlant
+    drakeSchunkWsg
+    robotlocomotion-lcmtypes-cpp)
 endif()
 
 add_subdirectory(controlled_kuka)
