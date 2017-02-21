@@ -70,6 +70,7 @@ drake_cc_library(
     hdrs = ["kuka_servo_system.h"],
     deps = [
         ":discrete_time_plan_eval_system",
+        "//drake/lcmtypes:plan_eval_debug_info",
     ],
 )
 
@@ -88,6 +89,7 @@ drake_cc_library(
     hdrs = ["qp_controller_system.h"],
     deps = [
         "//drake/examples/QPInverseDynamicsForHumanoids:qp_controller",
+        "//drake/lcmtypes:inverse_dynamics_debug_info",
         "//drake/multibody:rigid_body_tree",
         "//drake/systems/framework:leaf_system",
     ],

@@ -36,6 +36,8 @@
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/lcmt_schunk_wsg_status.hpp"
+#include "drake/lcmt_inverse_dynamics_debug_info.hpp"
+#include "drake/lcmt_plan_eval_debug_info.hpp"
 
 #include "drake/util/drakeGeometryUtil.h"
 
@@ -131,7 +133,7 @@ std::unique_ptr<RigidBodyPlant<T>> BuildCombinedPlant(
 template <typename T>
 class SimulatedIiwaWithWsg : public systems::Diagram<T> {
  public:
-  SimulatedIiwaWithWsg() {
+  SimulatedIiwaWithWsg(lcm::DrakeLcm *lcm) {
     this->set_name("SimulatedIiwaWithWsg");
     DiagramBuilder<T> builder;
 
@@ -158,7 +160,6 @@ class SimulatedIiwaWithWsg : public systems::Diagram<T> {
     iiwa_controller_ =
         builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
             iiwa_info.model_path, alias_path, id_config_path, iiwa_info.world_offset);
-
 
     // Sets a zero configuration and computes spatial inertia for the gripper
     // as well as the pose of the end effector link of iiwa using the world
@@ -274,6 +275,19 @@ class SimulatedIiwaWithWsg : public systems::Diagram<T> {
         box_state_est->get_input_port_state());
     builder.ExportOutput(box_state_est->get_output_port_msg());
 
+    // Exposes the debugging info from the iiwa controller
+    auto plan_eval_debug_pub = builder.AddSystem(
+        systems::lcm::LcmPublisherSystem::Make<lcmt_plan_eval_debug_info>(
+          "PLAN_EVAL_DEBUG", lcm));
+    builder.Connect(iiwa_controller_->get_output_port_plan_eval_debug_info(),
+        plan_eval_debug_pub->get_input_port(0));
+
+    auto inverse_dynamics_debug_pub = builder.AddSystem(
+        systems::lcm::LcmPublisherSystem::Make<lcmt_inverse_dynamics_debug_info>(
+          "ID_DEBUG", lcm));
+    builder.Connect(iiwa_controller_->get_output_port_inverse_dynamics_debug_info(),
+        inverse_dynamics_debug_pub->get_input_port(0));
+
     builder.BuildInto(this);
   }
 
@@ -324,12 +338,12 @@ class SimulatedIiwaWithWsg : public systems::Diagram<T> {
 };
 
 int DoMain() {
+  drake::lcm::DrakeLcm lcm;
   systems::DiagramBuilder<double> builder;
-  auto model = builder.AddSystem<SimulatedIiwaWithWsg<double>>();
+  auto model = builder.AddSystem<SimulatedIiwaWithWsg<double>>(&lcm);
 
   const RigidBodyTree<double>& tree = model->get_plant().get_rigid_body_tree();
 
-  drake::lcm::DrakeLcm lcm;
   DrakeVisualizer* visualizer = builder.AddSystem<DrakeVisualizer>(tree, &lcm);
   builder.Connect(model->get_plant_output_port(),
                   visualizer->get_input_port(0));

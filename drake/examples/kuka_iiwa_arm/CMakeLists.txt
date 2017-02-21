@@ -75,19 +75,19 @@ if(lcm_FOUND)
   drake_add_test(
       NAME kuka_simulation COMMAND kuka_simulation -simulation_sec 0.1)
 
-  add_executable(iiwa_wsg_simulation iiwa_wsg_simulation.cc)
-  target_link_libraries(iiwa_wsg_simulation
-    drakeKukaIiwaArmCommon
-    drakeKukaIiwaWorld
-    drakeLcmSystem
-    drakeLCMUtil
-    drakeRigidBodyPlant
-    drakeSchunkWsg
-    drakeSystemAnalysis
-    drakeSystemControllers
-    robotlocomotion-lcmtypes-cpp)
-  drake_add_test(
-      NAME iiwa_wsg_simulation COMMAND iiwa_wsg_simulation -simulation_sec 0.01)
+#  add_executable(iiwa_wsg_simulation iiwa_wsg_simulation.cc)
+#  target_link_libraries(iiwa_wsg_simulation
+#    drakeKukaIiwaArmCommon
+#    drakeKukaIiwaWorld
+#    drakeLcmSystem
+#    drakeLCMUtil
+#    drakeRigidBodyPlant
+#    drakeSchunkWsg
+#    drakeSystemAnalysis
+#    drakeSystemControllers
+#    robotlocomotion-lcmtypes-cpp)
+#  drake_add_test(
+#      NAME iiwa_wsg_simulation COMMAND iiwa_wsg_simulation -simulation_sec 0.01)
 
   add_executable(pick_and_place_demo
     pick_and_place_state_machine.cc

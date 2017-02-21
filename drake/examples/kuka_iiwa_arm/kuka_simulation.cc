@@ -13,14 +13,13 @@
 #include "drake/common/drake_path.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/system/kuka_inverse_dynamics_servo.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/multibody/rigid_body_tree_construction.h"
 #include "drake/systems/analysis/simulator.h"
-//#include "drake/systems/controllers/pid_with_gravity_compensator.h"
+#include "drake/systems/controllers/pid_with_gravity_compensator.h"
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/framework/leaf_system.h"
@@ -81,17 +80,9 @@ class SimulatedKuka : public systems::Diagram<T> {
     Eigen::VectorXd kd;
     SetPositionControlledIiwaGains(&kp, &ki, &kd);
 
-    /*
     controller_ =
         builder.template AddSystem<systems::PidWithGravityCompensator<T>>(
             plant_->get_rigid_body_tree(), kp, ki, kd);
-    */
-    const std::string alias_path = drake::GetDrakePath() +
-        "/examples/kuka_iiwa_arm/inverse_dynamics_controller_config/iiwa.alias_groups";
-    const std::string id_config_path = drake::GetDrakePath() +
-        "/examples/kuka_iiwa_arm/inverse_dynamics_controller_config/iiwa.id_controller_config";
-    controller_ =
-        builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(model_path, alias_path, id_config_path, nullptr);
 
     // Connects plant and controller.
     builder.Connect(plant_->state_output_port(),
@@ -101,23 +92,15 @@ class SimulatedKuka : public systems::Diagram<T> {
 
     // Exposes desired state input port.
     builder.ExportInput(controller_->get_desired_state_input_port());
-    builder.ExportInput(controller_->get_input_port_desired_acceleration());
-
     builder.ExportOutput(plant_->state_output_port());
     builder.BuildInto(this);
   }
 
   const RigidBodyPlant<T>& get_plant() const { return *plant_; }
 
-  void InitializeController(systems::Context<double>* context) {
-    systems::Context<double>* controller_context =
-        this->GetMutableSubsystemContext(context, controller_);
-    controller_->Initialize(controller_context);
-  }
-
  private:
   RigidBodyPlant<T>* plant_{nullptr};
-  qp_inverse_dynamics::KukaInverseDynamicsServo* controller_{nullptr};
+  systems::PidWithGravityCompensator<T>* controller_{nullptr};
 };
 
 int DoMain() {
@@ -145,13 +128,8 @@ int DoMain() {
 
   builder.Connect(command_sub->get_output_port(0),
                   command_receiver->get_input_port(0));
-  // Desired state.
   builder.Connect(command_receiver->get_output_port(0),
                   model->get_input_port(0));
-  // Desired acceleration.
-  builder.Connect(command_receiver->get_output_port(1),
-                  model->get_input_port(1));
-
   builder.Connect(model->get_output_port(0),
                   visualizer->get_input_port(0));
   builder.Connect(model->get_output_port(0),
@@ -172,8 +150,6 @@ int DoMain() {
                                       command_receiver),
       VectorX<double>::Zero(tree.get_num_positions()));
 
-  model->InitializeController(
-      sys->GetMutableSubsystemContext(simulator.get_mutable_context(), model));
 
   // Simulate for a very long time.
   simulator.StepTo(FLAGS_simulation_sec);

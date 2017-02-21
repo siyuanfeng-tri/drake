@@ -110,6 +110,7 @@ drake_cc_binary(
         "//drake/lcm",
         "//drake/multibody/rigid_body_plant",
         "//drake/systems/analysis:simulator",
+        "//drake/systems/controllers:pid_with_gravity_compensator",
         "//drake/systems/primitives:constant_vector_source",
         "@gflags//:gflags",
     ],
