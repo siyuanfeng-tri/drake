@@ -168,7 +168,7 @@ class SimulatedIiwaWithWsg : public systems::Diagram<T> {
     Eigen::VectorXd iiwa_kd = Eigen::VectorXd::Zero(7);
     Eigen::VectorXd iiwa_ki = Eigen::VectorXd::Zero(7);
     iiwa_kp << 100, 200, 100, 200, 10, 100, 1;
-    iiwa_ki << 0, 2, 0, 1, 0, 0.5, 0;
+    iiwa_ki << 0, 2, 0, 1, 0, 0.5, 1;
     for (int i = 0; i < iiwa_kp.size(); i++) {
       iiwa_kd[i] = 2 * std::sqrt(iiwa_kp[i]);
     }

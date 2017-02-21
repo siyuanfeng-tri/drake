@@ -24,6 +24,18 @@ filegroup(
 )
 
 drake_cc_library(
+    name = "iiwa_ik_planner",
+    srcs = ["iiwa_ik_planner.cc"],
+    hdrs = ["iiwa_ik_planner.h"],
+    deps = [
+        "//drake/common/trajectories:piecewise_polynomial_trajectory",
+        "//drake/multibody:inverse_kinematics",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+    ],
+)
+
+drake_cc_library(
     name = "iiwa_common",
     srcs = [
         "iiwa_common.cc",
@@ -122,8 +134,6 @@ drake_cc_binary(
     deps = [
         ":iiwa_common",
         ":iiwa_lcm",
-        "@bot_core_lcmtypes//:lib",
-        "@robotlocomotion_lcmtypes//:lib",
     ],
 )
 
@@ -138,8 +148,40 @@ cc_binary(
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/parsers",
         "//drake/solvers:mathematical_program",
-        "@bot_core_lcmtypes//:lib",
-        "@robotlocomotion_lcmtypes//:lib",
+    ],
+)
+
+drake_cc_library(
+    name = "kuka_pick_and_place",
+    srcs = ["pick_and_place_state.cc"],
+    hdrs = ["pick_and_place_state.h"],
+    deps = [
+        ":iiwa_common",
+        ":iiwa_lcm",
+        "//drake/examples/schunk_wsg:schunk_wsg_lcm",
+        "//drake/util:lcm_util",
+        "//drake/lcm",
+        "//drake/multibody:inverse_kinematics",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+        "//drake/solvers:mathematical_program",
+    ],
+)
+
+drake_cc_binary(
+    name = "pick_and_place_state_machine",
+    srcs = [
+        "pick_and_place_state_machine.cc",
+    ],
+    deps = [
+        ":iiwa_common",
+        ":kuka_pick_and_place",
+        ":iiwa_ik_planner",
+        ":iiwa_lcm",
+        "//drake/common/trajectories:piecewise_quaternion",
+        "//drake/common/trajectories:piecewise_polynomial",
+        "//drake/examples/schunk_wsg:schunk_wsg_lcm",
+        "//drake/util:lcm_util",
     ],
 )
 
