@@ -106,6 +106,7 @@ drake_cc_binary(
         ":iiwa_common",
         ":iiwa_lcm",
         "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
+        "//drake/examples/QPInverseDynamicsForHumanoids/system:kuka_inverse_dynamics_servo",
         "//drake/lcm",
         "//drake/multibody/rigid_body_plant",
         "//drake/systems/analysis:simulator",
