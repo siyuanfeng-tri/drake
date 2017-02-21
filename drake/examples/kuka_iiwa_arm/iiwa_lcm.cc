@@ -21,9 +21,15 @@ static const double kReceiverUpdatePeriod = 0.005;
 
 IiwaCommandReceiver::IiwaCommandReceiver() {
   this->DeclareAbstractInputPort();
+  // Desired q v.
   this->DeclareOutputPort(systems::kVectorValued, kNumJoints * 2);
+  // Desired vd.
+  this->DeclareOutputPort(systems::kVectorValued, kNumJoints);
   this->DeclareDiscreteUpdatePeriodSec(kReceiverUpdatePeriod);
-  this->DeclareDiscreteState(kNumJoints * 2);
+  // desired q, v, vd, last message time
+  this->DeclareDiscreteState(kNumJoints * 3 + 1);
+
+  set_name("CMD_RECEIVER");
 }
 
 void IiwaCommandReceiver::set_initial_position(
@@ -31,9 +37,10 @@ void IiwaCommandReceiver::set_initial_position(
     const Eigen::Ref<const VectorX<double>> x) const {
   auto state_value =
       context->get_mutable_discrete_state(0)->get_mutable_value();
-  DRAKE_ASSERT(x.size() == kNumJoints);
-  state_value.head(kNumJoints) = x;
-  state_value.tail(kNumJoints) = VectorX<double>::Zero(kNumJoints);
+  DRAKE_DEMAND(x.size() == kNumJoints);
+  // Init the last message receive time to -1
+  state_value << x, Eigen::Matrix<double, kNumJoints, 1>::Zero(),
+                 Eigen::Matrix<double, kNumJoints, 1>::Zero(), -1;
 }
 
 void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
@@ -45,29 +52,49 @@ void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
   // TODO(sam.creasey) Support torque control.
   DRAKE_ASSERT(command.num_torques == 0);
 
-
   // If we're using a default constructed message (haven't received
   // a command yet), keep using the initial state.
   if (command.num_joints != 0) {
-    DRAKE_DEMAND(command.num_joints == kNumJoints);
-    VectorX<double> new_positions(kNumJoints);
-    for (int i = 0; i < command.num_joints; ++i) {
-      new_positions(i) = command.joint_position[i];
-    }
-
+    // Gets last desired state.
     BasicVector<double>* state = discrete_state->get_mutable_discrete_state(0);
     auto state_value = state->get_mutable_value();
-    state_value.tail(kNumJoints) =
-        (new_positions - state_value.head(kNumJoints)) / kReceiverUpdatePeriod;
-    state_value.head(kNumJoints) = new_positions;
+
+    // Gets the last time when a different lcm message is received.
+    double last_msg_time = state_value[3 * kNumJoints];
+
+    DRAKE_DEMAND(command.num_joints == kNumJoints);
+    Eigen::Matrix<double, kNumJoints, 1> pos_d;
+
+    for (int i = 0; i < command.num_joints; ++i) {
+      pos_d(i) = command.joint_position[i];
+    }
+
+    double cur_time = command.utime / 1e6;
+    // Got first real message.
+    if (last_msg_time == -1) {
+      state_value << pos_d, Eigen::Matrix<double, kNumJoints, 1>::Zero(), Eigen::Matrix<double, kNumJoints, 1>::Zero(), cur_time;
+    }
+
+    // Only updates state when the time stamps are different.
+    if (cur_time != last_msg_time) {
+      Eigen::Matrix<double, kNumJoints, 1> vel_d =
+          (pos_d - state_value.head<kNumJoints>()) / (cur_time - last_msg_time);
+      Eigen::Matrix<double, kNumJoints, 1> acc_d =
+          (vel_d - state_value.segment<kNumJoints>(kNumJoints)) / (cur_time - last_msg_time);
+      state_value << pos_d, vel_d, acc_d, cur_time;
+    }
   }
 }
 
 void IiwaCommandReceiver::DoCalcOutput(const Context<double>& context,
                                        SystemOutput<double>* output) const {
-  Eigen::VectorBlock<VectorX<double>> output_vec =
+  Eigen::VectorBlock<VectorX<double>> desired_state_output =
       this->GetMutableOutputVector(output, 0);
-  output_vec = context.get_discrete_state(0)->get_value();
+  desired_state_output = context.get_discrete_state(0)->get_value().head<kNumJoints * 2>();
+
+  Eigen::VectorBlock<VectorX<double>> desired_acc_output =
+      this->GetMutableOutputVector(output, 1);
+  desired_acc_output = context.get_discrete_state(0)->get_value().segment<kNumJoints>(kNumJoints * 2);
 }
 
 IiwaStatusSender::IiwaStatusSender() {
