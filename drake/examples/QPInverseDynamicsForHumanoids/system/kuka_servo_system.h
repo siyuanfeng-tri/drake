@@ -38,6 +38,9 @@ class KukaServoSystem : public DiscreteTimePlanEvalSystem {
   std::unique_ptr<systems::AbstractState> AllocateAbstractState()
       const override;
 
+  std::unique_ptr<systems::AbstractValue> AllocateOutputAbstract(
+        const systems::OutputPortDescriptor<double>& descriptor) const override;
+
   /**
    * Initializes the internal states.
    */
@@ -62,6 +65,7 @@ class KukaServoSystem : public DiscreteTimePlanEvalSystem {
   }
 
  private:
+  int abstract_state_index_debug_info_{0};
   int input_port_index_desired_state_and_acceleration_{0};
   int output_port_index_debug_info_{0};
 };

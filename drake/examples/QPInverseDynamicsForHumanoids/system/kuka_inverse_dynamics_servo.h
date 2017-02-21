@@ -40,8 +40,12 @@ class KukaInverseDynamicsServo : public systems::ModelBasedController<double> {
     return systems::Diagram<double>::get_input_port(2);
   }
 
-  const systems::OutputPortDescriptor<double>& get_output_port_debug_info() const {
+  const systems::OutputPortDescriptor<double>& get_output_port_plan_eval_debug_info() const {
     return systems::Diagram<double>::get_output_port(1);
+  }
+
+  const systems::OutputPortDescriptor<double>& get_output_port_inverse_dynamics_debug_info() const {
+    return systems::Diagram<double>::get_output_port(2);
   }
 
  private:

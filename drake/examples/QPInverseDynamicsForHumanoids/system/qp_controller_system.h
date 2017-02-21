@@ -57,16 +57,25 @@ class QPControllerSystem : public systems::LeafSystem<double> {
     return get_output_port(output_port_index_qp_output_);
   }
 
+  /**
+   * @return Port for the output: lcmt_inverse_dynamics_debug_info.
+   */
+  inline const systems::OutputPortDescriptor<double>&
+  get_output_port_debug_info() const {
+    return get_output_port(output_port_index_debug_info_);
+  }
+
  private:
   QpOutput& get_mutable_qp_output(systems::State<double>* state) const {
     return state->get_mutable_abstract_state()
-        ->get_mutable_abstract_state(abstract_state_qp_output_index_)
+        ->get_mutable_abstract_state(abstract_state_index_qp_output_)
         .GetMutableValue<QpOutput>();
   }
 
   const RigidBodyTree<double>& robot_;
   const double control_dt_{0.002};
-  const int abstract_state_qp_output_index_{0};
+  const int abstract_state_index_qp_output_{0};
+  const int abstract_state_index_debug_info_{1};
 
   // TODO(siyuan.feng): This is a bad temporary hack to the const constraint for
   // CalcOutput. It is because qp controller needs to allocate mutable workspace
@@ -78,6 +87,7 @@ class QPControllerSystem : public systems::LeafSystem<double> {
   int input_port_index_humanoid_status_{0};
   int input_port_index_qp_input_{0};
   int output_port_index_qp_output_{0};
+  int output_port_index_debug_info_{0};
 };
 
 }  // namespace qp_inverse_dynamics

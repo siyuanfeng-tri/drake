@@ -80,6 +80,9 @@ KukaInverseDynamicsServo::KukaInverseDynamicsServo(
   // Exposes plan eval's debug output.
   builder.ExportOutput(servo_->get_output_port_debug_info());
 
+  // Exposes plan eval's debug output.
+  builder.ExportOutput(id_controller->get_output_port_debug_info());
+
   builder.BuildInto(this);
 }
 

@@ -151,8 +151,21 @@ class RobotPlanRunner {
     for (int k = 0; k < static_cast<int>(plan->plan.size()); ++k) {
       input_time.push_back(plan->plan[k].utime / 1e6);
     }
+
+    // HACK, only two knots
+    if (plan->plan.size() == 2) {
+      Eigen::MatrixXd last_slice = knots.back();
+      double last_time = input_time.back();
+
+      knots.back() = (knots[0] + knots.back()) / 2.;
+      knots.push_back(last_slice);
+      input_time.back() = (input_time.front() + input_time.back()) / 2;
+      input_time.push_back(last_time);
+    }
+
     plan_.reset(new PiecewisePolynomialTrajectory(
-        PiecewisePolynomial<double>::FirstOrderHold(input_time, knots)));
+        PiecewisePolynomial<double>::Cubic(input_time, knots, Eigen::MatrixXd::Zero(kNumJoints, 1), Eigen::MatrixXd::Zero(kNumJoints, 1))));
+        //PiecewisePolynomial<double>::FirstOrderHold(input_time, knots)));
     ++plan_number_;
   }
 

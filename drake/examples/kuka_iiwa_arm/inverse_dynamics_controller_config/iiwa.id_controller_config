@@ -16,8 +16,8 @@ contact_force_basis_weight: 1e-6
 
 default_dof_motion {
     name: "default"
-    kp: 10
-    kd: 3
+    kp: 100
+    kd: 20
     weight: 1e-1
 }
 

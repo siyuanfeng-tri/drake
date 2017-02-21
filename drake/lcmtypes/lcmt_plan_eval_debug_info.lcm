@@ -1,0 +1,14 @@
+package drake;
+
+struct lcmt_plan_eval_debug_info {
+  int64_t timestamp;
+
+  int32_t num_dof;
+
+  string dof_names[num_dof];
+
+  // Need to add more.
+  double nominal_q[num_dof];
+  double nominal_v[num_dof];
+  double nominal_vd[num_dof];
+}

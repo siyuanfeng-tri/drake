@@ -6,13 +6,12 @@ struct lcmt_inverse_dynamics_debug_info {
   int32_t num_dof;
 
   string dof_names[num_dof];
-  double nominal_q[num_dof];
-  double nominal_v[num_dof];
-  double nominal_vd[num_dof];
+
+  // Need to add more.
 
   double desired_vd[num_dof];
+
   double solved_vd[num_dof];
   double solved_torque[num_dof];
 
-  // Need to add more.
 }
