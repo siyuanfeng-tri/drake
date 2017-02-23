@@ -1,4 +1,4 @@
-#include "drake/examples/QPInverseDynamicsForHumanoids/system/kuka_inverse_dynamics_servo.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/system/manipulator_inverse_dynamics_servo.h"
 
 #include <memory>
 #include <string>
@@ -16,7 +16,7 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
-KukaInverseDynamicsServo::KukaInverseDynamicsServo(
+ManipulatorInverseDynamicsServo::ManipulatorInverseDynamicsServo(
     const std::string& model_path, const std::string& alias_group_path,
     const std::string& controller_config_path,
     std::shared_ptr<RigidBodyFrame<double>> world_offset)
@@ -24,7 +24,7 @@ KukaInverseDynamicsServo::KukaInverseDynamicsServo(
 
   const RigidBodyTree<double>& robot = get_robot_for_control();
 
-  this->set_name("KukaInverseDynamicsServo");
+  this->set_name("ManipulatorInverseDynamicsServo");
 
   systems::DiagramBuilder<double> builder;
 
@@ -33,25 +33,27 @@ KukaInverseDynamicsServo::KukaInverseDynamicsServo(
       std::make_unique<StateToHumanoidStatus>(robot, alias_group_path));
   // Converts qp output to raw torque.
   JointLevelControllerSystem* joint_level_controller =
-    builder.AddSystem(std::make_unique<JointLevelControllerSystem>(robot));
-  // Generates qp_input from desired q and qd qdd.
-  servo_ = builder.AddSystem(std::make_unique<KukaServoSystem>(
-        robot, alias_group_path, controller_config_path, 0.002));
-  // Inverse dynamics controller
+      builder.AddSystem(std::make_unique<JointLevelControllerSystem>(robot));
+  // Generates qp input from desired q and qd qdd.
+  servo_ = builder.AddSystem(std::make_unique<ManipulatorPlanEvalSystem>(
+      robot, alias_group_path, controller_config_path, kControlDt));
+  // Computes qp output from qp input.
   QPControllerSystem* id_controller =
-    builder.AddSystem(std::make_unique<QPControllerSystem>(robot, 0.002));
+    builder.AddSystem(std::make_unique<QPControllerSystem>(robot, kControlDt));
 
-  // rs -> qp_input
+  // Connects estimate state to plan eval.
   builder.Connect(rs_wrapper->get_output_port_humanoid_status(),
       servo_->get_input_port_humanoid_status());
 
-  // rs + qp_input -> qp_output
+  // Connects estimated state to inverse dynamics.
   builder.Connect(rs_wrapper->get_output_port_humanoid_status(),
       id_controller->get_input_port_humanoid_status());
+
+  // Connects plan eval to inverse dynamics.
   builder.Connect(servo_->get_output_port_qp_input(),
       id_controller->get_input_port_qp_input());
 
-  // qp_output -> joint controller
+  // Connects inverse dynamics to joint controller.
   builder.Connect(id_controller->get_output_port_qp_output(),
       joint_level_controller->get_input_port_qp_output());
 
@@ -62,31 +64,32 @@ KukaInverseDynamicsServo::KukaInverseDynamicsServo(
   systems::Multiplexer<double>* mux =
       builder.AddSystem(std::make_unique<systems::Multiplexer<double>>(input_sizes));
 
+  // Connects desired q, qd, qdd to plan eval.
   builder.Connect(mux->get_output_port(0),
                   servo_->get_input_port_desired_state_and_acceleration());
 
-  // Exposes arm state input.
+  // Exposes input: estimated arm state.
   builder.ExportInput(rs_wrapper->get_input_port_state());
 
-  // Exposes desired q qd.
+  // Exposes input: desired q qd.
   builder.ExportInput(mux->get_input_port(0));
 
-  // Exposes desired qdd.
+  // Exposes input: desired qdd.
   builder.ExportInput(mux->get_input_port(1));
 
-  // Exposes arm torque output.
+  // Exposes output: computed torque.
   builder.ExportOutput(joint_level_controller->get_output_port_torque());
 
-  // Exposes plan eval's debug output.
+  // Exposes output: plan eval's debug output.
   builder.ExportOutput(servo_->get_output_port_debug_info());
 
-  // Exposes plan eval's debug output.
+  // Exposes output: inverse dynamics' debug output.
   builder.ExportOutput(id_controller->get_output_port_debug_info());
 
   builder.BuildInto(this);
 }
 
-void KukaInverseDynamicsServo::Initialize(systems::Context<double>* context) {
+void ManipulatorInverseDynamicsServo::Initialize(systems::Context<double>* context) {
   systems::Context<double>* servo_context =
     GetMutableSubsystemContext(context, servo_);
   systems::State<double>* servo_state = servo_context->get_mutable_state();

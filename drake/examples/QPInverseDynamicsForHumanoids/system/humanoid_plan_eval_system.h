@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "drake/common/drake_copyable.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/discrete_time_plan_eval_system.h"
 
 namespace drake {
@@ -17,6 +18,8 @@ namespace qp_inverse_dynamics {
  */
 class HumanoidPlanEvalSystem : public DiscreteTimePlanEvalSystem {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(HumanoidPlanEvalSystem)
+
   /**
    * Constructor.
    * @param robot Reference to a RigidBodyTree, whose life span must be longer

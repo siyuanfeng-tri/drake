@@ -65,9 +65,9 @@ drake_cc_library(
 )
 
 drake_cc_library(
-    name = "iiwa_servo_system",
-    srcs = ["kuka_servo_system.cc"],
-    hdrs = ["kuka_servo_system.h"],
+    name = "manipulator_plan_eval_system",
+    srcs = ["manipulator_plan_eval_system.cc"],
+    hdrs = ["manipulator_plan_eval_system.h"],
     deps = [
         ":discrete_time_plan_eval_system",
         "//drake/lcmtypes:plan_eval_debug_info",
@@ -96,11 +96,11 @@ drake_cc_library(
 )
 
 drake_cc_library(
-    name = "kuka_inverse_dynamics_servo",
-    srcs = ["kuka_inverse_dynamics_servo.cc"],
-    hdrs = ["kuka_inverse_dynamics_servo.h"],
+    name = "manipulator_inverse_dynamics_servo",
+    srcs = ["manipulator_inverse_dynamics_servo.cc"],
+    hdrs = ["manipulator_inverse_dynamics_servo.h"],
     deps = [
-        ":iiwa_servo_system",
+        ":manipulator_plan_eval_system",
         ":joint_level_controller_system",
         ":qp_controller_system",
         ":state_to_humanoid_status",

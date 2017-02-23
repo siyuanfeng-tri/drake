@@ -16,7 +16,7 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/system/kuka_inverse_dynamics_servo.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/system/manipulator_inverse_dynamics_servo.h"
 #include "drake/examples/schunk_wsg/schunk_wsg_lcm.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/multibody/parsers/urdf_parser.h"
@@ -165,7 +165,7 @@ class SimulatedIiwaWithWsg : public systems::Diagram<T> {
     const std::string id_config_path = drake::GetDrakePath() +
         "/examples/kuka_iiwa_arm/inverse_dynamics_controller_config/iiwa.id_controller_config";
     iiwa_controller_ =
-        builder.template AddSystem<qp_inverse_dynamics::KukaInverseDynamicsServo>(
+        builder.template AddSystem<qp_inverse_dynamics::ManipulatorInverseDynamicsServo>(
             iiwa_info.model_path, alias_path, id_config_path, iiwa_info.world_offset);
 
     // Sets a zero configuration and computes spatial inertia for the gripper
@@ -340,7 +340,7 @@ class SimulatedIiwaWithWsg : public systems::Diagram<T> {
 
  private:
   RigidBodyPlant<T>* plant_{nullptr};
-  qp_inverse_dynamics::KukaInverseDynamicsServo* iiwa_controller_{nullptr};
+  qp_inverse_dynamics::ManipulatorInverseDynamicsServo* iiwa_controller_{nullptr};
   std::unique_ptr<RigidBodyTree<T>> object_;
 };
 

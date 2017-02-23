@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "drake/multibody/rigid_body_tree.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/rigid_body_tree_alias_groups.h"
 #include "drake/multibody/rigid_body_tree.h"
@@ -24,6 +25,8 @@ namespace qp_inverse_dynamics {
  */
 class DiscreteTimePlanEvalSystem : public systems::LeafSystem<double> {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(DiscreteTimePlanEvalSystem)
+
   /**
    * Constructor.
    * @param robot Reference to a RigidBodyTree, whose life span must be longer
@@ -83,18 +86,18 @@ class DiscreteTimePlanEvalSystem : public systems::LeafSystem<double> {
   template <typename PlanType>
   PlanType& get_mutable_plan(systems::State<double>* state) const {
     return state->get_mutable_abstract_state()
-        ->get_mutable_abstract_state(abstract_state_index_plan_)
+        ->get_mutable_abstract_state(kAbsStateIdxPlan)
         .GetMutableValue<PlanType>();
   }
 
   QpInput& get_mutable_qp_input(systems::State<double>* state) const {
     return state->get_mutable_abstract_state()
-        ->get_mutable_abstract_state(abstract_state_index_qp_input_)
+        ->get_mutable_abstract_state(kAbsStateIdxQpInput)
         .GetMutableValue<QpInput>();
   }
 
   const RigidBodyTree<double>& get_robot() const { return robot_; }
-  double get_control_dt() const { return control_dt_; }
+  double get_control_dt() const { return kControlDt; }
   const param_parsers::RigidBodyTreeAliasGroups<double>& get_alias_groups()
       const {
     return alias_groups_;
@@ -108,23 +111,23 @@ class DiscreteTimePlanEvalSystem : public systems::LeafSystem<double> {
     return output_port_index_qp_input_;
   }
   int get_abstract_state_index_qp_input() const {
-    return abstract_state_index_qp_input_;
+    return kAbsStateIdxQpInput;
   }
   int get_abstract_state_index_plan() const {
-    return abstract_state_index_plan_;
+    return kAbsStateIdxPlan;
   }
 
  private:
   const RigidBodyTree<double>& robot_;
-  const double control_dt_{2e-3};
+  const double kControlDt;
 
   param_parsers::RigidBodyTreeAliasGroups<double> alias_groups_;
   param_parsers::ParamSet paramset_;
 
   int input_port_index_humanoid_status_{0};
   int output_port_index_qp_input_{0};
-  int abstract_state_index_qp_input_{0};
-  int abstract_state_index_plan_{0};
+  const int kAbsStateIdxQpInput{0};
+  const int kAbsStateIdxPlan{0};
 };
 
 }  // namespace qp_inverse_dynamics

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "drake/common/drake_copyable.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/joint_level_controller_system.h"
 
 namespace drake {
@@ -14,6 +15,8 @@ namespace qp_inverse_dynamics {
  */
 class AtlasJointLevelControllerSystem : public JointLevelControllerSystem {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(AtlasJointLevelControllerSystem)
+
   /**
    * Constructor for AtlasJointLevelControllerSystem.
    * @param robot Reference to a RigidBodyTree. An internal alias is saved,
@@ -40,9 +43,9 @@ class AtlasJointLevelControllerSystem : public JointLevelControllerSystem {
   }
 
  private:
-  int output_port_index_atlas_cmd_;
+  int output_port_index_atlas_cmd_{0};
 
-  // Joint level gains, these are in robot_.actuators order.
+  // Joint level gains, these are in the actuator order.
   VectorX<double> k_q_p_;
   VectorX<double> k_q_i_;
   VectorX<double> k_qd_p_;

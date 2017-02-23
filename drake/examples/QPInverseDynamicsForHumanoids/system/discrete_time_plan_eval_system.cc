@@ -19,14 +19,15 @@ DiscreteTimePlanEvalSystem::DiscreteTimePlanEvalSystem(
     const std::string& alias_groups_file_name,
     const std::string& param_file_name, double dt)
     : robot_(robot),
-      control_dt_(dt),
+      kControlDt(dt),
       alias_groups_(robot),
-      abstract_state_index_qp_input_(0),
-      abstract_state_index_plan_(1) {
+      kAbsStateIdxQpInput(0),
+      kAbsStateIdxPlan(1) {
+  DRAKE_DEMAND(kControlDt > 0);
   input_port_index_humanoid_status_ = DeclareAbstractInputPort().get_index();
   output_port_index_qp_input_ = DeclareAbstractOutputPort().get_index();
   // Declare discrete time update.
-  DeclarePeriodicUnrestrictedUpdate(control_dt_, 0);
+  DeclarePeriodicUnrestrictedUpdate(kControlDt, 0);
 
   set_name("plan_eval");
 
@@ -34,9 +35,6 @@ DiscreteTimePlanEvalSystem::DiscreteTimePlanEvalSystem(
   alias_groups_.LoadFromFile(alias_groups_file_name);
 
   paramset_.LoadFromFile(param_file_name, alias_groups_);
-
-  abstract_state_index_qp_input_ = 0;
-  abstract_state_index_plan_ = 1;
 }
 
 void DiscreteTimePlanEvalSystem::DoCalcOutput(
@@ -46,7 +44,7 @@ void DiscreteTimePlanEvalSystem::DoCalcOutput(
   QpInput& qp_input = output->GetMutableData(output_port_index_qp_input_)
                           ->GetMutableValue<QpInput>();
   qp_input =
-      context.get_abstract_state<QpInput>(abstract_state_index_qp_input_);
+      context.get_abstract_state<QpInput>(kAbsStateIdxQpInput);
 }
 
 std::unique_ptr<systems::AbstractValue>

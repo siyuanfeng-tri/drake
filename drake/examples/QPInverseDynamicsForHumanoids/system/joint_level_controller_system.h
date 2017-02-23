@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "drake/common/drake_copyable.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -10,10 +11,13 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 /**
- * A class that translates QpOutput to vector of torque commands.
+ * A class that translates QpOutput to vector of torque commands in the
+ * actuator order.
  */
 class JointLevelControllerSystem : public systems::LeafSystem<double> {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(JointLevelControllerSystem)
+
   /**
    * Constructor for JointLevelControllerSystem.
    * @param robot Reference to a RigidBodyTree. An internal alias is saved,
@@ -49,8 +53,8 @@ class JointLevelControllerSystem : public systems::LeafSystem<double> {
  protected:
   const RigidBodyTree<double>& robot_;
 
-  int input_port_index_qp_output_;
-  int output_port_index_torque_;
+  int input_port_index_qp_output_{0};
+  int output_port_index_torque_{0};
 };
 
 }  // namespace qp_inverse_dynamics

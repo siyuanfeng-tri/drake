@@ -1,4 +1,4 @@
-#include "drake/examples/QPInverseDynamicsForHumanoids/system/kuka_servo_system.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/system/manipulator_plan_eval_system.h"
 
 #include <vector>
 
@@ -12,11 +12,11 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
-KukaServoSystem::KukaServoSystem(const RigidBodyTree<double>& robot,
+ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(const RigidBodyTree<double>& robot,
                                  const std::string& alias_groups_file_name,
                                  const std::string& param_file_name, double dt)
     : DiscreteTimePlanEvalSystem(robot, alias_groups_file_name, param_file_name,
-                                 dt), abstract_state_index_debug_info_(2) {
+                                 dt), kAbsStateIdxDebug(2) {
   DRAKE_DEMAND(get_robot().get_num_velocities() ==
                get_robot().get_num_positions());
   input_port_index_desired_state_and_acceleration_ =
@@ -29,7 +29,7 @@ KukaServoSystem::KukaServoSystem(const RigidBodyTree<double>& robot,
   set_name("kuka_servo_plan_eval");
 }
 
-void KukaServoSystem::Initialize(systems::State<double>* state) {
+void ManipulatorPlanEvalSystem::Initialize(systems::State<double>* state) {
   VectorSetpoint<double>& plan =
       get_mutable_plan<VectorSetpoint<double>>(state);
   plan = VectorSetpoint<double>(get_robot().get_num_velocities());
@@ -42,7 +42,7 @@ void KukaServoSystem::Initialize(systems::State<double>* state) {
                                         get_alias_groups());
 }
 
-void KukaServoSystem::DoCalcOutput(
+void ManipulatorPlanEvalSystem::DoCalcOutput(
     const systems::Context<double>& context,
     systems::SystemOutput<double>* output) const {
   // Do the normal plan eval step.
@@ -51,10 +51,10 @@ void KukaServoSystem::DoCalcOutput(
   lcmt_plan_eval_debug_info& debug = output->GetMutableData(output_port_index_debug_info_)
       ->GetMutableValue<lcmt_plan_eval_debug_info>();
   debug =
-      context.get_abstract_state<lcmt_plan_eval_debug_info>(abstract_state_index_debug_info_);
+      context.get_abstract_state<lcmt_plan_eval_debug_info>(kAbsStateIdxDebug);
 }
 
-void KukaServoSystem::DoCalcUnrestrictedUpdate(
+void ManipulatorPlanEvalSystem::DoCalcUnrestrictedUpdate(
     const systems::Context<double>& context,
     systems::State<double>* state) const {
   // Gets the plan from abstract state.
@@ -88,7 +88,7 @@ void KukaServoSystem::DoCalcUnrestrictedUpdate(
                                      robot_status->velocity());
 
   // Makes debug info.
-  lcmt_plan_eval_debug_info& debug = state->get_mutable_abstract_state()->get_mutable_abstract_state(abstract_state_index_debug_info_).GetMutableValue<lcmt_plan_eval_debug_info>();
+  lcmt_plan_eval_debug_info& debug = state->get_mutable_abstract_state()->get_mutable_abstract_state(kAbsStateIdxDebug).GetMutableValue<lcmt_plan_eval_debug_info>();
   int dim = get_robot().get_num_positions();
   debug.timestamp = static_cast<int64_t>(context.get_time() * 1e6);
   debug.num_dof = dim;
@@ -105,7 +105,7 @@ void KukaServoSystem::DoCalcUnrestrictedUpdate(
   }
 }
 
-std::unique_ptr<systems::AbstractState> KukaServoSystem::AllocateAbstractState()
+std::unique_ptr<systems::AbstractState> ManipulatorPlanEvalSystem::AllocateAbstractState()
     const {
   std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(3);
   abstract_vals[get_abstract_state_index_plan()] =
@@ -116,13 +116,13 @@ std::unique_ptr<systems::AbstractState> KukaServoSystem::AllocateAbstractState()
           get_paramset().MakeQpInput({}, /* contacts */
                                      {}, /* tracked bodies */
                                      get_alias_groups())));
-  abstract_vals[abstract_state_index_debug_info_] =
+  abstract_vals[kAbsStateIdxDebug] =
       std::unique_ptr<systems::AbstractValue>(
           new systems::Value<lcmt_plan_eval_debug_info>(lcmt_plan_eval_debug_info()));
   return std::make_unique<systems::AbstractState>(std::move(abstract_vals));
 }
 
-std::unique_ptr<systems::AbstractValue> KukaServoSystem::AllocateOutputAbstract(
+std::unique_ptr<systems::AbstractValue> ManipulatorPlanEvalSystem::AllocateOutputAbstract(
     const systems::OutputPortDescriptor<double>& descriptor) const {
   if (descriptor.get_index() == get_output_port_index_qp_input()) {
     return DiscreteTimePlanEvalSystem::AllocateOutputAbstract(descriptor);

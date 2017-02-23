@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "drake/common/drake_copyable.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/systems/framework/leaf_system.h"
@@ -11,14 +12,18 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 /**
- * A wrapper around qp inverse dynamics controller.
- *
- * Input: HumanoidStatus
- * Input: QpInput
- * Output: QpOutput
+ * A discrete time system block for an inverse dynamics controller.
  */
 class QPControllerSystem : public systems::LeafSystem<double> {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(QPControllerSystem)
+
+  /**
+   * Constructor for the inverse dynamics controller.
+   * @param robot Reference to a RigidBodyTree. An internal alias is saved,
+   * so the lifespan of @p robot must be longer than this object.
+   * @param dt Delta time between controls.
+   */
   QPControllerSystem(const RigidBodyTree<double>& robot, double dt);
 
   void DoCalcOutput(const systems::Context<double>& context,
@@ -68,14 +73,14 @@ class QPControllerSystem : public systems::LeafSystem<double> {
  private:
   QpOutput& get_mutable_qp_output(systems::State<double>* state) const {
     return state->get_mutable_abstract_state()
-        ->get_mutable_abstract_state(abstract_state_index_qp_output_)
+        ->get_mutable_abstract_state(kAbsStateIdxQpOutput)
         .GetMutableValue<QpOutput>();
   }
 
   const RigidBodyTree<double>& robot_;
-  const double control_dt_{0.002};
-  const int abstract_state_index_qp_output_{0};
-  const int abstract_state_index_debug_info_{1};
+  const double kControlDt;
+  const int kAbsStateIdxQpOutput;
+  const int kAbsStateIdxDebug;
 
   // TODO(siyuan.feng): This is a bad temporary hack to the const constraint for
   // CalcOutput. It is because qp controller needs to allocate mutable workspace

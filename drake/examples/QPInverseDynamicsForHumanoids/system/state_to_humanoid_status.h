@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "drake/common/drake_copyable.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -16,8 +17,17 @@ namespace qp_inverse_dynamics {
  */
 class StateToHumanoidStatus : public systems::LeafSystem<double> {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(StateToHumanoidStatus)
+
+  /**
+   * Constructor.
+   * @param robot Reference to a RigidBodyTree. An internal alias is saved,
+   * so the lifespan of @p robot must be longer than this object.
+   * @param alias_group_path Path to the alias groups file. Used by the
+   * controller to understand to topology of the robot.
+   */
   StateToHumanoidStatus(const RigidBodyTree<double>& robot,
-                        const std::string& path);
+                        const std::string& alias_group_path);
 
   void DoCalcOutput(const systems::Context<double>& context,
                     systems::SystemOutput<double>* output) const override;

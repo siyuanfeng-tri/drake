@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "drake/common/drake_copyable.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/discrete_time_plan_eval_system.h"
 
 namespace drake {
@@ -14,8 +15,10 @@ namespace qp_inverse_dynamics {
  * This class extends DiscreteTimePlanEvalSystem. It generates QpInput to track
  * desired instantaneous position, velocity and acceleration.
  */
-class KukaServoSystem : public DiscreteTimePlanEvalSystem {
+class ManipulatorPlanEvalSystem : public DiscreteTimePlanEvalSystem {
  public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulatorPlanEvalSystem)
+
   /**
    * Constructor.
    * @param robot Reference to a RigidBodyTree, whose life span must be longer
@@ -25,7 +28,7 @@ class KukaServoSystem : public DiscreteTimePlanEvalSystem {
    * @param param_file_name Path to the config file for the controller.
    * @param dt Time step
    */
-  KukaServoSystem(const RigidBodyTree<double>& robot,
+  ManipulatorPlanEvalSystem(const RigidBodyTree<double>& robot,
                   const std::string& alias_groups_file_name,
                   const std::string& param_file_name, double dt);
 
@@ -54,20 +57,27 @@ class KukaServoSystem : public DiscreteTimePlanEvalSystem {
     Initialize(servo_state);
   }
 
+  /**
+   * Returns the input port for desired q, qd and qdd.
+   */
   inline const systems::InputPortDescriptor<double>&
   get_input_port_desired_state_and_acceleration() const {
     return get_input_port(input_port_index_desired_state_and_acceleration_);
   }
 
+  /**
+   * Returns the output port for debugging information.
+   */
   inline const systems::OutputPortDescriptor<double>&
   get_output_port_debug_info() const {
     return get_output_port(output_port_index_debug_info_);
   }
 
  private:
-  int abstract_state_index_debug_info_{0};
   int input_port_index_desired_state_and_acceleration_{0};
   int output_port_index_debug_info_{0};
+
+  const int kAbsStateIdxDebug;
 };
 
 }  // namespace qp_inverse_dynamics
