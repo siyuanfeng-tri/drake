@@ -20,6 +20,7 @@ drake_cc_library(
         "clone_only_value.h"
     ],
     deps = [
+        "//drake/examples/QPInverseDynamicsForHumanoids:control_utils",
         "//drake/examples/QPInverseDynamicsForHumanoids:humanoid_status",
         "//drake/examples/QPInverseDynamicsForHumanoids:qp_controller_common",
         "//drake/examples/QPInverseDynamicsForHumanoids/param_parsers:param_parser",
@@ -36,7 +37,25 @@ drake_cc_library(
     hdrs = ["manipulator_streaming_plan.h"],
     deps = [
         ":generic_plan",
-        "//drake/examples/QPInverseDynamicsForHumanoids:control_utils",
+    ],
+)
+
+drake_cc_library(
+    name = "manipulator_plans",
+    srcs = [
+        "manipulator_move_end_effector_plan.cc",
+        "manipulator_move_joints_plan.cc",
+    ],
+    hdrs = [
+        "manipulator_move_end_effector_plan.h",
+        "manipulator_move_joints_plan.h",
+    ],
+    deps = [
+        ":generic_plan",
+        "//drake/lcmtypes:manipulator_plan_move_end_effector",
+        "//drake/util:lcm_util",
+        "@bot_core_lcmtypes//:lib",
+        "@robotlocomotion_lcmtypes//:lib",
     ],
 )
 
@@ -54,7 +73,6 @@ drake_cc_library(
     ],
     deps = [
         ":generic_plan",
-        "//drake/examples/QPInverseDynamicsForHumanoids:control_utils",
         "//drake/examples/QPInverseDynamicsForHumanoids:lcm_utils",
         "//drake/systems/controllers:zmp_planner",
         "//drake/util:util",

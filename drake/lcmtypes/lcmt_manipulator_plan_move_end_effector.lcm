@@ -1,0 +1,12 @@
+package drake;
+
+struct lcmt_manipulator_plan_move_end_effector
+{
+  int64_t timestamp;
+
+  int32_t num_steps;
+  double times[num_steps];
+  bot_core.position_3d_t poses[num_steps];
+
+  int32_t order_of_interpolation;
+}
