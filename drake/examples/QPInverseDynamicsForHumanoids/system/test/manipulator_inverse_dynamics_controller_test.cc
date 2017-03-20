@@ -39,10 +39,6 @@ class ManipulatorInverseDynamicsControllerTest : public ::testing::Test {
         "/examples/QPInverseDynamicsForHumanoids/"
         "config/iiwa.id_controller_config";
 
-    auto robot = std::make_unique<RigidBodyTree<double>>();
-    parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        kModelPath, multibody::joints::kFixed, robot.get());
-
     // Esimated state.
     VectorX<double> q(7);
     VectorX<double> v(7);
@@ -119,7 +115,13 @@ class ManipulatorInverseDynamicsControllerTest : public ::testing::Test {
     output_ = diagram_->AllocateOutput(*context_);
 
     // Initializes.
+    const param_parsers::RigidBodyTreeAliasGroups<double>& alias_groups =
+        qp_id_controller->get_alias_groups();
+    const RigidBodyTree<double>& robot = qp_id_controller->get_robot_for_control();
+    HumanoidStatus initial_status(robot, alias_groups);
+    initial_status.UpdateKinematics(context_->get_time(), q, v);
     qp_id_controller->Initialize(
+        initial_status,
         diagram_->GetMutableSubsystemContext(context_.get(), qp_id_controller));
 
     // Computes results.

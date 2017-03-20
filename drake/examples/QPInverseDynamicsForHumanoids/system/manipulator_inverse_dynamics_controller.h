@@ -53,7 +53,8 @@ class ManipulatorInverseDynamicsController
    * Initializes the controller's internal state. Must be called before
    * execution.
    */
-  void Initialize(systems::Context<double>* context);
+  void Initialize(const HumanoidStatus& current_status,
+                  systems::Context<double>* context);
 
   /**
    * Returns plan eval's alias groups.

@@ -92,12 +92,13 @@ ManipulatorInverseDynamicsController::ManipulatorInverseDynamicsController(
 }
 
 void ManipulatorInverseDynamicsController::Initialize(
+    const HumanoidStatus& current_status,
     systems::Context<double>* context) {
   systems::Context<double>* plan_eval_context =
       GetMutableSubsystemContext(context, plan_eval_);
   systems::State<double>* plan_eval_state =
       plan_eval_context->get_mutable_state();
-  plan_eval_->Initialize(plan_eval_state);
+  plan_eval_->InitializePlan(current_status, plan_eval_state);
 }
 
 }  // namespace qp_inverse_dynamics

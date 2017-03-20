@@ -73,16 +73,6 @@ drake_cc_library(
 )
 
 drake_cc_library(
-    name = "manipulator_plan_eval_system",
-    srcs = ["manipulator_plan_eval_system.cc"],
-    hdrs = ["manipulator_plan_eval_system.h"],
-    deps = [
-        ":plan_eval_base_system",
-        "//drake/lcmtypes:plan_eval_debug_info",
-    ],
-)
-
-drake_cc_library(
     name = "qp_controller_system",
     srcs = ["qp_controller_system.cc"],
     hdrs = ["qp_controller_system.h"],
