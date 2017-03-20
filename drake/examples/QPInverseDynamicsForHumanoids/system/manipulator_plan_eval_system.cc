@@ -5,11 +5,22 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller_common.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_streaming_plan.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/clone_only_value.h"
+
 #include "drake/lcmt_plan_eval_debug_info.hpp"
 
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
+
+template <typename CloneOnlyType>
+CloneOnlyType* get_mutable_plan(systems::State<double>* state, int index) {
+  systems::CloneOnlyValue<CloneOnlyType>& plan_ptr =
+      state->get_mutable_abstract_state()->get_mutable_value(index).
+          GetMutableValue<systems::CloneOnlyValue<CloneOnlyType>>();
+  return plan_ptr.get_value();
+}
 
 ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
     const RigidBodyTree<double>& robot,
@@ -33,20 +44,6 @@ ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
   set_name("ManipulatorPlanEvalSystem");
 }
 
-void ManipulatorPlanEvalSystem::Initialize(systems::State<double>* state) {
-  VectorSetpoint<double>& plan =
-      get_mutable_abstract_value<VectorSetpoint<double>>(state,
-                                                         abs_state_index_plan_);
-  plan = VectorSetpoint<double>(get_robot().get_num_velocities());
-  get_paramset().LookupDesiredDofMotionGains(&(plan.mutable_Kp()),
-                                             &(plan.mutable_Kd()));
-
-  QpInput& qp_input = get_mutable_qp_input(state);
-  qp_input = get_paramset().MakeQpInput({}, /* contacts */
-                                        {}, /* tracked bodies */
-                                        get_alias_groups());
-}
-
 void ManipulatorPlanEvalSystem::DoExtendedCalcOutput(
     const systems::Context<double>& context,
     systems::SystemOutput<double>* output) const {
@@ -58,6 +55,99 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcOutput(
       abs_state_index_debug_);
 }
 
+void ManipulatorPlanEvalSystem::DoInitializePlan(const HumanoidStatus& current_status, systems::State<double>* state) {
+  GenericPlan<double>* plan = get_mutable_plan<GenericPlan<double>>(state, abs_state_index_plan_);
+  plan->Initialize(current_status, get_paramset(), get_alias_groups());
+
+  QpInput& qp_input = get_mutable_qp_input(state);
+  plan->UpdateQpInput(current_status, get_paramset(), get_alias_groups(), &qp_input);
+}
+
+void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
+    const systems::Context<double>& context,
+    systems::State<double>* state) const {
+  // Gets the plan from abstract state.
+  GenericPlan<double>* base_plan = get_mutable_plan<GenericPlan<double>>(state, abs_state_index_plan_);
+  ManipulatorStreamingPlan<double>* plan = dynamic_cast<ManipulatorStreamingPlan<double>*>(base_plan);
+
+  // Gets the robot state from input.
+  const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
+      context, get_input_port_humanoid_status().get_index());
+
+  // Gets the desired position and velocity.
+  const systems::BasicVector<double>* state_d =
+      EvalVectorInput(context, input_port_index_desired_state_);
+
+  // Gets the desired acceleration.
+  const systems::BasicVector<double>* acc_d =
+      EvalVectorInput(context, input_port_index_desired_acceleration_);
+
+  // Updates the plan.
+  const int kDim = get_robot().get_num_positions();
+  VectorX<double> x_d = state_d->CopyToVector();
+  plan->get_mutable_reference_position() = x_d.head(kDim);
+  plan->get_mutable_reference_velocity() = x_d.tail(kDim);
+  plan->get_mutable_reference_acceleration() = acc_d->CopyToVector();
+
+  // Updates the desired accelerations.
+  QpInput& qp_input = get_mutable_qp_input(state);
+  plan->UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input);
+
+  // Generates debugging info.
+  lcmt_plan_eval_debug_info& debug =
+      get_mutable_abstract_value<lcmt_plan_eval_debug_info>(
+          state, abs_state_index_debug_);
+
+  debug.timestamp = static_cast<int64_t>(context.get_time() * 1e6);
+  debug.num_dof = kDim;
+  debug.dof_names.resize(kDim);
+  debug.nominal_q.resize(kDim);
+  debug.nominal_v.resize(kDim);
+  debug.nominal_vd.resize(kDim);
+
+  for (int i = 0; i < kDim; i++) {
+    debug.dof_names[i] = get_robot().get_position_name(i);
+    debug.nominal_q[i] = plan->get_reference_position()[i];
+    debug.nominal_v[i] = plan->get_reference_velocity()[i];
+    debug.nominal_vd[i] = plan->get_reference_acceleration()[i];
+  }
+}
+
+std::vector<std::unique_ptr<systems::AbstractValue>>
+ManipulatorPlanEvalSystem::ExtendedAllocateAbstractState() const {
+  std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(
+      get_num_extended_abstract_states());
+
+  abstract_vals[abs_state_index_plan_] =
+      systems::AbstractValue::Make<systems::CloneOnlyValue<GenericPlan<double>>>(
+          systems::CloneOnlyValue<GenericPlan<double>>(
+              std::make_unique<ManipulatorStreamingPlan<double>>()));
+
+  abstract_vals[abs_state_index_debug_] =
+      std::unique_ptr<systems::AbstractValue>(
+          new systems::Value<lcmt_plan_eval_debug_info>(
+              lcmt_plan_eval_debug_info()));
+
+  return abstract_vals;
+}
+
+/*
+void ManipulatorPlanEvalSystem::Initialize(systems::State<double>* state) {
+  VectorSetpoint<double>& plan =
+      get_mutable_abstract_value<VectorSetpoint<double>>(state,
+                                                         abs_state_index_plan_);
+  plan = VectorSetpoint<double>(get_robot().get_num_velocities());
+  get_paramset().LookupDesiredDofMotionGains(&(plan.mutable_Kp()),
+                                             &(plan.mutable_Kd()));
+
+  QpInput& qp_input = get_mutable_qp_input(state);
+  std::vector<std::string> contact_group_names = {};
+  std::vector<std::string> tracked_body_names = {};
+  qp_input = get_paramset().MakeQpInput(
+      contact_group_names, tracked_body_names, get_alias_groups());
+}
+
+>>>>>>> walking adding comment.s
 void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
     const systems::Context<double>& context,
     systems::State<double>* state) const {
@@ -79,10 +169,17 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
       EvalVectorInput(context, input_port_index_desired_acceleration_);
 
   // Updates the plan.
+<<<<<<< HEAD
   const int dim = get_robot().get_num_positions();
   for (int i = 0; i < dim; i++) {
     plan.mutable_desired_position()[i] = state_d->GetAtIndex(i);
     plan.mutable_desired_velocity()[i] = state_d->GetAtIndex(i + dim);
+=======
+  const int kDim = get_robot().get_num_positions();
+  for (int i = 0; i < kDim; i++) {
+    plan.mutable_desired_position()[i] = state_d->GetAtIndex(i);
+    plan.mutable_desired_velocity()[i] = state_d->GetAtIndex(i + kDim);
+>>>>>>> walking adding comment.s
     plan.mutable_desired_acceleration()[i] = acc_d->GetAtIndex(i);
   }
 
@@ -98,6 +195,7 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
           state, abs_state_index_debug_);
 
   debug.timestamp = static_cast<int64_t>(context.get_time() * 1e6);
+<<<<<<< HEAD
   debug.num_dof = dim;
   debug.dof_names.resize(dim);
   debug.nominal_q.resize(dim);
@@ -105,6 +203,15 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
   debug.nominal_vd.resize(dim);
 
   for (int i = 0; i < dim; i++) {
+=======
+  debug.num_dof = kDim;
+  debug.dof_names.resize(kDim);
+  debug.nominal_q.resize(kDim);
+  debug.nominal_v.resize(kDim);
+  debug.nominal_vd.resize(kDim);
+
+  for (int i = 0; i < kDim; i++) {
+>>>>>>> walking adding comment.s
     debug.dof_names[i] = get_robot().get_position_name(i);
     debug.nominal_q[i] = plan.desired_position()[i];
     debug.nominal_v[i] = plan.desired_velocity()[i];
@@ -117,6 +224,7 @@ ManipulatorPlanEvalSystem::ExtendedAllocateAbstractState() const {
   std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(
       get_num_extended_abstract_states());
 
+<<<<<<< HEAD
   const int dim = get_robot().get_num_velocities();
   abstract_vals[abs_state_index_plan_] =
       systems::AbstractValue::Make<VectorSetpoint<double>>(
@@ -128,6 +236,20 @@ ManipulatorPlanEvalSystem::ExtendedAllocateAbstractState() const {
 
   return abstract_vals;
 }
+=======
+  abstract_vals[abs_state_index_plan_] =
+      std::unique_ptr<systems::AbstractValue>(
+          new systems::Value<VectorSetpoint<double>>(VectorSetpoint<double>()));
+
+  abstract_vals[abs_state_index_debug_] =
+      std::unique_ptr<systems::AbstractValue>(
+          new systems::Value<lcmt_plan_eval_debug_info>(
+              lcmt_plan_eval_debug_info()));
+
+  return abstract_vals;
+}
+>>>>>>> walking adding comment.s
+*/
 
 std::unique_ptr<systems::AbstractValue>
 ManipulatorPlanEvalSystem::ExtendedAllocateOutputAbstract(

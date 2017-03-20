@@ -68,7 +68,7 @@ class ContactVisualizer(object):
                               contact.contact_force[2]])
             mag = np.linalg.norm(force)
             if mag > 1e-4:
-                mag = 0.3 / mag
+                mag = 1. / 1000.
 
             key1 = (str(contact.body1_name), str(contact.body2_name))
             key2 = (str(contact.body2_name), str(contact.body1_name))

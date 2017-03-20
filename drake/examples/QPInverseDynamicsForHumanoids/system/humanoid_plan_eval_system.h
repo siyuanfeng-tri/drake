@@ -34,32 +34,29 @@ class HumanoidPlanEvalSystem : public PlanEvalBaseSystem {
                          const std::string& alias_groups_file_name,
                          const std::string& param_file_name, double dt);
 
-  /**
-   * Initializes the plan in @p state to track the desired
-   * configuration @p q.
-   * @param q_d Desired generalized position.
-   * @param state State
-   */
-  void Initialize(const VectorX<double>& q, systems::State<double>* state);
-
  private:
-  int get_num_extended_abstract_states() const override { return 1; }
+  void DoInitializePlan(const HumanoidStatus& current_status,
+                        systems::State<double>* state);
 
-  void DoExtendedCalcUnrestrictedUpdate(
-      const systems::Context<double>& context,
-      systems::State<double>* state) const override;
+  int get_num_extended_abstract_states() const { return 1; }
 
-  void DoExtendedCalcOutput(
-      const systems::Context<double>& context,
-      systems::SystemOutput<double>* output) const override;
+  void DoExtendedCalcUnrestrictedUpdate(const systems::Context<double>& context,
+                                        systems::State<double>* state) const;
+
+  void DoExtendedCalcOutput(const systems::Context<double>& context,
+                            systems::SystemOutput<double>* output) const;
 
   std::vector<std::unique_ptr<systems::AbstractValue>>
-  ExtendedAllocateAbstractState() const override;
+  ExtendedAllocateAbstractState() const;
 
   std::unique_ptr<systems::AbstractValue> ExtendedAllocateOutputAbstract(
-      const systems::OutputPortDescriptor<double>& descriptor) const override;
+      const systems::OutputPortDescriptor<double>& descriptor) const;
 
   const int abs_state_index_plan_{};
+
+  mutable bool replaned_{false};
+  // int input_port_index_walking_plan_{};
+  // int input_port_index_manip_plan_{};
 };
 
 }  // namespace qp_inverse_dynamics

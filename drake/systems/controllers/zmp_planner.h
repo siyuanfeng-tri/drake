@@ -68,7 +68,7 @@ namespace systems {
  */
 class ZMPPlanner {
  public:
-  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ZMPPlanner)
+  //DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ZMPPlanner)
 
   ZMPPlanner() {}
 

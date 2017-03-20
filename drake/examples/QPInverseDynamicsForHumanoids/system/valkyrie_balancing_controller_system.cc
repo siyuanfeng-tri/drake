@@ -94,16 +94,6 @@ void controller_loop() {
   std::unique_ptr<systems::State<double>> tmp_state = context->CloneState();
   systems::UpdateActions<double> actions;
 
-  // Sets plan eval's desired to the nominal state.
-  systems::Context<double>* plan_eval_context =
-      diagram->GetMutableSubsystemContext(context.get(), plan_eval);
-  systems::State<double>* plan_eval_state =
-      plan_eval_context->get_mutable_state();
-  DRAKE_DEMAND(valkyrie::kRPYValkyrieDof == robot->get_num_positions());
-  VectorX<double> desired_q =
-      valkyrie::RPYValkyrieFixedPointState().head(valkyrie::kRPYValkyrieDof);
-  plan_eval->Initialize(desired_q, plan_eval_state);
-
   lcm.StartReceiveThread();
 
   drake::log()->info("controller started");
@@ -118,6 +108,14 @@ void controller_loop() {
             diagram->GetSubsystemContext(*context, rs_msg_to_rs), 0);
     context->set_time(static_cast<double>(msg->utime) / 1e6);
     if (context->get_time() != 0) break;
+  }
+
+  // Initializes plan eval to the first received message.
+  {
+    systems::Context<double>* plan_eval_context =
+      diagram->GetMutableSubsystemContext(context.get(), plan_eval);
+    const HumanoidStatus* measured_status = plan_eval->EvalInputValue<HumanoidStatus>(*plan_eval_context, plan_eval->get_input_port_humanoid_status().get_index());
+    plan_eval->InitializePlan(*measured_status, plan_eval_context->get_mutable_state());
   }
 
   double next_control_time =

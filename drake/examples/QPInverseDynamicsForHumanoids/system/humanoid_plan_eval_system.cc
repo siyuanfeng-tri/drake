@@ -9,20 +9,26 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/humanoid_walking_plan.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/humanoid_manipulation_plan.h"
+
+#include "robotlocomotion/robot_plan_t.hpp"
+#include "drake/math/roll_pitch_yaw.h"
+#include "drake/util/lcmUtil.h"
+
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/clone_only_value.h"
+
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
-// Example struct of a "Plan" object containing internal state such as desired
-// trajectories or setpoints.
-struct SimpleStandingPlan {
-  VectorSetpoint<double> joint_servo;
-  CartesianSetpoint<double> pelvis_servo;
-  CartesianSetpoint<double> torso_servo;
-  VectorSetpoint<double> com_servo;
-
-  Vector3<double> initial_com;
-};
+template <typename CloneOnlyType>
+CloneOnlyType* get_mutable_plan(systems::State<double>* state, int index) {
+  systems::CloneOnlyValue<CloneOnlyType>& plan_ptr =
+      state->get_mutable_abstract_state()->get_mutable_value(index).
+          GetMutableValue<systems::CloneOnlyValue<CloneOnlyType>>();
+  return plan_ptr.get_value();
+}
 
 HumanoidPlanEvalSystem::HumanoidPlanEvalSystem(
     const RigidBodyTree<double>& robot,
@@ -47,47 +53,35 @@ HumanoidPlanEvalSystem::ExtendedAllocateOutputAbstract(
 void HumanoidPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
     const systems::Context<double>& context,
     systems::State<double>* state) const {
-  // Gets the plan from abstract state.
-  SimpleStandingPlan& plan = get_mutable_abstract_value<SimpleStandingPlan>(
-      state, abs_state_index_plan_);
-
   // Gets the robot state from input.
   const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
       context, get_input_port_humanoid_status().get_index());
 
-  // Mutates the plan given the current state.
-  // This can be much more complicated like replanning trajectories, etc.
-  // Moves desired com height in a sine wave.
-  plan.com_servo.mutable_desired_position()[2] =
-      plan.initial_com[2] + 0.1 * std::sin(context.get_time() * 2 * M_PI);
+  // HACK simulate swapping plans.
+  // Should implement a set abs val func.
+  if (context.get_time() > 2 && !replaned_) {
+    systems::CloneOnlyValue<GenericPlan<double>> walking_plan(std::make_unique<HumanoidWalkingPlan<double>>());
+    systems::CloneOnlyValue<GenericPlan<double>>& plan_ptr =
+      state->get_mutable_abstract_state()->
+      get_mutable_value(abs_state_index_plan_).
+      GetMutableValue<systems::CloneOnlyValue<GenericPlan<double>>>();
+    plan_ptr = walking_plan;
+    std::cout << "Changed to walking plan\n";
+    replaned_ = true;
 
-  // Generates a QpInput and stores it in AbstractState.
+    plan_ptr.get_value()->Initialize(*robot_status, get_paramset(), get_alias_groups());
+    plan_ptr.get_value()->HandlePlanMessage(*robot_status, get_paramset(), get_alias_groups(), nullptr, 0);
+  }
+
+  // Gets the plan from abstract state.
+  GenericPlan<double>* plan = get_mutable_plan<GenericPlan<double>>(state, abs_state_index_plan_);
+
+  // Runs controller.
+  plan->ExecutePlan(*robot_status, get_paramset(), get_alias_groups());
+
+  // Updates the QpInput in AbstractState.
   QpInput& qp_input = get_mutable_qp_input(state);
-
-  // Does acceleration feedback based on the plan.
-  qp_input.mutable_desired_centroidal_momentum_dot()
-      .mutable_values()
-      .tail<3>() = get_robot().getMass() *
-                   plan.com_servo.ComputeTargetAcceleration(
-                       robot_status->com(), robot_status->comd());
-
-  qp_input.mutable_desired_dof_motions().mutable_values() =
-      plan.joint_servo.ComputeTargetAcceleration(robot_status->position(),
-                                                 robot_status->velocity());
-
-  const std::string& pelvis_body_name =
-      get_alias_groups().get_body("pelvis")->get_name();
-  const std::string& torso_body_name =
-      get_alias_groups().get_body("torso")->get_name();
-
-  qp_input.mutable_desired_body_motions()
-      .at(pelvis_body_name)
-      .mutable_values() = plan.pelvis_servo.ComputeTargetAcceleration(
-      robot_status->pelvis().pose(), robot_status->pelvis().velocity());
-
-  qp_input.mutable_desired_body_motions().at(torso_body_name).mutable_values() =
-      plan.torso_servo.ComputeTargetAcceleration(
-          robot_status->torso().pose(), robot_status->torso().velocity());
+  plan->UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input);
 }
 
 std::vector<std::unique_ptr<systems::AbstractValue>>
@@ -95,52 +89,73 @@ HumanoidPlanEvalSystem::ExtendedAllocateAbstractState() const {
   std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(
       get_num_extended_abstract_states());
   abstract_vals[abs_state_index_plan_] =
-      std::unique_ptr<systems::AbstractValue>(
-          new systems::Value<SimpleStandingPlan>(SimpleStandingPlan()));
+      systems::AbstractValue::Make<systems::CloneOnlyValue<GenericPlan<double>>>(
+          systems::CloneOnlyValue<GenericPlan<double>>(
+              //std::make_unique<HumanoidWalkingPlan<double>>()));
+              std::make_unique<HumanoidManipulationPlan<double>>()));
   return abstract_vals;
 }
 
-void HumanoidPlanEvalSystem::Initialize(const VectorX<double>& q_d,
-                                        systems::State<double>* state) {
-  // Gets the plan.
-  SimpleStandingPlan& plan = get_mutable_abstract_value<SimpleStandingPlan>(
-      state, abs_state_index_plan_);
+bot_core::robot_state_t q_to_robot_state_t(const RigidBodyTree<double>& robot, const VectorX<double>& q, double time) {
+  bot_core::robot_state_t msg;
 
-  KinematicsCache<double> cache = get_robot().doKinematics(q_d);
+  msg.utime = static_cast<int64_t>(time * 1e6);
 
-  plan.initial_com = get_robot().centerOfMass(cache);
-  plan.pelvis_servo.mutable_desired_pose() = get_robot().relativeTransform(
-      cache, 0, get_alias_groups().get_body("pelvis")->get_body_index());
-  plan.torso_servo.mutable_desired_pose() = get_robot().relativeTransform(
-      cache, 0, get_alias_groups().get_body("torso")->get_body_index());
+  Isometry3<double> pose;
+  pose.translation() = q.head<3>();
+  pose.linear() = math::rpy2rotmat(q.segment<3>(3));
+  EncodePose(pose, msg.pose);
 
-  plan.com_servo = VectorSetpoint<double>(3);
-  plan.com_servo.mutable_desired_position() = plan.initial_com;
+  EncodeTwist(Vector6<double>::Zero(), msg.twist);
 
-  int dim = get_robot().get_num_velocities();
-  plan.joint_servo = VectorSetpoint<double>(dim);
-  plan.joint_servo.mutable_desired_position() = q_d;
+  msg.num_joints = robot.get_num_positions() - 6;
+  msg.joint_name.resize(msg.num_joints);
+  msg.joint_position.resize(msg.num_joints);
+  msg.joint_velocity.resize(msg.num_joints, 0);
+  msg.joint_effort.resize(msg.num_joints, 0);
 
-  // Sets the gains.
-  get_paramset().LookupDesiredBodyMotionGains(
-      *get_alias_groups().get_body("pelvis"), &(plan.pelvis_servo.mutable_Kp()),
-      &(plan.pelvis_servo.mutable_Kd()));
-  get_paramset().LookupDesiredBodyMotionGains(
-      *get_alias_groups().get_body("torso"), &(plan.torso_servo.mutable_Kp()),
-      &(plan.torso_servo.mutable_Kd()));
-  get_paramset().LookupDesiredDofMotionGains(&(plan.joint_servo.mutable_Kp()),
-                                             &(plan.joint_servo.mutable_Kd()));
-  Vector6<double> Kp, Kd;
-  get_paramset().LookupDesiredCentroidalMomentumDotGains(&Kp, &Kd);
-  plan.com_servo.mutable_Kp() = Kp.tail<3>();
-  plan.com_servo.mutable_Kd() = Kd.tail<3>();
+  for (int i = 6; i < robot.get_num_positions(); ++i) {
+    msg.joint_name[i - 6] = robot.get_position_name(i);
+    msg.joint_position[i - 6] = q[i];
+  }
 
-  // Initializes qp input.
+  return msg;
+}
+
+robotlocomotion::robot_plan_t make_fake_manip_plan(const HumanoidStatus& robot_status) {
+  robotlocomotion::robot_plan_t msg;
+
+  msg.robot_name = "robot";
+  msg.num_states = 3;
+  msg.plan.resize(msg.num_states);
+  msg.plan_info.resize(msg.num_states, 1);
+  msg.num_bytes = 0;
+  msg.matlab_data.resize(0);
+
+  VectorX<double> q_d = robot_status.position();
+  msg.plan[0] = q_to_robot_state_t(robot_status.robot(), q_d, 0);
+
+  q_d[10] += 1;
+  msg.plan[1] = q_to_robot_state_t(robot_status.robot(), q_d, 1);
+
+  msg.plan[2] = q_to_robot_state_t(robot_status.robot(), q_d, 1.1);
+
+  return msg;
+}
+
+void HumanoidPlanEvalSystem::DoInitializePlan(const HumanoidStatus& current_status,
+                                              systems::State<double>* state) {
+  GenericPlan<double>* plan = get_mutable_plan<GenericPlan<double>>(state, abs_state_index_plan_);
+  plan->Initialize(current_status, get_paramset(), get_alias_groups());
+
+  robotlocomotion::robot_plan_t msg = make_fake_manip_plan(current_status);
+  std::vector<uint8_t> raw(msg.getEncodedSize());
+  msg.encode(raw.data(), 0, raw.size());
+
+  plan->HandlePlanMessage(current_status, get_paramset(), get_alias_groups(), raw.data(), raw.size());
+
   QpInput& qp_input = get_mutable_qp_input(state);
-  qp_input =
-      get_paramset().MakeQpInput({"feet"},            /* contacts */
-                                 {"pelvis", "torso"}, /* tracked bodies */
-                                 get_alias_groups());
+  plan->UpdateQpInput(current_status, get_paramset(), get_alias_groups(), &qp_input);
 }
 
 }  // namespace qp_inverse_dynamics

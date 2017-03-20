@@ -34,19 +34,6 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
                             const std::string& param_file_name, double dt);
 
   /**
-   * Initializes the plan and gains. Must be called before execution.
-   */
-  void Initialize(systems::State<double>* state);
-
-  /**
-   * Initializes the plan and gains. Must be called before execution.
-   */
-  void Initialize(systems::Context<double>* context) {
-    systems::State<double>* servo_state = context->get_mutable_state();
-    Initialize(servo_state);
-  }
-
-  /**
    * Returns the input port for desired position and velocity.
    */
   inline const systems::InputPortDescriptor<double>&
@@ -71,21 +58,22 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
   }
 
  private:
-  int get_num_extended_abstract_states() const override { return 2; }
+  void DoInitializePlan(const HumanoidStatus& current_status,
+                        systems::State<double>* state);
 
-  void DoExtendedCalcUnrestrictedUpdate(
-      const systems::Context<double>& context,
-      systems::State<double>* state) const override;
+  int get_num_extended_abstract_states() const { return 2; }
 
-  void DoExtendedCalcOutput(
-      const systems::Context<double>& context,
-      systems::SystemOutput<double>* output) const override;
+  void DoExtendedCalcUnrestrictedUpdate(const systems::Context<double>& context,
+                                        systems::State<double>* state) const;
+
+  void DoExtendedCalcOutput(const systems::Context<double>& context,
+                            systems::SystemOutput<double>* output) const;
 
   std::vector<std::unique_ptr<systems::AbstractValue>>
-  ExtendedAllocateAbstractState() const override;
+  ExtendedAllocateAbstractState() const;
 
   std::unique_ptr<systems::AbstractValue> ExtendedAllocateOutputAbstract(
-      const systems::OutputPortDescriptor<double>& descriptor) const override;
+      const systems::OutputPortDescriptor<double>& descriptor) const;
 
   int input_port_index_desired_state_{};
   int input_port_index_desired_acceleration_{};

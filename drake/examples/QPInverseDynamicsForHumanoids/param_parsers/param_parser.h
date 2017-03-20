@@ -306,6 +306,11 @@ class ParamSet {
       const std::vector<std::string>& tracked_body_groups,
       const RigidBodyTreeAliasGroups<double>& alias_group) const;
 
+  QpInput MakeQpInput(
+      const std::vector<const RigidBody<double>*>& contact_bodies,
+      const std::vector<const RigidBody<double>*>& tracked_bodies,
+      const RigidBodyTreeAliasGroups<double>& alias_group) const;
+
   /**
    * Returns the weight for regularizing the basis vectors of contact forces.
    */

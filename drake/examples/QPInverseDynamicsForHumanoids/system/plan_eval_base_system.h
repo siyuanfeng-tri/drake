@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "drake/common/drake_copyable.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/rigid_body_tree_alias_groups.h"
 #include "drake/multibody/rigid_body_tree.h"
@@ -71,6 +72,14 @@ class PlanEvalBaseSystem : public systems::LeafSystem<double> {
   std::unique_ptr<systems::AbstractValues> AllocateAbstractState() const final;
 
   /**
+   *
+   */
+  void InitializePlan(const HumanoidStatus& current_status,
+                      systems::State<double>* state) {
+    DoInitializePlan(current_status, state);
+  }
+
+  /**
    * Returns input port for HumanoidStatus.
    */
   inline const systems::InputPortDescriptor<double>&
@@ -108,6 +117,12 @@ class PlanEvalBaseSystem : public systems::LeafSystem<double> {
   /// @}
 
  protected:
+  /**
+   * Derived classes need to implement this to do custom initialization.
+   */
+  virtual void DoInitializePlan(const HumanoidStatus& current_status,
+                                systems::State<double>* state) = 0;
+
   /**
    * Returns the size of extended abstract state.
    */
