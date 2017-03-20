@@ -176,6 +176,19 @@ drake_cc_binary(
 )
 
 drake_cc_binary(
+    name = "pub_stuff",
+    srcs = ["pub_stuff.cc"],
+    deps = [
+        ":iiwa_lcm",
+        "//drake/lcm",
+        "//drake/lcmtypes:manipulator_plan_move_end_effector",
+        "@bot_core_lcmtypes//:lib",
+        "@robotlocomotion_lcmtypes//:lib",
+        "//drake/util:lcm_util",
+    ],
+)
+
+cc_binary(
     name = "kuka_ik_demo",
     srcs = ["kuka_ik_demo.cc"],
     data = [":models"],

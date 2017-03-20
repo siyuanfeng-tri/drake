@@ -63,6 +63,28 @@ drake_cc_library(
 )
 
 drake_cc_library(
+    name = "manipulator_controller",
+    visibility = ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
+    srcs = [
+        "manipulator_controller.cc",
+        "manipulator_plan_eval.cc",
+    ],
+    hdrs = [
+        "manipulator_controller.h",
+        "manipulator_plan_eval.h",
+    ],
+    deps = [
+        ":humanoid_status_translator_system",
+        ":joint_level_controller_system",
+        ":plan_eval_base_system",
+        ":qp_controller_system",
+        "//drake/examples/QPInverseDynamicsForHumanoids/plan_eval:manipulator_plans",
+        "//drake/lcmtypes:plan_eval_debug_info",
+        "//drake/systems/controllers:model_based_controller_base",
+    ],
+)
+
+drake_cc_library(
     name = "humanoid_plan_eval_system",
     srcs = ["humanoid_plan_eval_system.cc"],
     hdrs = ["humanoid_plan_eval_system.h"],

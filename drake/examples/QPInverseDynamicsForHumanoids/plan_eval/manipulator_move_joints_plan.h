@@ -7,11 +7,11 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 template <typename T>
-class ManipulatorMoveJointPlan : public GenericPlan<T> {
+class ManipulatorMoveJointsPlan : public GenericPlan<T> {
  public:
-  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulatorMoveJointPlan<T>)
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulatorMoveJointsPlan<T>)
 
-  ManipulatorMoveJointPlan();
+  ManipulatorMoveJointsPlan();
 
  private:
   GenericPlan<T>* CloneGenericPlanDerived() const;

@@ -25,6 +25,20 @@ cc_binary(
 )
 
 cc_binary(
+    name = "qp_id_controlled_iiwa",
+    srcs = ["qp_id_controlled_iiwa.cc"],
+    data = ["//drake/examples/kuka_iiwa_arm:models"],
+    deps = [
+        "//drake/examples/kuka_iiwa_arm:iiwa_common",
+        "//drake/examples/kuka_iiwa_arm:sim_diagram_builder",
+        "//drake/lcm",
+        "//drake/systems/analysis:simulator",
+        "//drake/examples/QPInverseDynamicsForHumanoids/system:manipulator_controller",
+        "@gflags//:gflags",
+    ],
+)
+
+cc_binary(
     name = "kuka_cartesian_way_point_demo",
     srcs = ["kuka_cartesian_way_point_demo.cc"],
     data = ["//drake/examples/kuka_iiwa_arm:models"],

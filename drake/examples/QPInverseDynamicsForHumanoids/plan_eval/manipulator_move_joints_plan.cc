@@ -7,10 +7,10 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 template <typename T>
-ManipulatorMoveJointPlan<T>::ManipulatorMoveJointPlan() {}
+ManipulatorMoveJointsPlan<T>::ManipulatorMoveJointsPlan() {}
 
 template <typename T>
-void ManipulatorMoveJointPlan<T>::InitializeGenericPlanDerived(
+void ManipulatorMoveJointsPlan<T>::InitializeGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {
   // Knots are constant, the second time doesn't matter.
@@ -22,7 +22,7 @@ void ManipulatorMoveJointPlan<T>::InitializeGenericPlanDerived(
 }
 
 template <typename T>
-void ManipulatorMoveJointPlan<T>::HandlePlanMessageGenericPlanDerived(
+void ManipulatorMoveJointsPlan<T>::HandlePlanMessageGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
     const void* message_bytes, int message_length) {
@@ -33,16 +33,15 @@ void ManipulatorMoveJointPlan<T>::HandlePlanMessageGenericPlanDerived(
   const int dim = robot_status.robot().get_num_positions();
 
   int length = static_cast<int>(msg.plan.size());
-  std::vector<MatrixX<T>> dof_knots(length);
+  std::vector<MatrixX<T>> dof_knots(length, MatrixX<T>::Zero(dim, 1));
   std::vector<T> times(length);
   for (int f = 0; f < length; f++) {
     const bot_core::robot_state_t& keyframe = msg.plan[f];
+    DRAKE_DEMAND(keyframe.num_joints == dim);
 
     times[f] = robot_status.time() + static_cast<double>(keyframe.utime) / 1e6;
-    dof_knots[f].resize(keyframe.num_joints, 1);
-    DRAKE_DEMAND(keyframe.num_joints == dim);
     for (int i = 0; i < keyframe.num_joints; i++) {
-      dof_knots[f](0, i) = keyframe.joint_position.at(i);
+      dof_knots[f](i, 0) = keyframe.joint_position.at(i);
     }
   }
 
@@ -52,11 +51,11 @@ void ManipulatorMoveJointPlan<T>::HandlePlanMessageGenericPlanDerived(
 }
 
 template <typename T>
-GenericPlan<T>* ManipulatorMoveJointPlan<T>::CloneGenericPlanDerived() const {
-  return new ManipulatorMoveJointPlan();
+GenericPlan<T>* ManipulatorMoveJointsPlan<T>::CloneGenericPlanDerived() const {
+  return new ManipulatorMoveJointsPlan();
 }
 
-template class ManipulatorMoveJointPlan<double>;
+template class ManipulatorMoveJointsPlan<double>;
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
