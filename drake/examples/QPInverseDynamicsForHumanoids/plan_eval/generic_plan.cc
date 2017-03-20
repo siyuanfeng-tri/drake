@@ -27,6 +27,14 @@ void GenericPlan<T>::Initialize(
   // Clears all tracked body trajectories.
   body_trajectories_.clear();
 
+  // Initializes all dof trajectory to hold at the measured.
+  // Knots are constant, so the end time doesn't matter.
+  const std::vector<T> times = {robot_status.time(), robot_status.time() + 1};
+  const MatrixX<T> q_d = robot_status.position();
+  this->set_dof_trajectory(
+      PiecewiseCubicTrajectory<T>(
+          PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
+
   // Calls custom stuff.
   InitializeGenericPlanDerived(robot_status, paramset, alias_groups);
 }

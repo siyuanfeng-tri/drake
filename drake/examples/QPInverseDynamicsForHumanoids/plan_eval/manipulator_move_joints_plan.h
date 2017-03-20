@@ -11,7 +11,7 @@ class ManipulatorMoveJointsPlan : public GenericPlan<T> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulatorMoveJointsPlan<T>)
 
-  ManipulatorMoveJointsPlan();
+  ManipulatorMoveJointsPlan() {}
 
  private:
   GenericPlan<T>* CloneGenericPlanDerived() const;
@@ -19,7 +19,7 @@ class ManipulatorMoveJointsPlan : public GenericPlan<T> {
   void InitializeGenericPlanDerived(
       const HumanoidStatus& robot_status,
       const param_parsers::ParamSet& paramset,
-      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups);
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {}
 
   void ExecutePlanGenericPlanDerived(
       const HumanoidStatus& robot_stauts,

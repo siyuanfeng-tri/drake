@@ -105,8 +105,12 @@ void HumanoidManipulationPlan<T>::HandlePlanMessageGenericPlanDerived(
     for (const auto& body_knots_pair : body_knots) {
       const RigidBody<T>* body = body_knots_pair.first;
       const std::vector<Isometry3<T>>& body_knots = body_knots_pair.second;
-      this->set_body_trajectory(
-          body, PiecewiseCartesianTrajectory<T>(times, body_knots, true));
+
+      PiecewiseCartesianTrajectory<T> body_traj =
+          PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+              times, body_knots);
+
+      this->set_body_trajectory(body, body_traj);
     }
   }
 }

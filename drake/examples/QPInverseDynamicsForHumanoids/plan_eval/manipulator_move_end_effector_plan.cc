@@ -8,26 +8,20 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 template <typename T>
-ManipulatorMoveEndEffectorPlan<T>::ManipulatorMoveEndEffectorPlan() {}
-
-template <typename T>
 void ManipulatorMoveEndEffectorPlan<T>::InitializeGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {
+  std::string ee_name = "end_effector";
   // Knots are constant, the second time doesn't matter.
   const std::vector<T> times = {robot_status.time(), robot_status.time() + 1};
-  const MatrixX<double> q_d = robot_status.position();
-  this->set_dof_trajectory(
-      PiecewiseCubicTrajectory<T>(
-          PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
-
-  std::string ee_name = "end_effector";
   const RigidBody<T>* ee_body = alias_groups.get_body(ee_name);
   Isometry3<T> ee_pose = robot_status.robot().CalcBodyPoseInWorldFrame(
         robot_status.cache(), *ee_body);
-  this->set_body_trajectory(
-      ee_body, PiecewiseCartesianTrajectory<T>(
-          times, {ee_pose, ee_pose}, true));
+
+  PiecewiseCartesianTrajectory<T> ee_traj =
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+          times, {ee_pose, ee_pose});
+  this->set_body_trajectory(ee_body, ee_traj);
 }
 
 template <typename T>
@@ -35,22 +29,40 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
     const void* message_bytes, int message_length) {
+  // Tries to decode as a lcmt_manipulator_plan_move_end_effector message.
   lcmt_manipulator_plan_move_end_effector msg;
   int consumed = msg.decode(message_bytes, 0, message_length);
   DRAKE_DEMAND(consumed == message_length);
 
-  std::vector<T> times(msg.num_steps);
-  std::vector<Isometry3<T>> poses(msg.num_steps);
-  for (int i = 0; i < msg.num_steps; i++) {
-    times[i] = robot_status.time() + msg.times[i];
-    poses[i] = DecodePose(msg.poses[i]);
-  }
+  DRAKE_DEMAND(static_cast<size_t>(msg.num_steps) == msg.utimes.size() &&
+               static_cast<size_t>(msg.num_steps) == msg.poses.size());
+  DRAKE_DEMAND(msg.num_steps >= 0);
 
-  // TODO(siyuan): use msg.order_of_interpolation.
-  PiecewiseCartesianTrajectory<T> ee_traj(times, poses, true);
+  if (msg.num_steps == 0)
+    return;
+
+  std::vector<T> times;
+  std::vector<Isometry3<T>> poses;
 
   std::string ee_name = "end_effector";
   const RigidBody<T>* ee_body = alias_groups.get_body(ee_name);
+
+  // If the first keyframe does not start immediately (its time > 0), we start
+  // from the current desired pose.
+  if (msg.utimes.front() != 0) {
+    times.push_back(robot_status.time());
+    poses.push_back(this->get_body_trajectory(ee_body).get_pose(robot_status.time()));
+  }
+
+  for (int i = 0; i < msg.num_steps; i++) {
+    times.push_back(robot_status.time() + static_cast<T>(msg.utimes[i]) / 1e6);
+    poses.push_back(DecodePose(msg.poses[i]));
+  }
+
+  // TODO(siyuan): use msg.order_of_interpolation.
+  PiecewiseCartesianTrajectory<T> ee_traj =
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+          times, poses);
 
   this->set_body_trajectory(ee_body, ee_traj);
 }

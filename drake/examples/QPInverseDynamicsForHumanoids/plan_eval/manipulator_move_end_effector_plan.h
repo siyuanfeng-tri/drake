@@ -11,7 +11,7 @@ class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ManipulatorMoveEndEffectorPlan<T>)
 
-  ManipulatorMoveEndEffectorPlan();
+  ManipulatorMoveEndEffectorPlan() {}
 
  private:
   GenericPlan<T>* CloneGenericPlanDerived() const;

@@ -32,12 +32,6 @@ void HumanoidPlan<T>::InitializeGenericPlanDerived(
       PiecewisePolynomial<T>::ZeroOrderHold(times, {com_d, com_d});
   this->UpdateZmpPlan(zmp_d, xcom, 1);
 
-  // Sets a dof traj to track current.
-  const MatrixX<double> q_d = robot_status.position();
-  this->set_dof_trajectory(
-      PiecewiseCubicTrajectory<T>(
-          PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
-
   // Sets contact state to double support always.
   ContactState double_support;
   double_support.insert(alias_groups.get_body("left_foot"));
@@ -50,9 +44,11 @@ void HumanoidPlan<T>::InitializeGenericPlanDerived(
     const RigidBody<T>* body = alias_groups.get_body(name);
     Isometry3<T> body_pose = robot_status.robot().CalcBodyPoseInWorldFrame(
         robot_status.cache(), *body);
-    this->set_body_trajectory(
-        body, PiecewiseCartesianTrajectory<T>(
-            times, {body_pose, body_pose}, true));
+
+    PiecewiseCartesianTrajectory<T> body_traj =
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+          times, {body_pose, body_pose});
+    this->set_body_trajectory(body, body_traj);
   }
 
   // Calls derived classes' initialization.

@@ -27,11 +27,24 @@ T average_angles(T a, T b) {
     return fmod((a + b) / 2., 2 * M_PI) - M_PI;
 }
 
+/**
+ * A wrapper class that stores a PiecewisePolynomial and its first and second
+ * derivatives. This class is supposed to represent position, velocity and
+ * acceleration. Thus, when the interpolating time is beyond the time bounds,
+ * the interpolated velocity and acceleration will be set to zero, and the
+ * interpolated position will peg at the terminal values. All dimensions are
+ * assumed to be independent of each other.
+ */
 template <typename T>
 class PiecewiseCubicTrajectory {
  public:
   PiecewiseCubicTrajectory() {}
 
+  /**
+   * Constructor.
+   * @param position_traj PiecewisePolynomial that represents the position
+   * trajectory. Its first and second derivatives are computed and stored.
+   */
   PiecewiseCubicTrajectory(const PiecewisePolynomial<T>& position_traj) {
     q_ = position_traj;
     qd_ = q_.derivative();
@@ -39,15 +52,15 @@ class PiecewiseCubicTrajectory {
   }
 
   /**
-   * Returns the interpolated pose at @p time.
+   * Returns the interpolated position at @p time.
    */
   VectorX<T> get_position(double time) const {
     return q_.value(time);
   }
 
   /**
-   * Returns the interpolated velocity at @p time or zero if @p time is before
-   * this trajectory's start time or after its end time.
+   * Returns the interpolated velocity at @p time or zero if @p time is out of
+   * the time bounds.
    */
   VectorX<T> get_velocity(double time) const {
     if (time <= q_.getStartTime() || time >= q_.getEndTime()) {
@@ -57,8 +70,8 @@ class PiecewiseCubicTrajectory {
   }
 
   /**
-   * Returns the interpolated acceleration at @p time or zero if @p time is
-   * before this trajectory's start time or after its end time.
+   * Returns the interpolated acceleration at @p time or zero if @p time is out
+   * of the time bounds.
    */
   VectorX<T> get_acceleration(double time) const {
     if (time <= q_.getStartTime() || time >= q_.getEndTime()) {
@@ -105,9 +118,9 @@ class PiecewiseCartesianTrajectory {
    * @param zero_end_point_linear_velocities If true, the start and end
    * velocity for the position spline are set to zero.
    */
-  PiecewiseCartesianTrajectory(const std::vector<T>& times,
-                               const std::vector<Isometry3<T>>& poses,
-                               bool zero_end_point_linear_velocities) {
+  static PiecewiseCartesianTrajectory<T> MakeCubicLinearWithZeroEndVelocity(
+      const std::vector<T>& times,
+      const std::vector<Isometry3<T>>& poses) {
     std::vector<MatrixX<T>> pos_knots(poses.size());
     eigen_aligned_std_vector<Matrix3<T>> rot_knots(poses.size());
     for (size_t i = 0; i < poses.size(); ++i) {
@@ -115,21 +128,18 @@ class PiecewiseCartesianTrajectory {
       rot_knots[i] = poses[i].linear();
     }
 
-    if (zero_end_point_linear_velocities) {
-      position_ = PiecewisePolynomial<T>::Cubic(
-          times, pos_knots, MatrixX<T>::Zero(3, 1), MatrixX<T>::Zero(3, 1));
-    } else {
-      if (pos_knots.size() >= 3) {
-        position_ = PiecewisePolynomial<T>::Cubic(times, pos_knots);
-      } else {
-        position_ = PiecewisePolynomial<T>::FirstOrderHold(times, pos_knots);
-      }
-    }
+    return PiecewiseCartesianTrajectory(
+        PiecewisePolynomial<T>::Cubic(
+            times, pos_knots, MatrixX<T>::Zero(3, 1), MatrixX<T>::Zero(3, 1)),
+        PiecewiseQuaternionSlerp<T>(times, rot_knots));
+  }
 
+  PiecewiseCartesianTrajectory(const PiecewisePolynomial<T>& pos_traj,
+                               const PiecewiseQuaternionSlerp<T>& rot_traj) {
+    position_ = pos_traj;
     positiond_ = position_.derivative();
     positiondd_ = positiond_.derivative();
-
-    orientation_ = PiecewiseQuaternionSlerp<T>(times, rot_knots);
+    orientation_ = rot_traj;
   }
 
   /**

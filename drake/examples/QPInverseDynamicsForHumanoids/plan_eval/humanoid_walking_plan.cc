@@ -186,8 +186,12 @@ HumanoidWalkingPlan<T>::GenerateDesiredSwingPelvisTrajectory(
 
   const std::vector<T> times = {t0, t0 + ss_duration_};
   const std::vector<Isometry3<T>> poses = {pelvis_pose0, pelvis_pose1};
+  PiecewiseCartesianTrajectory<T> traj =
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+          times, poses);
+
   return std::pair<const RigidBody<T>*, PiecewiseCartesianTrajectory<T>>(
-      pelvis, PiecewiseCartesianTrajectory<T>(times, poses, true));
+      pelvis, traj);
 }
 
 template <typename T>
@@ -208,8 +212,11 @@ HumanoidWalkingPlan<T>::GenerateDesiredSwingTorsoTrajectory(
 
   const std::vector<T> times = {t0, t0 + ss_duration_};
   const std::vector<Isometry3<T>> poses = {torso_pose0, torso_pose1};
+  PiecewiseCartesianTrajectory<T> traj =
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+          times, poses);
   return std::pair<const RigidBody<T>*, PiecewiseCartesianTrajectory<T>>(
-      torso, PiecewiseCartesianTrajectory<T>(times, poses, true));
+      torso, traj);
 }
 
 template <typename T>
@@ -254,8 +261,11 @@ HumanoidWalkingPlan<T>::GenerateDesiredSwingFootTrajectory(
   times = {t0, t0 + ss_duration_ / 2., t0 + ss_duration_};
   std::vector<Isometry3<T>> pose_knots = {current_pose, mid_pose,
                                           touchdown_foot_pose};
+  PiecewiseCartesianTrajectory<T> traj =
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
+          times, pose_knots);
   return std::pair<const RigidBody<T>*, PiecewiseCartesianTrajectory<T>>(
-      swing_foot, PiecewiseCartesianTrajectory<T>(times, pose_knots, true));
+      swing_foot, traj);
 }
 
 template <typename T>
