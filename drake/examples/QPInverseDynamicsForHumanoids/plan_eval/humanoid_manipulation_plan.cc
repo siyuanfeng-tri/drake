@@ -96,7 +96,7 @@ void HumanoidManipulationPlan<T>::HandlePlanMessageGenericPlanDerived(
   // Generates dof trajectories.
   {
     MatrixX<T> zeros = VectorX<T>::Zero(robot.get_num_positions());
-    this->UpdateDofTrajectory(
+    this->set_dof_trajectory(
         PiecewisePolynomial<T>::Cubic(times, dof_knots, zeros, zeros));
   }
 

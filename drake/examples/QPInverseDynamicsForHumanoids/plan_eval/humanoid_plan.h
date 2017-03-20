@@ -31,12 +31,6 @@ class HumanoidPlan : public GenericPlan<T> {
     zmp_planner_.Plan(zmp_d, x_com0, height);
   }
 
-  void UpdateDofTrajectory(const PiecewisePolynomial<T>& q_d) {
-    dof_trajectory_ = q_d;
-    dofd_trajectory_ = dof_trajectory_.derivative();
-    dofdd_trajectory_ = dofd_trajectory_.derivative();
-  }
-
   virtual HumanoidPlan<T>* CloneHumanoidPlanDerived() const = 0;
 
   virtual void InitializeHumanoidPlanDerived(
@@ -46,10 +40,6 @@ class HumanoidPlan : public GenericPlan<T> {
 
  private:
   systems::ZMPPlanner zmp_planner_;
-
-  PiecewisePolynomial<T> dof_trajectory_;
-  PiecewisePolynomial<T> dofd_trajectory_;
-  PiecewisePolynomial<T> dofdd_trajectory_;
 };
 
 }  // namespace qp_inverse_dynamics

@@ -5,6 +5,7 @@ namespace examples {
 namespace qp_inverse_dynamics {
 
 template class PiecewiseCartesianTrajectory<double>;
+template class PiecewiseCubicTrajectory<double>;
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples

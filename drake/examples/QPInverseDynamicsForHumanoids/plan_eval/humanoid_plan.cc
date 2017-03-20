@@ -11,9 +11,6 @@ template <typename T>
 GenericPlan<T>* HumanoidPlan<T>::CloneGenericPlanDerived() const {
   HumanoidPlan<T>* clone = CloneHumanoidPlanDerived();
   clone->zmp_planner_ = this->zmp_planner_;
-  clone->dof_trajectory_ = this->dof_trajectory_;
-  clone->dofd_trajectory_ = this->dofd_trajectory_;
-  clone->dofdd_trajectory_ = this->dofdd_trajectory_;
 
   return clone;
 }
@@ -37,8 +34,9 @@ void HumanoidPlan<T>::InitializeGenericPlanDerived(
 
   // Sets a dof traj to track current.
   MatrixX<double> q_d = robot_status.position();
-  this->UpdateDofTrajectory(
-      PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d}));
+  this->set_dof_trajectory(
+      PiecewiseCubicTrajectory<T>(
+          PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
 
   // Sets contact state to double support always.
   ContactState double_support;
@@ -66,8 +64,7 @@ void HumanoidPlan<T>::UpdateQpInputGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
     QpInput* qp_input) const {
-  T interp_time =
-      robot_status.time();  // this->get_interp_time(robot_status.time());
+  T interp_time = robot_status.time();
 
   // Generates desired acceleration for tracked bodies
   for (const auto& body_motion_pair : this->get_body_trajectories()) {
@@ -94,14 +91,12 @@ void HumanoidPlan<T>::UpdateQpInputGenericPlanDerived(
   // Generates desired acceleration for all dof.
   VectorX<T> kp, kd;
   paramset.LookupDesiredDofMotionGains(&kp, &kd);
-  VectorX<T> v_d = dofd_trajectory_.value(interp_time);
-  VectorX<T> vd_d = dofdd_trajectory_.value(interp_time);
-  if (interp_time > dofd_trajectory_.getEndTime()) {
-    v_d.setZero();
-    vd_d.setZero();
-  }
-  VectorSetpoint<T> tracker(dof_trajectory_.value(interp_time),
-                            v_d, vd_d, kp, kd);
+  const PiecewiseCubicTrajectory<T>& dof_traj = this->get_dof_trajectory();
+  VectorSetpoint<T> tracker(
+      dof_traj.get_position(interp_time),
+      dof_traj.get_velocity(interp_time),
+      dof_traj.get_acceleration(interp_time),
+      kp, kd);
   qp_input->mutable_desired_dof_motions().mutable_values() =
       tracker.ComputeTargetAcceleration(robot_status.position(),
                                         robot_status.velocity());

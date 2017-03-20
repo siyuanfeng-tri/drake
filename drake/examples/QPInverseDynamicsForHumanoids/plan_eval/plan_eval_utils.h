@@ -27,6 +27,62 @@ T average_angles(T a, T b) {
     return fmod((a + b) / 2., 2 * M_PI) - M_PI;
 }
 
+template <typename T>
+class PiecewiseCubicTrajectory {
+ public:
+  PiecewiseCubicTrajectory() {}
+
+  PiecewiseCubicTrajectory(const PiecewisePolynomial<T>& position_traj) {
+    q_ = position_traj;
+    qd_ = q_.derivative();
+    qdd_ = qd_.derivative();
+  }
+
+  /**
+   * Returns the interpolated pose at @p time.
+   */
+  VectorX<T> get_position(double time) const {
+    return q_.value(time);
+  }
+
+  /**
+   * Returns the interpolated velocity at @p time or zero if @p time is before
+   * this trajectory's start time or after its end time.
+   */
+  VectorX<T> get_velocity(double time) const {
+    if (time <= q_.getStartTime() || time >= q_.getEndTime()) {
+      return VectorX<T>::Zero(q_.rows());
+    }
+    return qd_.value(time);
+  }
+
+  /**
+   * Returns the interpolated acceleration at @p time or zero if @p time is
+   * before this trajectory's start time or after its end time.
+   */
+  VectorX<T> get_acceleration(double time) const {
+    if (time <= q_.getStartTime() || time >= q_.getEndTime()) {
+      return VectorX<T>::Zero(q_.rows());
+    }
+    return qdd_.value(time);
+  }
+
+  /**
+   * Returns the start time of this trajectory.
+   */
+  double get_start_time() const { return q_.getStartTime(); }
+
+  /**
+   * Returns the end time of this trajectory.
+   */
+  double get_end_time() const { return q_.getEndTime(); }
+
+ private:
+  PiecewisePolynomial<T> q_;
+  PiecewisePolynomial<T> qd_;
+  PiecewisePolynomial<T> qdd_;
+};
+
 /**
  * A wrapper class that represents a Cartesian trajectory, whose position part
  * is a PiecewisePolynomial, and the rotation part is a

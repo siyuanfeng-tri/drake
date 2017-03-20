@@ -8,6 +8,7 @@ template <typename T>
 std::unique_ptr<GenericPlan<T>> GenericPlan<T>::Clone() const {
   std::unique_ptr<GenericPlan<T>> clone(CloneGenericPlanDerived());
   clone->contact_state_ = this->contact_state_;
+  clone->dof_trajectory_ = this->dof_trajectory_;
   clone->body_trajectories_ = this->body_trajectories_;
 
   return clone;

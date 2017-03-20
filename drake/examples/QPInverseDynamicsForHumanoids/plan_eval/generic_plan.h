@@ -178,8 +178,17 @@ class GenericPlan {
     body_trajectories_.erase(body);
   }
 
+  const PiecewiseCubicTrajectory<T>& get_dof_trajectory() const {
+    return dof_trajectory_;
+  }
+
+  void set_dof_trajectory(const PiecewiseCubicTrajectory<T>& traj) {
+    dof_trajectory_ = traj;
+  }
+
  private:
   ContactState contact_state_;
+  PiecewiseCubicTrajectory<T> dof_trajectory_;
   std::unordered_map<const RigidBody<T>*, PiecewiseCartesianTrajectory<T>>
       body_trajectories_;
 };
