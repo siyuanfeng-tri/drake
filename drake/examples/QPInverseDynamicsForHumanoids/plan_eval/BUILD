@@ -17,7 +17,6 @@ drake_cc_library(
     hdrs = [
         "generic_plan.h",
         "plan_eval_utils.h",
-        "clone_only_value.h"
     ],
     deps = [
         "//drake/examples/QPInverseDynamicsForHumanoids:control_utils",

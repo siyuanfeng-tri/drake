@@ -40,7 +40,10 @@ drake_cc_library(
 drake_cc_library(
     name = "plan_eval_base_system",
     srcs = ["plan_eval_base_system.cc"],
-    hdrs = ["plan_eval_base_system.h"],
+    hdrs = [
+        "clone_only_value.h",
+        "plan_eval_base_system.h",
+    ],
     deps = [
         "//drake/common:drake_path",
         "//drake/examples/QPInverseDynamicsForHumanoids:control_utils",

@@ -16,7 +16,7 @@
 #include "drake/math/roll_pitch_yaw.h"
 #include "drake/util/lcmUtil.h"
 
-#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/clone_only_value.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/system/clone_only_value.h"
 
 namespace drake {
 namespace examples {

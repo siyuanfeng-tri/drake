@@ -6,7 +6,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller_common.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_streaming_plan.h"
-#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/clone_only_value.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/system/clone_only_value.h"
 
 #include "drake/lcmt_plan_eval_debug_info.hpp"
 
