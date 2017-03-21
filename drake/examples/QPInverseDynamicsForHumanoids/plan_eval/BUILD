@@ -26,11 +26,70 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "generic_plan",
+    srcs = [
+        "generic_plan.cc",
+    ],
+    hdrs = [
+        "generic_plan.h",
+    ],
+    deps = [
+        ":plan_eval_utils",
+        "//drake/examples/QPInverseDynamicsForHumanoids:control_utils",
+        "//drake/examples/QPInverseDynamicsForHumanoids:humanoid_status",
+        "//drake/examples/QPInverseDynamicsForHumanoids:qp_controller_common",
+        "//drake/examples/QPInverseDynamicsForHumanoids/param_parsers:param_parser",
+        "//drake/examples/QPInverseDynamicsForHumanoids/param_parsers:rigid_body_tree_alias_groups",
+    ],
+)
+
+drake_cc_library(
+    name = "manipulator_plans",
+    srcs = [
+        "manipulator_move_end_effector_plan.cc",
+        "manipulator_move_joints_plan.cc",
+    ],
+    hdrs = [
+        "manipulator_move_end_effector_plan.h",
+        "manipulator_move_joints_plan.h",
+    ],
+    deps = [
+        ":generic_plan",
+        "//drake/lcmtypes:manipulator_plan_move_end_effector",
+        "//drake/util:lcm_util",
+        "@bot_core_lcmtypes//:lib",
+        "@robotlocomotion_lcmtypes//:lib",
+    ],
+)
+
 # === test/ ===
 drake_cc_googletest(
     name = "plan_eval_utils_test",
     deps = [
         ":plan_eval_utils",
         "//drake/common:eigen_matrix_compare",
+    ],
+)
+
+drake_cc_googletest(
+    name = "generic_plan_test",
+    deps = [
+        ":generic_plan",
+        "//drake/common:drake_path",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+    ],
+)
+
+drake_cc_googletest(
+    name = "manipulator_plan_test",
+    deps = [
+        ":manipulator_plans",
+        "//drake/common:drake_path",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
     ],
 )
