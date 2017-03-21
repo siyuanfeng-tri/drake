@@ -53,14 +53,16 @@ class GenericPlanTest : public ::testing::Test {
  protected:
   void SetUp() override {
     const std::string kModelPath = drake::GetDrakePath() +
-        "/examples/kuka_iiwa_arm/models/iiwa14/"
-        "iiwa14_simplified_collision.urdf";
+                                   "/examples/kuka_iiwa_arm/models/iiwa14/"
+                                   "iiwa14_simplified_collision.urdf";
 
-    const std::string kAliasGroupsPath = drake::GetDrakePath() +
+    const std::string kAliasGroupsPath =
+        drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
         "config/iiwa.alias_groups";
 
-    const std::string kControlConfigPath = drake::GetDrakePath() +
+    const std::string kControlConfigPath =
+        drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
         "config/iiwa.id_controller_config";
 
@@ -101,28 +103,27 @@ TEST_F(GenericPlanTest, TestInitialize) {
   EXPECT_TRUE(plan.get_contact_state().empty());
   EXPECT_TRUE(plan.get_body_trajectories().empty());
 
-  // The desired position interpolated at any time should be equal to the current posture.
+  // The desired position interpolated at any time should be equal to the
+  // current posture.
   // The desired velocity and acceleration should be zero.
-  std::vector<double> test_times = {
-      robot_status_->time() - 0.5,
-      robot_status_->time(),
-      robot_status_->time() + 3};
+  std::vector<double> test_times = {robot_status_->time() - 0.5,
+                                    robot_status_->time(),
+                                    robot_status_->time() + 3};
 
   for (double time : test_times) {
     EXPECT_TRUE(drake::CompareMatrices(
-          robot_status_->position(),
-          plan.get_dof_trajectory().get_position(time),
-          1e-12, drake::MatrixCompareType::absolute));
+        robot_status_->position(), plan.get_dof_trajectory().get_position(time),
+        1e-12, drake::MatrixCompareType::absolute));
 
     EXPECT_TRUE(drake::CompareMatrices(
-          VectorX<double>::Zero(robot_->get_num_velocities()),
-          plan.get_dof_trajectory().get_velocity(time),
-          1e-12, drake::MatrixCompareType::absolute));
+        VectorX<double>::Zero(robot_->get_num_velocities()),
+        plan.get_dof_trajectory().get_velocity(time), 1e-12,
+        drake::MatrixCompareType::absolute));
 
     EXPECT_TRUE(drake::CompareMatrices(
-          VectorX<double>::Zero(robot_->get_num_velocities()),
-          plan.get_dof_trajectory().get_acceleration(time),
-          1e-12, drake::MatrixCompareType::absolute));
+        VectorX<double>::Zero(robot_->get_num_velocities()),
+        plan.get_dof_trajectory().get_acceleration(time), 1e-12,
+        drake::MatrixCompareType::absolute));
   }
 }
 
@@ -150,32 +151,31 @@ TEST_F(GenericPlanTest, TestUpdateQpInput) {
   robot_status_->UpdateKinematics(0.66, q_d * 0.3, robot_status_->velocity());
 
   VectorX<double> expected_vd =
-       (kp.array() * (q_d - robot_status_->position()).array() -
-        kd.array() * robot_status_->velocity().array()).matrix();
+      (kp.array() * (q_d - robot_status_->position()).array() -
+       kd.array() * robot_status_->velocity().array())
+          .matrix();
 
   QpInput qp_input;
   plan.UpdateQpInput(*robot_status_, *params_, *alias_groups_, &qp_input);
 
   // Desired generalized acceleration should match expected.
-  EXPECT_EQ(qp_input.desired_dof_motions().size(),
-      robot_->get_num_positions());
+  EXPECT_EQ(qp_input.desired_dof_motions().size(), robot_->get_num_positions());
 
   EXPECT_TRUE(drake::CompareMatrices(
-        expected_vd, qp_input.desired_dof_motions().values(), 1e-12,
-        drake::MatrixCompareType::absolute));
+      expected_vd, qp_input.desired_dof_motions().values(), 1e-12,
+      drake::MatrixCompareType::absolute));
   VectorX<double> expected_weights = params_->MakeDesiredDofMotions().weights();
   EXPECT_TRUE(drake::CompareMatrices(
-        expected_weights, qp_input.desired_dof_motions().weights(), 1e-12,
-        drake::MatrixCompareType::absolute));
+      expected_weights, qp_input.desired_dof_motions().weights(), 1e-12,
+      drake::MatrixCompareType::absolute));
   for (int i = 0; i < robot_->get_num_positions(); ++i) {
     EXPECT_EQ(qp_input.desired_dof_motions().constraint_type(i),
-        ConstraintType::Soft);
+              ConstraintType::Soft);
   }
 
   // Contact force basis regularization weight is irrelevant here since there
   // is not contacts, but its value should match params'.
-  EXPECT_EQ(qp_input.w_basis_reg(),
-      params_->get_basis_regularization_weight());
+  EXPECT_EQ(qp_input.w_basis_reg(), params_->get_basis_regularization_weight());
 
   // Not tracking Cartesian motions.
   EXPECT_TRUE(qp_input.desired_body_motions().empty());
@@ -188,7 +188,7 @@ TEST_F(GenericPlanTest, TestUpdateQpInput) {
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().value(i), 0);
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().weight(i), 0);
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().constraint_type(i),
-        ConstraintType::Skip);
+              ConstraintType::Skip);
   }
 }
 

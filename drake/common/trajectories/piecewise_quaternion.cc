@@ -1,7 +1,7 @@
 #include "drake/common/trajectories/piecewise_quaternion.h"
 
 #include <algorithm>
-#include <iostream>
+
 #include "drake/math/quaternion.h"
 
 namespace drake {

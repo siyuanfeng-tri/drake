@@ -36,7 +36,7 @@ void GenericPlan<T>::Initialize(
   this->set_dof_trajectory(PiecewiseCubicTrajectory<T>(
       PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
 
-  // Calls custom stuff.
+  // Calls custom initialization.
   InitializeGenericPlanDerived(robot_status, paramset, alias_groups);
 }
 
@@ -45,6 +45,7 @@ void GenericPlan<T>::HandlePlanMessage(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
     const void* message_bytes, int message_length) {
+  // Calls custom handler.
   HandlePlanMessageGenericPlanDerived(robot_status, paramset, alias_groups,
                                       message_bytes, message_length);
 }
@@ -111,7 +112,7 @@ void GenericPlan<T>::UpdateQpInput(
       tracker.ComputeTargetAcceleration(robot_status.position(),
                                         robot_status.velocity());
 
-  // Do more updates, like update desired values etc.
+  // Calls custom update.
   UpdateQpInputGenericPlanDerived(robot_status, paramset, alias_groups,
                                   qp_input);
 }
