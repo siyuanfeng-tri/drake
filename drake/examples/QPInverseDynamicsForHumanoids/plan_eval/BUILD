@@ -54,6 +54,17 @@ drake_cc_library(
 
 # === test/ ===
 drake_cc_googletest(
+    name = "generic_plan_test",
+    deps = [
+        ":generic_plan",
+        "//drake/common:drake_path",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+    ],
+)
+
+drake_cc_googletest(
     name = "manipulator_plan_test",
     deps = [
         ":manipulator_plans",
@@ -65,12 +76,9 @@ drake_cc_googletest(
 )
 
 drake_cc_googletest(
-    name = "generic_plan_test",
+    name = "plan_eval_utils_test",
     deps = [
         ":generic_plan",
-        "//drake/common:drake_path",
         "//drake/common:eigen_matrix_compare",
-        "//drake/multibody:rigid_body_tree",
-        "//drake/multibody/parsers",
     ],
 )

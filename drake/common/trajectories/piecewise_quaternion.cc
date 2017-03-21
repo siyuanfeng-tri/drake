@@ -1,7 +1,7 @@
 #include "drake/common/trajectories/piecewise_quaternion.h"
 
 #include <algorithm>
-
+#include <iostream>
 #include "drake/math/quaternion.h"
 
 namespace drake {
@@ -9,23 +9,19 @@ namespace drake {
 template <typename Scalar>
 bool PiecewiseQuaternionSlerp<Scalar>::is_approx(
     const PiecewiseQuaternionSlerp<Scalar>& other, Scalar tol) const {
+  // Velocities are derived from the quaternions, and I don't want to
+  // overload units for tol, so I am skipping the checks on velocities.
   if (!this->segmentTimesEqual(other, tol))
     return false;
 
   if (quaternions_.size() != other.quaternions_.size())
     return false;
 
-  if (angular_velocities_.size() != other.angular_velocities_.size())
-    return false;
-
   for (size_t i = 0; i < quaternions_.size(); ++i) {
-    if (quaternions_[i].isApprox(other.quaternions_[i], tol))
+    Scalar dot = std::abs(quaternions_[i].dot(other.quaternions_[i]));
+    if (dot < std::cos(tol / 2)) {
       return false;
-  }
-
-  for (size_t i = 0; i < angular_velocities_.size(); ++i) {
-    if (angular_velocities_[i].isApprox(other.angular_velocities_[i], tol))
-      return false;
+    }
   }
 
   return true;
