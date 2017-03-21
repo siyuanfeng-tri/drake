@@ -1,5 +1,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_move_joints_plan.h"
 
+#include <vector>
+
 #include "robotlocomotion/robot_plan_t.hpp"
 
 namespace drake {
@@ -18,8 +20,7 @@ void ManipulatorMoveJointsPlan<T>::HandlePlanMessageGenericPlanDerived(
 
   int length = static_cast<int>(msg.plan.size());
   const int dim = robot_status.robot().get_num_positions();
-  if (length == 0)
-    return;
+  if (length == 0) return;
 
   std::vector<MatrixX<T>> dof_knots;
   std::vector<T> times;
@@ -27,7 +28,8 @@ void ManipulatorMoveJointsPlan<T>::HandlePlanMessageGenericPlanDerived(
   // If the first keyframe does not start immediately (its time > 0), we start
   // from the current desired posture.
   if (msg.plan.front().utime != 0) {
-    dof_knots.push_back(this->get_dof_trajectory().get_position(robot_status.time()));
+    dof_knots.push_back(
+        this->get_dof_trajectory().get_position(robot_status.time()));
     times.push_back(robot_status.time());
   }
 
@@ -41,8 +43,9 @@ void ManipulatorMoveJointsPlan<T>::HandlePlanMessageGenericPlanDerived(
   }
 
   MatrixX<T> zeros = VectorX<T>::Zero(dim);
-  this->set_dof_trajectory(
-      PiecewisePolynomial<T>::Cubic(times, dof_knots, zeros, zeros));
+  PiecewisePolynomial<T> pos_traj =
+      PiecewisePolynomial<T>::Cubic(times, dof_knots, zeros, zeros);
+  this->set_dof_trajectory(PiecewiseCubicTrajectory<T>(pos_traj));
 }
 
 template <typename T>

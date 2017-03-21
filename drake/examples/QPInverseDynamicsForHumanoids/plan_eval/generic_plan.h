@@ -98,6 +98,42 @@ class GenericPlan {
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       QpInput* qp_input) const;
 
+  /**
+   * Returns the current planned contact state.
+   */
+  const ContactState& get_contact_state() const { return contact_state_; }
+
+  /**
+   * Returns a map of all Cartesian trajectories.
+   */
+  const std::unordered_map<const RigidBody<T>*,
+                           PiecewiseCartesianTrajectory<T>>&
+  get_body_trajectories() const {
+    return body_trajectories_;
+  }
+
+  /**
+   * Returns the Cartesian trajectory for @p body.
+   */
+  const PiecewiseCartesianTrajectory<T>& get_body_trajectory(
+      const RigidBody<T>* body) const {
+    return body_trajectories_.at(body);
+  }
+
+  /**
+   * Returns trajectory for all degrees of freedom.
+   */
+  const PiecewiseCubicTrajectory<T>& get_dof_trajectory() const {
+    return dof_trajectory_;
+  }
+
+  /**
+   * Returns true if there is a Cartesian trajectory for @p body.
+   */
+  const bool has_body_trajectory(const RigidBody<T>* body) const {
+    return body_trajectories_.find(body) != body_trajectories_.end();
+  }
+
  protected:
   virtual GenericPlan<T>* CloneGenericPlanDerived() const = 0;
 
@@ -124,11 +160,6 @@ class GenericPlan {
       QpInput* qp_input) const = 0;
 
   /**
-   * Returns the current planned contact state.
-   */
-  const ContactState& get_contact_state() const { return contact_state_; }
-
-  /**
    * Sets the planned contact state to @p contact_state.
    */
   void UpdateContactState(const ContactState& contact_state) {
@@ -148,40 +179,15 @@ class GenericPlan {
   }
 
   /**
-   * Returns a map of all Cartesian trajectories.
-   */
-  const std::unordered_map<const RigidBody<T>*,
-                           PiecewiseCartesianTrajectory<T>>&
-  get_body_trajectories() const {
-    return body_trajectories_;
-  }
-
-  /**
-   * Returns the Cartesian trajectory for @p body.
-   */
-  const PiecewiseCartesianTrajectory<T>& get_body_trajectory(
-      const RigidBody<T>* body) const {
-    return body_trajectories_.at(body);
-  }
-
-  /**
-   * Returns true if there is a Cartesian trajectory for @p body.
-   */
-  const bool has_body_trajectory(const RigidBody<T>* body) const {
-    return body_trajectories_.find(body) != body_trajectories_.end();
-  }
-
-  /**
    * Removes a Cartesian trajectory for @p body.
    */
   const void remove_body_trajectory(const RigidBody<T>* body) {
     body_trajectories_.erase(body);
   }
 
-  const PiecewiseCubicTrajectory<T>& get_dof_trajectory() const {
-    return dof_trajectory_;
-  }
-
+  /**
+   * Sets dof trajectory to @p traj.
+   */
   void set_dof_trajectory(const PiecewiseCubicTrajectory<T>& traj) {
     dof_trajectory_ = traj;
   }

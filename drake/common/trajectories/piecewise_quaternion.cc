@@ -7,6 +7,31 @@
 namespace drake {
 
 template <typename Scalar>
+bool PiecewiseQuaternionSlerp<Scalar>::is_approx(
+    const PiecewiseQuaternionSlerp<Scalar>& other, Scalar tol) const {
+  if (!this->segmentTimesEqual(other, tol))
+    return false;
+
+  if (quaternions_.size() != other.quaternions_.size())
+    return false;
+
+  if (angular_velocities_.size() != other.angular_velocities_.size())
+    return false;
+
+  for (size_t i = 0; i < quaternions_.size(); ++i) {
+    if (quaternions_[i].isApprox(other.quaternions_[i], tol))
+      return false;
+  }
+
+  for (size_t i = 0; i < angular_velocities_.size(); ++i) {
+    if (angular_velocities_[i].isApprox(other.angular_velocities_[i], tol))
+      return false;
+  }
+
+  return true;
+}
+
+template <typename Scalar>
 void PiecewiseQuaternionSlerp<Scalar>::ComputeAngularVelocities() {
   if (quaternions_.empty()) return;
 

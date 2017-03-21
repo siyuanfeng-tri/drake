@@ -479,7 +479,8 @@ QpInput ParamSet::MakeQpInput(
 
   // Inserts all tracked bodies.
   for (const auto& body : tracked_bodies) {
-    const DesiredMotionParam& param = FindParam(body->get_name(), body_motion_params_);
+    const DesiredMotionParam& param =
+        FindParam(body->get_name(), body_motion_params_);
     qp_input.mutable_desired_body_motions().emplace(
         body->get_name(), MakeDesiredBodyMotionFromParam(*body, param));
   }

@@ -1,5 +1,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_move_end_effector_plan.h"
 
+#include <vector>
+
 #include "drake/lcmt_manipulator_plan_move_end_effector.hpp"
 #include "drake/util/lcmUtil.h"
 
@@ -13,9 +15,10 @@ void ManipulatorMoveEndEffectorPlan<T>::InitializeGenericPlanDerived(
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {
   // Knots are constant, the second time doesn't matter.
   const std::vector<T> times = {robot_status.time(), robot_status.time() + 1};
-  const RigidBody<T>* ee_body = alias_groups.get_body(kEndEffectorAliasGroupName);
+  const RigidBody<T>* ee_body =
+      alias_groups.get_body(kEndEffectorAliasGroupName);
   Isometry3<T> ee_pose = robot_status.robot().CalcBodyPoseInWorldFrame(
-        robot_status.cache(), *ee_body);
+      robot_status.cache(), *ee_body);
 
   PiecewiseCartesianTrajectory<T> ee_traj =
       PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
@@ -37,19 +40,20 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
                static_cast<size_t>(msg.num_steps) == msg.poses.size());
   DRAKE_DEMAND(msg.num_steps >= 0);
 
-  if (msg.num_steps == 0)
-    return;
+  if (msg.num_steps == 0) return;
 
   std::vector<T> times;
   std::vector<Isometry3<T>> poses;
 
-  const RigidBody<T>* ee_body = alias_groups.get_body(kEndEffectorAliasGroupName);
+  const RigidBody<T>* ee_body =
+      alias_groups.get_body(kEndEffectorAliasGroupName);
 
   // If the first keyframe does not start immediately (its time > 0), we start
   // from the current desired pose.
   if (msg.utimes.front() != 0) {
     times.push_back(robot_status.time());
-    poses.push_back(this->get_body_trajectory(ee_body).get_pose(robot_status.time()));
+    poses.push_back(
+        this->get_body_trajectory(ee_body).get_pose(robot_status.time()));
   }
 
   for (int i = 0; i < msg.num_steps; i++) {
@@ -66,7 +70,8 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
 }
 
 template <typename T>
-GenericPlan<T>* ManipulatorMoveEndEffectorPlan<T>::CloneGenericPlanDerived() const {
+GenericPlan<T>* ManipulatorMoveEndEffectorPlan<T>::CloneGenericPlanDerived()
+    const {
   return new ManipulatorMoveEndEffectorPlan();
 }
 

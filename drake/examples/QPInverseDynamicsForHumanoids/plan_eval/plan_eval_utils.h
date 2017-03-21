@@ -1,5 +1,8 @@
 #pragma once
 
+#include <set>
+#include <vector>
+
 #include "drake/common/eigen_types.h"
 #include "drake/common/trajectories/piecewise_polynomial.h"
 #include "drake/common/trajectories/piecewise_quaternion.h"
@@ -34,7 +37,8 @@ class PiecewiseCubicTrajectory {
    * @param position_traj PiecewisePolynomial that represents the position
    * trajectory. Its first and second derivatives are computed and stored.
    */
-  PiecewiseCubicTrajectory(const PiecewisePolynomial<T>& position_traj) {
+  explicit PiecewiseCubicTrajectory(
+      const PiecewisePolynomial<T>& position_traj) {
     q_ = position_traj;
     qd_ = q_.derivative();
     qdd_ = qd_.derivative();
@@ -43,16 +47,14 @@ class PiecewiseCubicTrajectory {
   /**
    * Returns the interpolated position at @p time.
    */
-  VectorX<T> get_position(double time) const {
-    return q_.value(time);
-  }
+  VectorX<T> get_position(double time) const { return q_.value(time); }
 
   /**
    * Returns the interpolated velocity at @p time or zero if @p time is out of
    * the time bounds.
    */
   VectorX<T> get_velocity(double time) const {
-    if (time <= q_.getStartTime() || time >= q_.getEndTime()) {
+    if (time < q_.getStartTime() || time > q_.getEndTime()) {
       return VectorX<T>::Zero(q_.rows());
     }
     return qd_.value(time);
@@ -63,7 +65,7 @@ class PiecewiseCubicTrajectory {
    * of the time bounds.
    */
   VectorX<T> get_acceleration(double time) const {
-    if (time <= q_.getStartTime() || time >= q_.getEndTime()) {
+    if (time < q_.getStartTime() || time > q_.getEndTime()) {
       return VectorX<T>::Zero(q_.rows());
     }
     return qdd_.value(time);
@@ -78,6 +80,37 @@ class PiecewiseCubicTrajectory {
    * Returns the end time of this trajectory.
    */
   double get_end_time() const { return q_.getEndTime(); }
+
+  /**
+   * Returns true if the position trajectory and its first and second
+   * derivatives are all within @p tol to @p other.
+   */
+  bool is_approx(const PiecewiseCubicTrajectory<T>& other, T tol) const {
+    bool ret = q_.isApprox(other.q_, tol);
+    ret &= qd_.isApprox(other.qd_, tol);
+    ret &= qdd_.isApprox(other.qdd_, tol);
+    return ret;
+  }
+
+  const PiecewisePolynomial<T>& get_position_traj() const {
+    return q_;
+  }
+
+  const PiecewisePolynomial<T>& get_velocity_traj() const {
+    return qd_;
+  }
+
+  const PiecewisePolynomial<T>& get_acceleration_traj() const {
+    return qd_;
+  }
+
+  bool operator==(const PiecewiseCubicTrajectory<T>& other) const {
+    return is_approx(other, 1e-12);
+  }
+
+  bool operator!=(const PiecewiseCubicTrajectory<T>& other) const {
+    return !(this->operator==(other));
+  }
 
  private:
   PiecewisePolynomial<T> q_;
@@ -102,8 +135,7 @@ class PiecewiseCartesianTrajectory {
    * @param poses Knots used to build the splines.
    */
   static PiecewiseCartesianTrajectory<T> MakeCubicLinearWithZeroEndVelocity(
-      const std::vector<T>& times,
-      const std::vector<Isometry3<T>>& poses) {
+      const std::vector<T>& times, const std::vector<Isometry3<T>>& poses) {
     std::vector<MatrixX<T>> pos_knots(poses.size());
     eigen_aligned_std_vector<Matrix3<T>> rot_knots(poses.size());
     for (size_t i = 0; i < poses.size(); ++i) {
@@ -112,8 +144,8 @@ class PiecewiseCartesianTrajectory {
     }
 
     return PiecewiseCartesianTrajectory(
-        PiecewisePolynomial<T>::Cubic(
-            times, pos_knots, MatrixX<T>::Zero(3, 1), MatrixX<T>::Zero(3, 1)),
+        PiecewisePolynomial<T>::Cubic(times, pos_knots, MatrixX<T>::Zero(3, 1),
+                                      MatrixX<T>::Zero(3, 1)),
         PiecewiseQuaternionSlerp<T>(times, rot_knots));
   }
 
@@ -177,6 +209,22 @@ class PiecewiseCartesianTrajectory {
    * Returns the end time of this trajectory.
    */
   double get_end_time() const { return position_.getEndTime(); }
+
+  bool is_approx(const PiecewiseCartesianTrajectory<T>& other, T tol) const {
+    bool ret = position_.isApprox(other.position_, tol);
+    ret &= positiond_.isApprox(other.positiond_, tol);
+    ret &= positiondd_.isApprox(other.positiondd_, tol);
+    ret &= orientation_.is_approx(other.orientation_, tol);
+    return ret;
+  }
+
+  bool operator==(const PiecewiseCartesianTrajectory<T>& other) const {
+    return is_approx(other, 1e-12);
+  }
+
+  bool operator!=(const PiecewiseCartesianTrajectory<T>& other) const {
+    return !(this->operator==(other));
+  }
 
  private:
   PiecewisePolynomial<T> position_;

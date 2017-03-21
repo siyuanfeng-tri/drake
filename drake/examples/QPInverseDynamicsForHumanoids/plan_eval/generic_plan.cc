@@ -1,5 +1,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/generic_plan.h"
 
+#include <vector>
+
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 
 namespace drake {
@@ -31,9 +33,8 @@ void GenericPlan<T>::Initialize(
   // Knots are constant, so the end time doesn't matter.
   const std::vector<T> times = {robot_status.time(), robot_status.time() + 1};
   const MatrixX<T> q_d = robot_status.position();
-  this->set_dof_trajectory(
-      PiecewiseCubicTrajectory<T>(
-          PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
+  this->set_dof_trajectory(PiecewiseCubicTrajectory<T>(
+      PiecewisePolynomial<T>::ZeroOrderHold(times, {q_d, q_d})));
 
   // Calls custom stuff.
   InitializeGenericPlanDerived(robot_status, paramset, alias_groups);
@@ -41,12 +42,11 @@ void GenericPlan<T>::Initialize(
 
 template <typename T>
 void GenericPlan<T>::HandlePlanMessage(
-    const HumanoidStatus& robot_status,
-    const param_parsers::ParamSet& paramset,
+    const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
     const void* message_bytes, int message_length) {
   HandlePlanMessageGenericPlanDerived(robot_status, paramset, alias_groups,
-      message_bytes, message_length);
+                                      message_bytes, message_length);
 }
 
 template <typename T>
@@ -103,11 +103,10 @@ void GenericPlan<T>::UpdateQpInput(
   VectorX<T> kp, kd;
   paramset.LookupDesiredDofMotionGains(&kp, &kd);
   const PiecewiseCubicTrajectory<T>& dof_traj = dof_trajectory_;
-  VectorSetpoint<T> tracker(
-      dof_traj.get_position(interp_time),
-      dof_traj.get_velocity(interp_time),
-      dof_traj.get_acceleration(interp_time),
-      kp, kd);
+  VectorSetpoint<T> tracker(dof_traj.get_position(interp_time),
+                            dof_traj.get_velocity(interp_time),
+                            dof_traj.get_acceleration(interp_time), kp, kd);
+
   qp_input->mutable_desired_dof_motions().mutable_values() =
       tracker.ComputeTargetAcceleration(robot_status.position(),
                                         robot_status.velocity());

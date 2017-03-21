@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/generic_plan.h"
 
 namespace drake {
@@ -48,7 +50,7 @@ class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       QpInput* qp_input) const {}
 
-  static constexpr std::string kEndEffectorAliasGroupName = "end_effector";
+  static constexpr char kEndEffectorAliasGroupName[] = "end_effector";
 };
 
 }  // namespace qp_inverse_dynamics

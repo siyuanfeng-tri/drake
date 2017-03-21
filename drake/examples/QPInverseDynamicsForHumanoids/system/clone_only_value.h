@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <stdexcept>
 #include <utility>
 
 namespace drake {
@@ -10,7 +9,7 @@ namespace systems {
 template <typename CloneOnlyType>
 class CloneOnlyValue : public Value<CloneOnlyType*> {
  public:
-  CloneOnlyValue(std::unique_ptr<CloneOnlyType> v)
+  explicit CloneOnlyValue(std::unique_ptr<CloneOnlyType> v)
       : Value<CloneOnlyType*>(v.get()), owned_value_(std::move(v)) {
     DRAKE_ASSERT_VOID(CheckInvariants());
   }

@@ -98,6 +98,13 @@ class PiecewiseQuaternionSlerp : public PiecewiseFunction {
     return quaternions_;
   }
 
+  /**
+   * Returns true if all the segment times and quaternion knot points match
+   * those in @p other within @p tol.
+   */
+  bool is_approx(const PiecewiseQuaternionSlerp<Scalar>& other, Scalar tol)
+      const;
+
  private:
   // Initialize quaternions_ and computes angular velocity for each segment.
   void Initialize(
