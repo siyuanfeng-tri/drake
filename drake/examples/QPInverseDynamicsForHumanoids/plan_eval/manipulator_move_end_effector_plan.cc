@@ -11,10 +11,9 @@ template <typename T>
 void ManipulatorMoveEndEffectorPlan<T>::InitializeGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {
-  std::string ee_name = "end_effector";
   // Knots are constant, the second time doesn't matter.
   const std::vector<T> times = {robot_status.time(), robot_status.time() + 1};
-  const RigidBody<T>* ee_body = alias_groups.get_body(ee_name);
+  const RigidBody<T>* ee_body = alias_groups.get_body(kEndEffectorAliasGroupName);
   Isometry3<T> ee_pose = robot_status.robot().CalcBodyPoseInWorldFrame(
         robot_status.cache(), *ee_body);
 
@@ -44,8 +43,7 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
   std::vector<T> times;
   std::vector<Isometry3<T>> poses;
 
-  std::string ee_name = "end_effector";
-  const RigidBody<T>* ee_body = alias_groups.get_body(ee_name);
+  const RigidBody<T>* ee_body = alias_groups.get_body(kEndEffectorAliasGroupName);
 
   // If the first keyframe does not start immediately (its time > 0), we start
   // from the current desired pose.

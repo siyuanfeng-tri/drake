@@ -16,17 +16,6 @@ namespace qp_inverse_dynamics {
  */
 typedef std::set<const RigidBody<double>*> ContactState;
 
-template <typename T>
-T average_angles(T a, T b) {
-  T x = fmod(fabs(a - b), 2 * M_PI);
-  if (x >= 0 && x <= M_PI)
-    return fmod((a + b) / 2., 2 * M_PI);
-  else if (x >= M_PI && x < 1.5 * M_PI)
-    return fmod((a + b) / 2., 2 * M_PI) + M_PI;
-  else
-    return fmod((a + b) / 2., 2 * M_PI) - M_PI;
-}
-
 /**
  * A wrapper class that stores a PiecewisePolynomial and its first and second
  * derivatives. This class is supposed to represent position, velocity and
@@ -106,17 +95,11 @@ class PiecewiseCartesianTrajectory {
  public:
   /**
    * Constructs a PiecewiseCartesianTrajectory from given @p time and @p poses.
-   * A cubic polynomial is used to construct the position part. There must be
-   * at least two elements in @p times and @p poses.
-   * If @p zero_end_point_linear_velocities is true, zero velocities are set
-   * for the linear velocity. When @p zero_end_point_linear_velocities is
-   * false and there are only two elements in @p time, a linear spline is used
-   * to represent the position part. PiecewiseQuaternionSlerp is used for the
-   * orientation part.
+   * A cubic polynomial with zero end velocities is used to construct the
+   * position part. There must be at least two elements in @p times and
+   * @p poses.
    * @param times Breaks used to build the splines.
    * @param poses Knots used to build the splines.
-   * @param zero_end_point_linear_velocities If true, the start and end
-   * velocity for the position spline are set to zero.
    */
   static PiecewiseCartesianTrajectory<T> MakeCubicLinearWithZeroEndVelocity(
       const std::vector<T>& times,
@@ -134,6 +117,11 @@ class PiecewiseCartesianTrajectory {
         PiecewiseQuaternionSlerp<T>(times, rot_knots));
   }
 
+  /**
+   * Constructor.
+   * @param pos_traj PiecewisePolynomial that represents the position part.
+   * @param rot_traj PiecewiseQuaternionSlerp that represents the rotation part.
+   */
   PiecewiseCartesianTrajectory(const PiecewisePolynomial<T>& pos_traj,
                                const PiecewiseQuaternionSlerp<T>& rot_traj) {
     position_ = pos_traj;

@@ -6,6 +6,9 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+/**
+ * A concrete plan that sets up a joint space tracking objective.
+ */
 template <typename T>
 class ManipulatorMoveJointsPlan : public GenericPlan<T> {
  public:
@@ -26,6 +29,8 @@ class ManipulatorMoveJointsPlan : public GenericPlan<T> {
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {}
 
+  // the lcm message passed in @p message_bytes needs to be of type
+  // robotlocomotion::robot_plan_t.
   void HandlePlanMessageGenericPlanDerived(
       const HumanoidStatus& robot_stauts,
       const param_parsers::ParamSet& paramset,

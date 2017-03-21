@@ -6,6 +6,10 @@ namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 
+/**
+ * A concrete plan that sets up a Cartesian tracking objective for the end
+ * effector.
+ */
 template <typename T>
 class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
  public:
@@ -16,6 +20,8 @@ class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
  private:
   GenericPlan<T>* CloneGenericPlanDerived() const;
 
+  // @p alias_groups must have a singleton body group name that matches
+  // kEndEffectorAliasGroupName.
   void InitializeGenericPlanDerived(
       const HumanoidStatus& robot_status,
       const param_parsers::ParamSet& paramset,
@@ -26,6 +32,10 @@ class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {}
 
+  // @p alias_groups must have a singleton body group name that matches
+  // kEndEffectorAliasGroupName.
+  // The lcm message passed in @p message_bytes needs to be of type
+  // lcmt_manipulator_plan_move_end_effector
   void HandlePlanMessageGenericPlanDerived(
       const HumanoidStatus& robot_stauts,
       const param_parsers::ParamSet& paramset,
@@ -37,6 +47,8 @@ class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       QpInput* qp_input) const {}
+
+  static constexpr std::string kEndEffectorAliasGroupName = "end_effector";
 };
 
 }  // namespace qp_inverse_dynamics
