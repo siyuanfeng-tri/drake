@@ -24,10 +24,10 @@ GTEST_TEST(testQPInverseDynamicsController, testForIiwa) {
                      "iiwa14_simplified_collision.urdf";
   std::string alias_groups_config = drake::GetDrakePath() +
                                     "/examples/QPInverseDynamicsForHumanoids/"
-                                    "config/iiwa.alias_groups";
+                                    "config/iiwa_for_test.alias_groups";
   std::string controller_config = drake::GetDrakePath() +
                                   "/examples/QPInverseDynamicsForHumanoids/"
-                                  "config/iiwa.id_controller_config";
+                                  "config/iiwa_for_test.id_controller_config";
 
   auto robot = std::make_unique<RigidBodyTree<double>>();
   parsers::urdf::AddModelInstanceFromUrdfFileToWorld(

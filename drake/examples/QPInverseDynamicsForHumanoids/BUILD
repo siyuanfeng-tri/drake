@@ -125,8 +125,8 @@ drake_cc_googletest(
     name = "iiwa_inverse_dynamics_test",
     srcs = ["test/iiwa_inverse_dynamics_test.cc"],
     data = [
-        "config/iiwa.alias_groups",
-        "config/iiwa.id_controller_config",
+        "config/iiwa_for_test.alias_groups",
+        "config/iiwa_for_test.id_controller_config",
         "//drake/examples/kuka_iiwa_arm:models",
     ],
     tags = [

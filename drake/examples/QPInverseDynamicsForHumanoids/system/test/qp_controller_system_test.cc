@@ -29,12 +29,12 @@ GTEST_TEST(testQpControllerSystem, IiwaInverseDynamics) {
   const std::string kAliasGroupsPath =
       drake::GetDrakePath() +
       "/examples/QPInverseDynamicsForHumanoids/config/"
-      "iiwa.alias_groups";
+      "iiwa_for_test.alias_groups";
 
   const std::string kControlConfigPath =
       drake::GetDrakePath() +
       "/examples/QPInverseDynamicsForHumanoids/config/"
-      "iiwa.id_controller_config";
+      "iiwa_for_test.id_controller_config";
 
   auto robot = std::make_unique<RigidBodyTree<double>>();
   parsers::urdf::AddModelInstanceFromUrdfFileToWorld(

@@ -1,3 +1,4 @@
+#include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/test/test_common.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_move_end_effector_plan.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_move_joints_plan.h"
 
@@ -13,12 +14,13 @@
 #include "drake/util/lcmUtil.h"
 #include "robotlocomotion/robot_plan_t.hpp"
 
+
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
 namespace {
 
-class ManipPlanTest : public ::testing::Test {
+class ManipMoveJointsPlanTest : public GenericPlanTest {
  protected:
   void SetUp() override {
     const std::string kModelPath = drake::GetDrakePath() +
@@ -27,38 +29,21 @@ class ManipPlanTest : public ::testing::Test {
 
     const std::string kAliasGroupsPath = drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
-        "config/iiwa.alias_groups";
+        "config/iiwa_for_test.alias_groups";
 
     const std::string kControlConfigPath = drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
-        "config/iiwa.id_controller_config";
+        "config/iiwa_for_test.id_controller_config";
 
     robot_ = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
         kModelPath, multibody::joints::kFixed, robot_.get());
 
-    alias_groups_ =
-        std::make_unique<param_parsers::RigidBodyTreeAliasGroups<double>>(
-            *robot_);
-    alias_groups_->LoadFromFile(kAliasGroupsPath);
+    dut_ = std::unique_ptr<GenericPlan<double>>(
+        new ManipulatorMoveJointsPlan<double>());
 
-    params_ = std::make_unique<param_parsers::ParamSet>();
-    params_->LoadFromFile(kControlConfigPath, *alias_groups_);
-
-    robot_status_ = std::make_unique<HumanoidStatus>(*robot_, *alias_groups_);
-    double time_now = 0.2;
-    VectorX<double> q(robot_->get_num_positions());
-    VectorX<double> v(robot_->get_num_velocities());
-    q << 0.3, 0.5, -0.2, 1, 0.99, -0.55, 0.233;
-    v << -1, -3, 2.4, 0.66, 0.77, 0.456, -0.237;
-    robot_status_->UpdateKinematics(time_now, q, v);
+    Initialize(kAliasGroupsPath, kControlConfigPath);
   }
-
-  std::unique_ptr<RigidBodyTree<double>> robot_;
-  std::unique_ptr<param_parsers::RigidBodyTreeAliasGroups<double>>
-      alias_groups_;
-  std::unique_ptr<param_parsers::ParamSet> params_;
-  std::unique_ptr<HumanoidStatus> robot_status_;
 };
 
 robotlocomotion::robot_plan_t make_robot_plan_t_message(
@@ -90,10 +75,7 @@ robotlocomotion::robot_plan_t make_robot_plan_t_message(
   return msg;
 }
 
-TEST_F(ManipPlanTest, MoveJointsHandleMessageTest) {
-  ManipulatorMoveJointsPlan<double> move_joints;
-  move_joints.Initialize(*robot_status_, *params_, *alias_groups_);
-
+TEST_F(ManipMoveJointsPlanTest, MoveJointsHandleMessageTest) {
   const int dim = robot_->get_num_positions();
   double time_now = robot_status_->time();
 
@@ -102,37 +84,47 @@ TEST_F(ManipPlanTest, MoveJointsHandleMessageTest) {
   // Makes up a plan that starts with the first time stamp being zero, meaning
   // the trajectory should start immediately from the first given knot point,
   // without any smoothing from the current setpoint.
-  const int num_steps = 3;
-  std::vector<MatrixX<double>> plan_knots(num_steps,
-                                          MatrixX<double>::Zero(dim, 1));
-  std::vector<double> plan_times(num_steps, 0);
-  plan_times[1] += 1;
-  plan_times[2] += 3;
-
-  plan_knots[0] << 0.3, -0.1, 1, -0.06, -0.3, 0.6, 0.23;
-  plan_knots[1] << -0.3, 0.1, -1, 0.06, 0.3, -0.6, -0.23;
-  plan_knots[2] << 0.3, -0.1, 1, -0.06, -0.3, 0.6, 0.23;
+  std::vector<double> plan_times = {0, 1, 2};
+  std::vector<MatrixX<double>> plan_knots(plan_times.size());
+  std::default_random_engine generator(456);
+  for (size_t i = 0; i < plan_knots.size(); ++i) {
+    plan_knots[i] = robot_->getRandomConfiguration(generator);
+  }
 
   // Gets msg's raw bytes.
   msg = make_robot_plan_t_message(*robot_, plan_times, plan_knots);
   bytes.resize(msg.getEncodedSize());
   msg.encode(bytes.data(), 0, msg.getEncodedSize());
-  move_joints.HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
-                                bytes.data(), bytes.size());
+
+  // Handles a new plan.
+  dut_->HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
+                          bytes.data(), bytes.size());
+
+  // There shouldn't be any body trajectories.
+  EXPECT_TRUE(dut_->get_body_trajectories().empty());
+
+  // The contact state should not change.
+  EXPECT_TRUE(dut_->get_contact_state().empty());
 
   {
     // Constructs the expected splines.
     std::vector<double> traj_times = plan_times;
-    for (size_t i = 0; i < traj_times.size(); ++i) traj_times[i] += time_now;
+    for (size_t i = 0; i < traj_times.size(); ++i) {
+      traj_times[i] += time_now;
+    }
 
     PiecewiseCubicTrajectory<double> expected_trajs(
         PiecewisePolynomial<double>::Cubic(traj_times, plan_knots,
                                            MatrixX<double>::Zero(dim, 1),
                                            MatrixX<double>::Zero(dim, 1)));
-    // Tolerance is low because the knot points are stored as floats in the
-    // lcm message..
+    // Tolerance is low because the lcm message's joint angles are stored as
+    // floats.
     EXPECT_TRUE(
-        expected_trajs.is_approx(move_joints.get_dof_trajectory(), 1e-7));
+        expected_trajs.is_approx(dut_->get_dof_trajectory(), 1e-5));
+
+    // The new body trajectory should run from cur_time, to cur_time + plan_times[end]
+    EXPECT_EQ(robot_status_->time(), dut_->get_dof_trajectory().get_start_time());
+    EXPECT_EQ(robot_status_->time() + plan_times.back(), dut_->get_dof_trajectory().get_end_time());
   }
 
   /////////////////////////////////////////////////////////////////////////////
@@ -148,12 +140,20 @@ TEST_F(ManipPlanTest, MoveJointsHandleMessageTest) {
   time_now += 0.5;
   robot_status_->UpdateKinematics(
       time_now, robot_status_->position(), robot_status_->velocity());
-  move_joints.HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
-                                bytes.data(), bytes.size());
 
+  VectorX<double> q_d_now =
+      dut_->get_dof_trajectory().get_position(time_now);
+
+  // Handles a new plan.
+  dut_->HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
+                         bytes.data(), bytes.size());
+
+  // There shouldn't be any body trajectories.
+  EXPECT_TRUE(dut_->get_body_trajectories().empty());
+
+  // The contact state should not change.
+  EXPECT_TRUE(dut_->get_contact_state().empty());
   {
-    VectorX<double> q_d_now =
-        move_joints.get_dof_trajectory().get_position(time_now);
     std::vector<double> traj_times;
     std::vector<MatrixX<double>> traj_knots;
     traj_times.push_back(time_now);
@@ -167,20 +167,60 @@ TEST_F(ManipPlanTest, MoveJointsHandleMessageTest) {
         PiecewisePolynomial<double>::Cubic(traj_times, traj_knots,
                                            MatrixX<double>::Zero(dim, 1),
                                            MatrixX<double>::Zero(dim, 1)));
-    // Tolerance is low because the knot points are stored as floats in the
-    // lcm message..
+    // Tolerance is low because the lcm message's joint angles are stored as
+    // floats.
     EXPECT_TRUE(
-        expected_trajs.is_approx(move_joints.get_dof_trajectory(), 1e-7));
+        expected_trajs.is_approx(dut_->get_dof_trajectory(), 1e-5));
+
+    // The new body trajectory should run from cur_time, to cur_time + plan_times[end]
+    EXPECT_EQ(robot_status_->time(), dut_->get_dof_trajectory().get_start_time());
+    EXPECT_EQ(robot_status_->time() + plan_times.back(), dut_->get_dof_trajectory().get_end_time());
   }
 }
 
-TEST_F(ManipPlanTest, MoveEndEffectorInitializeTest) {
-  ManipulatorMoveEndEffectorPlan<double> plan;
-  plan.Initialize(*robot_status_, *params_, *alias_groups_);
+class ManipMoveEndEffectorPlanTest : public GenericPlanTest {
+ protected:
+  void SetUp() override {
+    const std::string kModelPath = drake::GetDrakePath() +
+        "/examples/kuka_iiwa_arm/models/iiwa14/"
+        "iiwa14_simplified_collision.urdf";
 
+    const std::string kAliasGroupsPath = drake::GetDrakePath() +
+        "/examples/QPInverseDynamicsForHumanoids/"
+        "config/iiwa_for_test.alias_groups";
+
+    const std::string kControlConfigPath = drake::GetDrakePath() +
+        "/examples/QPInverseDynamicsForHumanoids/"
+        "config/iiwa_for_test.id_controller_config";
+
+    robot_ = std::make_unique<RigidBodyTree<double>>();
+    parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
+        kModelPath, multibody::joints::kFixed, robot_.get());
+
+    dut_ = std::unique_ptr<GenericPlan<double>>(
+        new ManipulatorMoveEndEffectorPlan<double>());
+
+    Initialize(kAliasGroupsPath, kControlConfigPath);
+
+    ee_body_ = alias_groups_->get_body(ManipulatorMoveEndEffectorPlan<double>::kEndEffectorAliasGroupName);
+  }
+
+  Isometry3<double> get_end_effector_pose() const {
+    return robot_status_->robot().CalcBodyPoseInWorldFrame(robot_status_->cache(), *ee_body_);
+  }
+
+  Vector6<double> get_end_effector_velocity() const {
+    return robot_status_->robot().CalcBodySpatialVelocityInWorldFrame(robot_status_->cache(), *ee_body_);
+  }
+
+  // End effector body pointer.
+  const RigidBody<double>* ee_body_;
+};
+
+TEST_F(ManipMoveEndEffectorPlanTest, MoveEndEffectorInitializeTest) {
   // There should be no contacts, 1 tracked body for move end effector plan.
-  EXPECT_TRUE(plan.get_contact_state().empty());
-  EXPECT_EQ(plan.get_body_trajectories().size(), 1);
+  EXPECT_TRUE(dut_->get_contact_state().empty());
+  EXPECT_EQ(dut_->get_body_trajectories().size(), 1);
 
   // The desired position interpolated at any time should be equal to the
   // current posture.
@@ -189,27 +229,24 @@ TEST_F(ManipPlanTest, MoveEndEffectorInitializeTest) {
                                     robot_status_->time(),
                                     robot_status_->time() + 3};
 
-  const RigidBody<double>* ee_body =
-      alias_groups_->get_body(ManipulatorMoveEndEffectorPlan<double>::kEndEffectorAliasGroupName);
   const PiecewiseCartesianTrajectory<double>& ee_traj =
-      plan.get_body_trajectory(ee_body);
-  const Isometry3<double> ee_pose = robot_status_->robot().CalcBodyPoseInWorldFrame(
-      robot_status_->cache(), *ee_body);
+      dut_->get_body_trajectory(ee_body_);
+  const Isometry3<double> ee_pose = get_end_effector_pose();
 
   for (double time : test_times) {
     // Dof trajectory.
     EXPECT_TRUE(drake::CompareMatrices(
-        robot_status_->position(), plan.get_dof_trajectory().get_position(time),
+        robot_status_->position(), dut_->get_dof_trajectory().get_position(time),
         1e-12, drake::MatrixCompareType::absolute));
 
     EXPECT_TRUE(drake::CompareMatrices(
         VectorX<double>::Zero(robot_->get_num_velocities()),
-        plan.get_dof_trajectory().get_velocity(time), 1e-12,
+        dut_->get_dof_trajectory().get_velocity(time), 1e-12,
         drake::MatrixCompareType::absolute));
 
     EXPECT_TRUE(drake::CompareMatrices(
         VectorX<double>::Zero(robot_->get_num_velocities()),
-        plan.get_dof_trajectory().get_acceleration(time), 1e-12,
+        dut_->get_dof_trajectory().get_acceleration(time), 1e-12,
         drake::MatrixCompareType::absolute));
 
     // End effector trajectory.
@@ -230,76 +267,76 @@ TEST_F(ManipPlanTest, MoveEndEffectorInitializeTest) {
   }
 }
 
-TEST_F(ManipPlanTest, TestUpdateQpInput) {
-  // The plan is set to hold the current posture.
-  ManipulatorMoveEndEffectorPlan<double> plan;
-  plan.Initialize(*robot_status_, *params_, *alias_groups_);
-  const RigidBody<double>* ee_body =
-      alias_groups_->get_body(ManipulatorMoveEndEffectorPlan<double>::kEndEffectorAliasGroupName);
+TEST_F(ManipMoveEndEffectorPlanTest, TestUpdateQpInput) {
+  QpInput qp_input;
 
   VectorX<double> q_d = robot_status_->position();
-  const Isometry3<double> ee_pose_d = robot_status_->robot().CalcBodyPoseInWorldFrame(
-      robot_status_->cache(), *ee_body);
+
+  const Isometry3<double> ee_pose_d = get_end_effector_pose();
+  const Vector6<double> ee_vel_d = Vector6<double>::Zero();
+  const Vector6<double> ee_acc_d = Vector6<double>::Zero();
+
+  // Changes the current state.
+  robot_status_->UpdateKinematics(0.66, robot_status_->position() * 0.3, robot_status_->velocity());
+  dut_->UpdateQpInput(*robot_status_, *params_, *alias_groups_, &qp_input);
 
   // The expected dof acceleration should only contain the position and
   // velocity term.
   VectorX<double> kp, kd;
   params_->LookupDesiredDofMotionGains(&kp, &kd);
 
-  robot_status_->UpdateKinematics(0.66, robot_status_->position() * 0.3, robot_status_->velocity());
-
   VectorX<double> expected_vd =
       (kp.array() * (q_d - robot_status_->position()).array() -
        kd.array() * robot_status_->velocity().array())
           .matrix();
 
-  QpInput qp_input;
-  plan.UpdateQpInput(*robot_status_, *params_, *alias_groups_, &qp_input);
-
-  // Desired generalized acceleration should match expected.
-  EXPECT_EQ(qp_input.desired_dof_motions().size(), robot_->get_num_positions());
-
+  // The weights / constraint types are hard coded in this test. They need to
+  // match the numbers specified in
   EXPECT_TRUE(drake::CompareMatrices(
       expected_vd, qp_input.desired_dof_motions().values(), 1e-12,
       drake::MatrixCompareType::absolute));
-  VectorX<double> expected_weights = params_->MakeDesiredDofMotions().weights();
-
-  EXPECT_TRUE(drake::CompareMatrices(
-      expected_weights, qp_input.desired_dof_motions().weights(), 1e-12,
-      drake::MatrixCompareType::absolute));
   for (int i = 0; i < robot_->get_num_positions(); ++i) {
+    // Checks dof constraint type.
     EXPECT_EQ(qp_input.desired_dof_motions().constraint_type(i),
               ConstraintType::Soft);
+    // Checks dof weight.
+    EXPECT_EQ(qp_input.desired_dof_motions().weight(i), 1e-1);
   }
 
   // Contact force basis regularization weight is irrelevant here since there
   // is not contacts, but its value should match params'.
-  EXPECT_EQ(qp_input.w_basis_reg(), params_->get_basis_regularization_weight());
+  EXPECT_EQ(qp_input.w_basis_reg(), 1e-6);
 
-  // Not tracking Cartesian motions.
+  // There should be only one body motion tracking objective.
   EXPECT_EQ(qp_input.desired_body_motions().size(), 1);
-  const DesiredBodyMotion& ee_motion = qp_input.desired_body_motions().at(ee_body->get_name());
+  const DesiredBodyMotion& ee_motion =
+      qp_input.desired_body_motions().at(ee_body_->get_name());
 
-  const Isometry3<double> ee_pose = robot_status_->robot().CalcBodyPoseInWorldFrame(
-      robot_status_->cache(), *ee_body);
-  const Vector6<double> ee_vel = robot_status_->robot().CalcBodySpatialVelocityInWorldFrame(
-      robot_status_->cache(), *ee_body);
+  // Computes current pose and velocity of the body.
+  const Isometry3<double> ee_pose = get_end_effector_pose();
+  const Vector6<double> ee_vel = get_end_effector_velocity();
+
+  // Computes the desired acceleration for that body.
   Vector6<double> ee_kp, ee_kd;
-  params_->LookupDesiredBodyMotionGains(*ee_body, &ee_kp, &ee_kd);
-  CartesianSetpoint<double> tracker(ee_pose_d, Vector6<double>::Zero(), Vector6<double>::Zero(), ee_kp, ee_kd);
+  params_->LookupDesiredBodyMotionGains(*ee_body_, &ee_kp, &ee_kd);
+  CartesianSetpoint<double> tracker(ee_pose_d, ee_vel_d, ee_acc_d, ee_kp, ee_kd);
   Vector6<double> expected_pose_acc = tracker.ComputeTargetAcceleration(ee_pose, ee_vel);
 
+  // Checks body acceleration.
   EXPECT_TRUE(drake::CompareMatrices(
       expected_pose_acc, ee_motion.values(), 1e-12,
       drake::MatrixCompareType::absolute));
   for (int i = 0; i < 6; i++) {
+    // Checks body constraint type.
     EXPECT_EQ(ee_motion.constraint_type(i), ConstraintType::Soft);
+    // Checks body weight.
+    EXPECT_EQ(ee_motion.weight(i), 1);
   }
 
   // No contacts.
   EXPECT_TRUE(qp_input.contact_information().empty());
 
-  // Doesn't care about overall center of mass or angular momentum.
+  // No center of mass or angular momentum objective.
   for (int i = 0; i < 6; ++i) {
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().value(i), 0);
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().weight(i), 0);
@@ -308,13 +345,116 @@ TEST_F(ManipPlanTest, TestUpdateQpInput) {
   }
 }
 
-TEST_F(ManipPlanTest, MoveEndEffectorHandleMessageTest) {
-  ManipulatorMoveEndEffectorPlan<double> move_ee;
-  move_ee.Initialize(*robot_status_, *params_, *alias_groups_);
+lcmt_manipulator_plan_move_end_effector make_move_end_effector_message(
+    const std::vector<double>& times,
+    const std::vector<Isometry3<double>>& poses) {
+  lcmt_manipulator_plan_move_end_effector msg;
 
-  std::vector<double> times = {1, 2};
-  std::vector<Isometry3<double>> poses(times.size(), Isometry3<double>::Identity());
+  msg.num_steps = static_cast<int>(times.size());
+  msg.utimes.resize(msg.num_steps);
+  msg.poses.resize(msg.num_steps);
 
+  for (int i = 0; i < msg.num_steps; i++) {
+    msg.utimes[i] = static_cast<int64_t>(times[i] * 1e6);
+    EncodePose(poses[i], msg.poses[i]);
+  }
+
+  return msg;
+}
+
+
+TEST_F(ManipMoveEndEffectorPlanTest, MoveEndEffectorHandleMessageTest) {
+  // Makes a copy of the current dof tracking trajectory.
+  const PiecewiseCubicTrajectory<double> expected_dof_traj =
+      dut_->get_dof_trajectory();
+
+  std::vector<double> plan_times = {0, 2};
+  std::vector<Isometry3<double>> plan_poses(plan_times.size(), Isometry3<double>::Identity());
+
+  std::vector<uint8_t> bytes;
+  lcmt_manipulator_plan_move_end_effector msg =
+      make_move_end_effector_message(plan_times, plan_poses);
+  bytes.resize(msg.getEncodedSize());
+  msg.encode(bytes.data(), 0, msg.getEncodedSize());
+
+  // Handles the new plan.
+  dut_->HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
+                          bytes.data(), bytes.size());
+  {
+    const PiecewiseCartesianTrajectory<double>& body_traj =
+        dut_->get_body_trajectory(ee_body_);
+    // The new body trajectory should run from cur_time, to cur_time + plan_times[end]
+    EXPECT_EQ(robot_status_->time(), body_traj.get_position_trajectory().get_start_time());
+    EXPECT_EQ(robot_status_->time() + plan_times.back(), body_traj.get_position_trajectory().get_end_time());
+
+    // There should be no contacts, 1 tracked body.
+    EXPECT_TRUE(dut_->get_contact_state().empty());
+    EXPECT_EQ(dut_->get_body_trajectories().size(), 1);
+    // The dof trajectory should not change.
+    EXPECT_EQ(expected_dof_traj, dut_->get_dof_trajectory());
+
+    // Constructs the expected body traj.
+    std::vector<double> traj_times = plan_times;
+    std::vector<Isometry3<double>> traj_poses = plan_poses;
+
+    for (size_t i = 0; i < traj_times.size(); ++i) {
+      traj_times[i] += robot_status_->time();
+    }
+
+    PiecewiseCartesianTrajectory<double> expected_traj =
+        PiecewiseCartesianTrajectory<double>::MakeCubicLinearWithZeroEndVelocity(traj_times, traj_poses);
+
+    EXPECT_TRUE(
+        expected_traj.is_approx(dut_->get_body_trajectory(ee_body_), 1e-12));
+  }
+
+  // Makes a different plan that starts with ramping.
+  plan_times[0] = 0.8;
+  msg = make_move_end_effector_message(plan_times, plan_poses);
+  bytes.resize(msg.getEncodedSize());
+  msg.encode(bytes.data(), 0, msg.getEncodedSize());
+
+  // Moves the clock forward in time.
+  robot_status_->UpdateKinematics(
+      robot_status_->time() + 1, robot_status_->position(), robot_status_->velocity());
+
+  Isometry3<double> ee_pose_d_now = dut_->get_body_trajectory(ee_body_).get_pose(robot_status_->time());
+
+  // Handles the new plan.
+  dut_->HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
+                         bytes.data(), bytes.size());
+  {
+    const PiecewiseCartesianTrajectory<double>& body_traj =
+        dut_->get_body_trajectory(ee_body_);
+
+    // There should be no contacts, 1 tracked body.
+    EXPECT_TRUE(dut_->get_contact_state().empty());
+    EXPECT_EQ(dut_->get_body_trajectories().size(), 1);
+    // The dof trajectory should not change.
+    EXPECT_EQ(expected_dof_traj, dut_->get_dof_trajectory());
+
+    // The new body trajectory should run from cur_time, to cur_time + plan_times[end]
+    EXPECT_EQ(robot_status_->time(), body_traj.get_position_trajectory().get_start_time());
+    EXPECT_EQ(robot_status_->time() + plan_times.back(), body_traj.get_position_trajectory().get_end_time());
+
+    // Constructs the expected body traj.
+    std::vector<double> traj_times;
+    std::vector<Isometry3<double>> traj_poses;
+
+    traj_times.push_back(robot_status_->time());
+    traj_poses.push_back(ee_pose_d_now);
+
+    for (size_t i = 0; i < plan_times.size(); ++i) {
+      traj_times.push_back(plan_times[i] + robot_status_->time());
+      traj_poses.push_back(plan_poses[i]);
+    }
+
+    PiecewiseCartesianTrajectory<double> expected_traj =
+        PiecewiseCartesianTrajectory<double>::MakeCubicLinearWithZeroEndVelocity(traj_times, traj_poses);
+
+    EXPECT_TRUE(
+        expected_traj.is_approx(dut_->get_body_trajectory(ee_body_), 1e-12));
+  }
 }
 
 }  // namespace

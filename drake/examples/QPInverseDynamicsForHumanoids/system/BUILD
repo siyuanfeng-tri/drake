@@ -158,8 +158,8 @@ drake_cc_googletest(
     name = "manipulator_inverse_dynamics_controller_test",
     srcs = ["test/manipulator_inverse_dynamics_controller_test.cc"],
     data = [
-        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa.alias_groups",
-        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa.id_controller_config",
+        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa_for_test.alias_groups",
+        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa_for_test.id_controller_config",
         "//drake/examples/kuka_iiwa_arm:models",
     ],
     tags = [
@@ -182,8 +182,8 @@ drake_cc_googletest(
     name = "qp_controller_system_test",
     srcs = ["test/qp_controller_system_test.cc"],
     data = [
-        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa.alias_groups",
-        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa.id_controller_config",
+        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa_for_test.alias_groups",
+        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa_for_test.id_controller_config",
         "//drake/examples/kuka_iiwa_arm:models",
     ],
     tags = [

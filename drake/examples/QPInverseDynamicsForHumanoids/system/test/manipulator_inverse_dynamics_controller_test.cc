@@ -32,12 +32,12 @@ class ManipulatorInverseDynamicsControllerTest : public ::testing::Test {
     const std::string kAliasGroupsPath =
         drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
-        "config/iiwa.alias_groups";
+        "config/iiwa_for_test.alias_groups";
 
     const std::string kControlConfigPath =
         drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
-        "config/iiwa.id_controller_config";
+        "config/iiwa_for_test.id_controller_config";
 
     auto robot = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
