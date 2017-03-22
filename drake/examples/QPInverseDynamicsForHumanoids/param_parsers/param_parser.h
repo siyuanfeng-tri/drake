@@ -290,7 +290,7 @@ class ParamSet {
 
   /**
    * Returns a QpInput for the given contacts and tracked bodies using the
-   * parameters hold by this instance. Note that this function only sets the
+   * parameters held by this instance. Note that this function only sets the
    * `weights` and `constraint_types` fields for DesiredBodyMotion and
    * DesiredDofMotions, the desire accelerations need to be set separately by
    * some control policy.
@@ -310,7 +310,7 @@ class ParamSet {
 
   /**
    * Returns a QpInput for the given contacts and tracked bodies using the
-   * parameters hold by this instance. Note that this function only sets the
+   * parameters held by this instance. Note that this function only sets the
    * `weights` and `constraint_types` fields for DesiredBodyMotion and
    * DesiredDofMotions, the desire accelerations need to be set separately by
    * some control policy.

@@ -19,8 +19,8 @@ bool PiecewiseQuaternionSlerp<Scalar>::is_approx(
 
   for (size_t i = 0; i < quaternions_.size(); ++i) {
     // A quick reference:
-    // https://fgiesen.wordpress.com/2013/01/07/
-    // small-note-on-quaternion-distance-metrics/
+    // Page "Metric on sphere of unit quaternions" from
+    // http://www.cs.cmu.edu/afs/cs/academic/class/16741-s07/www/Lecture8.pdf
     Scalar dot = std::abs(quaternions_[i].dot(other.quaternions_[i]));
     if (dot < std::cos(tol / 2)) {
       return false;
