@@ -25,12 +25,16 @@ void ManipulatorMoveJointsPlan<T>::HandlePlanMessageGenericPlanDerived(
   std::vector<MatrixX<T>> dof_knots;
   std::vector<T> times;
 
+  // Initial desired velocity.
+  VectorX<T> vel0_d = VectorX<T>::Zero(dim);
+
   // If the first keyframe does not start immediately (its time > 0), we start
-  // from the current desired posture.
+  // from the current desired position and velocity.
   if (msg.plan.front().utime != 0) {
     dof_knots.push_back(
         this->get_dof_trajectory().get_position(robot_status.time()));
     times.push_back(robot_status.time());
+    vel0_d = this->get_dof_trajectory().get_velocity(robot_status.time());
   }
 
   for (const bot_core::robot_state_t& keyframe : msg.plan) {
@@ -42,9 +46,9 @@ void ManipulatorMoveJointsPlan<T>::HandlePlanMessageGenericPlanDerived(
     }
   }
 
-  MatrixX<T> zeros = VectorX<T>::Zero(dim);
   PiecewisePolynomial<T> pos_traj =
-      PiecewisePolynomial<T>::Cubic(times, dof_knots, zeros, zeros);
+      PiecewisePolynomial<T>::Cubic(
+          times, dof_knots, vel0_d, VectorX<T>::Zero(dim));
   this->set_dof_trajectory(PiecewiseCubicTrajectory<T>(pos_traj));
 }
 

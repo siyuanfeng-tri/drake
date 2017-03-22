@@ -13,7 +13,7 @@ namespace qp_inverse_dynamics {
 
 // This is a derived class from GenericPlan with no additional features.
 // It sets up a plan that does not have any Cartesian tracking objectives,
-// no contacts, and holds the current generalized position for ever.
+// no contacts, and holds the current generalized position forever.
 template <typename T>
 class DummyPlan : public GenericPlan<T> {
  public:
@@ -22,9 +22,7 @@ class DummyPlan : public GenericPlan<T> {
   DummyPlan() {}
 
  private:
-  GenericPlan<T>* CloneGenericPlanDerived() const {
-    return new DummyPlan<T>();
-  }
+  GenericPlan<T>* CloneGenericPlanDerived() const { return new DummyPlan<T>(); }
 
   void InitializeGenericPlanDerived(
       const HumanoidStatus& robot_status,
@@ -53,14 +51,16 @@ class DummyPlanTest : public GenericPlanTest {
  protected:
   void SetUp() override {
     const std::string kModelPath = drake::GetDrakePath() +
-        "/examples/kuka_iiwa_arm/models/iiwa14/"
-        "iiwa14_simplified_collision.urdf";
+                                   "/examples/kuka_iiwa_arm/models/iiwa14/"
+                                   "iiwa14_simplified_collision.urdf";
 
-    const std::string kAliasGroupsPath = drake::GetDrakePath() +
+    const std::string kAliasGroupsPath =
+        drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
         "config/iiwa_for_test.alias_groups";
 
-    const std::string kControlConfigPath = drake::GetDrakePath() +
+    const std::string kControlConfigPath =
+        drake::GetDrakePath() +
         "/examples/QPInverseDynamicsForHumanoids/"
         "config/iiwa_for_test.id_controller_config";
 
@@ -68,15 +68,16 @@ class DummyPlanTest : public GenericPlanTest {
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
         kModelPath, multibody::joints::kFixed, robot_.get());
 
-    dut_ = std::unique_ptr<GenericPlan<double>>(
-        new DummyPlan<double>());
+    dut_ = std::unique_ptr<GenericPlan<double>>(new DummyPlan<double>());
 
     Initialize(kAliasGroupsPath, kControlConfigPath);
   }
 };
 
+// Tests GenericPlan's Initialize(). It should generate a plan with no
+// contacts, no tracked bodies, and holds all dof at where the plan was
+// initialized.
 TEST_F(DummyPlanTest, TestInitialize) {
-  // There should be no contacts, no tracked bodies for move joints plan.
   EXPECT_TRUE(dut_->get_contact_state().empty());
   EXPECT_TRUE(dut_->get_body_trajectories().empty());
 
@@ -88,9 +89,10 @@ TEST_F(DummyPlanTest, TestInitialize) {
                                     robot_status_->time() + 3};
 
   for (double time : test_times) {
-    EXPECT_TRUE(drake::CompareMatrices(
-        robot_status_->position(), dut_->get_dof_trajectory().get_position(time),
-        1e-12, drake::MatrixCompareType::absolute));
+    EXPECT_TRUE(
+        drake::CompareMatrices(robot_status_->position(),
+                               dut_->get_dof_trajectory().get_position(time),
+                               1e-12, drake::MatrixCompareType::absolute));
 
     EXPECT_TRUE(drake::CompareMatrices(
         VectorX<double>::Zero(robot_->get_num_velocities()),
@@ -104,7 +106,7 @@ TEST_F(DummyPlanTest, TestInitialize) {
   }
 }
 
-// Tests the cloned fields are the same.
+// Tests the cloned fields are the same as the original.
 TEST_F(DummyPlanTest, TestClone) {
   std::unique_ptr<GenericPlan<double>> clone = dut_->Clone();
   EXPECT_TRUE(dut_->get_contact_state() == clone->get_contact_state());
@@ -116,28 +118,31 @@ TEST_F(DummyPlanTest, TestClone) {
 TEST_F(DummyPlanTest, TestUpdateQpInput) {
   QpInput qp_input;
 
+  // Desired joint position and velocity.
   VectorX<double> q_d = robot_status_->position();
+  VectorX<double> v_d(robot_status_->robot().get_num_velocities());
+  v_d.setZero();
 
   // Changes the current state.
-  robot_status_->UpdateKinematics(
-      0.66, 0.3 * robot_status_->position(), robot_status_->velocity());
+  robot_status_->UpdateKinematics(0.66, 0.3 * robot_status_->position(),
+                                  0.4 * robot_status_->velocity());
 
   // Computes QpInput.
   dut_->UpdateQpInput(*robot_status_, *params_, *alias_groups_, &qp_input);
 
   // The expected dof acceleration should only contain the position and
-  // velocity term.
+  // velocity terms.
   VectorX<double> kp, kd;
   params_->LookupDesiredDofMotionGains(&kp, &kd);
 
   VectorX<double> expected_vd =
-      (kp.array() * (q_d - robot_status_->position()).array() -
-       kd.array() * robot_status_->velocity().array())
-          .matrix();
+      (kp.array() * (q_d - robot_status_->position()).array() +
+       kd.array() * (v_d - robot_status_->velocity()).array()).matrix();
 
   // The weights / constraint types are hard coded in this test. They need to
   // match the numbers specified in
   // "config/iiwa_for_test.id_controller_config".
+
   // Checks dof acceleration.
   EXPECT_TRUE(drake::CompareMatrices(
       expected_vd, qp_input.desired_dof_motions().values(), 1e-12,
@@ -160,7 +165,7 @@ TEST_F(DummyPlanTest, TestUpdateQpInput) {
   EXPECT_TRUE(qp_input.contact_information().empty());
 
   // No center of mass or angular momentum objective.
-  for (int i = 0; i < 6; ++i) {
+  for (int i = 0; i < qp_input.desired_centroidal_momentum_dot().size(); ++i) {
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().value(i), 0);
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().weight(i), 0);
     EXPECT_EQ(qp_input.desired_centroidal_momentum_dot().constraint_type(i),
