@@ -186,6 +186,7 @@ class PiecewiseCartesianTrajectory {
     Isometry3<T> pose;
     pose.translation() = position_.get_position(time);
     pose.linear() = orientation_.orientation(time).toRotationMatrix();
+    pose.makeAffine();
     return pose;
   }
 

@@ -138,6 +138,7 @@ void HumanoidStatus::Update() {
       Isometry3<double> H1;
       H1.linear() = kFootToSensorRotationOffset.transpose();
       H1.translation() = -kFootToSensorPositionOffset + kFootToSoleOffset;
+      H1.makeAffine();
 
       foot_wrench_in_sole_frame_[i] =
           transformSpatialForce(H1, foot_wrench_raw_[i]);
@@ -149,6 +150,7 @@ void HumanoidStatus::Update() {
           foot(i).pose().linear() * kFootToSensorRotationOffset.transpose();
       H2.translation() =
           foot(i).pose().translation() - foot_sensor(i).pose().translation();
+      H2.makeAffine();
 
       foot_wrench_in_world_frame_[i] =
           transformSpatialForce(H2, foot_wrench_raw_[i]);

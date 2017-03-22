@@ -83,11 +83,11 @@ class PiecewiseCartesianTrajectoryTest : public ::testing::Test {
     pos_knots[0] << 0.3, 0, -0.5;
     pos_knots[1] << 1, -1, 3;
 
-    std::vector<Isometry3<double>> knots(times.size(),
-                                         Isometry3<double>::Identity());
+    std::vector<Isometry3<double>> knots(times.size());
     for (size_t i = 0; i < times.size(); ++i) {
       knots[i].translation() = pos_knots[i];
       knots[i].linear() = rot_knots[i].toRotationMatrix();
+      knots[i].makeAffine();
     }
 
     dut_ = PiecewiseCartesianTrajectory<

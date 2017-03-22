@@ -381,6 +381,7 @@ void EncodeRobotStateLcmMsg(const std::vector<std::string>& act_joint_names,
   Isometry3<double> pose;
   pose.translation() = q.head<3>();
   pose.linear() = math::rpy2rotmat(q.segment<3>(3));
+  pose.makeAffine();
   EncodePose(pose, msg->pose);
 
   Vector3<double> rpy = q.segment<3>(3);
