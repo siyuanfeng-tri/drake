@@ -150,7 +150,8 @@ TEST_F(GenericPlanTest, TestUpdateQpInput) {
   VectorX<double> q_d = robot_status_->position();
   robot_status_->UpdateKinematics(0.66, q_d * 0.3, robot_status_->velocity());
 
-  VectorX<double> expected_vd =
+  DesiredDofMotions expected_dof_motions = params_->MakeDesiredDofMotions();
+  expected_dof_motions.mutable_values() =
       (kp.array() * (q_d - robot_status_->position()).array() -
        kd.array() * robot_status_->velocity().array())
           .matrix();
@@ -159,19 +160,7 @@ TEST_F(GenericPlanTest, TestUpdateQpInput) {
   plan.UpdateQpInput(*robot_status_, *params_, *alias_groups_, &qp_input);
 
   // Desired generalized acceleration should match expected.
-  EXPECT_EQ(qp_input.desired_dof_motions().size(), robot_->get_num_positions());
-
-  EXPECT_TRUE(drake::CompareMatrices(
-      expected_vd, qp_input.desired_dof_motions().values(), 1e-12,
-      drake::MatrixCompareType::absolute));
-  VectorX<double> expected_weights = params_->MakeDesiredDofMotions().weights();
-  EXPECT_TRUE(drake::CompareMatrices(
-      expected_weights, qp_input.desired_dof_motions().weights(), 1e-12,
-      drake::MatrixCompareType::absolute));
-  for (int i = 0; i < robot_->get_num_positions(); ++i) {
-    EXPECT_EQ(qp_input.desired_dof_motions().constraint_type(i),
-              ConstraintType::Soft);
-  }
+  EXPECT_EQ(qp_input.desired_dof_motions(), expected_dof_motions);
 
   // Contact force basis regularization weight is irrelevant here since there
   // is not contacts, but its value should match params'.

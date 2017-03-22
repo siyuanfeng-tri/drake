@@ -44,15 +44,26 @@ drake_cc_library(
     ],
 )
 
-# === test/ ===
-drake_cc_googletest(
-    name = "plan_eval_utils_test",
+drake_cc_library(
+    name = "manipulator_plans",
+    srcs = [
+        "manipulator_move_end_effector_plan.cc",
+        "manipulator_move_joints_plan.cc",
+    ],
+    hdrs = [
+        "manipulator_move_end_effector_plan.h",
+        "manipulator_move_joints_plan.h",
+    ],
     deps = [
-        ":plan_eval_utils",
-        "//drake/common:eigen_matrix_compare",
+        ":generic_plan",
+        "//drake/lcmtypes:manipulator_plan_move_end_effector",
+        "//drake/util:lcm_util",
+        "@bot_core_lcmtypes//:lib",
+        "@robotlocomotion_lcmtypes//:lib",
     ],
 )
 
+# === test/ ===
 drake_cc_googletest(
     name = "generic_plan_test",
     deps = [
@@ -61,6 +72,25 @@ drake_cc_googletest(
         "//drake/common:eigen_matrix_compare",
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/parsers",
+    ],
+)
+
+drake_cc_googletest(
+    name = "manipulator_plan_test",
+    deps = [
+        ":manipulator_plans",
+        "//drake/common:drake_path",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+    ],
+)
+
+drake_cc_googletest(
+    name = "plan_eval_utils_test",
+    deps = [
+        ":plan_eval_utils",
+        "//drake/common:eigen_matrix_compare",
     ],
 )
 
