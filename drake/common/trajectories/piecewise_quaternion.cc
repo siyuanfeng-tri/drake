@@ -7,6 +7,30 @@
 namespace drake {
 
 template <typename Scalar>
+bool PiecewiseQuaternionSlerp<Scalar>::is_approx(
+    const PiecewiseQuaternionSlerp<Scalar>& other, Scalar tol) const {
+  // Velocities are derived from the quaternions, and I don't want to
+  // overload units for tol, so I am skipping the checks on velocities.
+  if (!this->segmentTimesEqual(other, tol))
+    return false;
+
+  if (quaternions_.size() != other.quaternions_.size())
+    return false;
+
+  for (size_t i = 0; i < quaternions_.size(); ++i) {
+    // A quick reference:
+    // https://fgiesen.wordpress.com/2013/01/07/
+    // small-note-on-quaternion-distance-metrics/
+    Scalar dot = std::abs(quaternions_[i].dot(other.quaternions_[i]));
+    if (dot < std::cos(tol / 2)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <typename Scalar>
 void PiecewiseQuaternionSlerp<Scalar>::ComputeAngularVelocities() {
   if (quaternions_.empty()) return;
 
