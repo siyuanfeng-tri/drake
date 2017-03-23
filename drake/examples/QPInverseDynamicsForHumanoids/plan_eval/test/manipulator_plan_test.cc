@@ -418,9 +418,12 @@ TEST_F(ManipMoveEndEffectorPlanTest, MoveEndEffectorHandleMessageTest) {
       traj_times[i] += robot_status_->time();
     }
 
+    const Vector3<double> zero = Vector3<double>::Zero();
     PiecewiseCartesianTrajectory<double> expected_traj =
         PiecewiseCartesianTrajectory<
-            double>::MakeCubicLinearWithZeroEndVelocity(traj_times, traj_poses);
+            double>::MakeCubicLinearWithEndLinearVelocity(traj_times,
+                                                          traj_poses, zero,
+                                                          zero);
 
     EXPECT_TRUE(
         expected_traj.is_approx(dut_->get_body_trajectory(ee_body_), 1e-12));
@@ -439,6 +442,8 @@ TEST_F(ManipMoveEndEffectorPlanTest, MoveEndEffectorHandleMessageTest) {
 
   Isometry3<double> ee_pose_d_now =
       dut_->get_body_trajectory(ee_body_).get_pose(robot_status_->time());
+  Vector6<double> ee_vel_d_now =
+      dut_->get_body_trajectory(ee_body_).get_velocity(robot_status_->time());
 
   // Handles the new plan.
   dut_->HandlePlanMessage(*robot_status_, *params_, *alias_groups_,
@@ -473,8 +478,10 @@ TEST_F(ManipMoveEndEffectorPlanTest, MoveEndEffectorHandleMessageTest) {
     }
 
     PiecewiseCartesianTrajectory<double> expected_traj =
-        PiecewiseCartesianTrajectory<
-            double>::MakeCubicLinearWithZeroEndVelocity(traj_times, traj_poses);
+        PiecewiseCartesianTrajectory<double>::
+            MakeCubicLinearWithEndLinearVelocity(traj_times, traj_poses,
+                                                 ee_vel_d_now.tail<3>(),
+                                                 Vector3<double>::Zero());
 
     EXPECT_TRUE(
         expected_traj.is_approx(dut_->get_body_trajectory(ee_body_), 1e-12));

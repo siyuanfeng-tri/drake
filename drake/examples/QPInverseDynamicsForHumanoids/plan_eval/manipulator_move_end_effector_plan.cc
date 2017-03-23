@@ -21,8 +21,9 @@ void ManipulatorMoveEndEffectorPlan<T>::InitializeGenericPlanDerived(
       robot_status.cache(), *ee_body);
 
   PiecewiseCartesianTrajectory<T> ee_traj =
-      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
-          times, {ee_pose, ee_pose});
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithEndLinearVelocity(
+          times, {ee_pose, ee_pose}, Vector3<double>::Zero(),
+          Vector3<double>::Zero());
   this->set_body_trajectory(ee_body, ee_traj);
 }
 
@@ -44,6 +45,7 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
 
   std::vector<T> times;
   std::vector<Isometry3<T>> poses;
+  Vector3<double> vel0 = Vector3<double>::Zero();
 
   const RigidBody<T>* ee_body =
       alias_groups.get_body(kEndEffectorAliasGroupName);
@@ -54,6 +56,9 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
     times.push_back(robot_status.time());
     poses.push_back(
         this->get_body_trajectory(ee_body).get_pose(robot_status.time()));
+    vel0 = this->get_body_trajectory(ee_body)
+               .get_velocity(robot_status.time())
+               .template tail<3>();
   }
 
   for (int i = 0; i < msg.num_steps; i++) {
@@ -63,8 +68,8 @@ void ManipulatorMoveEndEffectorPlan<T>::HandlePlanMessageGenericPlanDerived(
 
   // TODO(siyuan): use msg.order_of_interpolation.
   PiecewiseCartesianTrajectory<T> ee_traj =
-      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithZeroEndVelocity(
-          times, poses);
+      PiecewiseCartesianTrajectory<T>::MakeCubicLinearWithEndLinearVelocity(
+          times, poses, vel0, Vector3<double>::Zero());
 
   this->set_body_trajectory(ee_body, ee_traj);
 }
