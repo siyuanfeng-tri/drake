@@ -71,6 +71,9 @@ void IiwaPlanSource::DoCalcOutput(
       ->GetValue<lcmt_iiwa_status>();
 
   if (!status.utime) {
+    for (int i = 0; i < status.num_joints; i++)
+      std::cout << status.joint_position_measured[i] << std::endl;
+
     throw std::runtime_error(
         "iiwa status not known when attempting to "
         "calculate plan output");

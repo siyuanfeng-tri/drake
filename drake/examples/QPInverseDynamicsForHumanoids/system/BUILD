@@ -117,6 +117,7 @@ drake_cc_binary(
         "local",
     ],
     deps = [
+        "//drake/systems/lcm:lcm_driven_loop",
         ":atlas_joint_level_controller_system",
         ":humanoid_plan_eval_system",
         ":humanoid_status_translator_system",

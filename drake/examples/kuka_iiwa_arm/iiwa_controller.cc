@@ -24,6 +24,8 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/primitives/demultiplexer.h"
 
+#include "drake/systems/lcm/lcm_driven_loop.h"
+
 using robotlocomotion::robot_plan_t;
 
 namespace drake {
@@ -41,24 +43,28 @@ const int kNumJoints = 7;
 // Create a system which has an integrator on the interpolated
 // reference position for received plans.
 int DoMain() {
-  lcm::DrakeLcm lcm;
+  //lcm::DrakeLcm lcm;
   systems::DiagramBuilder<double> builder;
+  systems::lcm::LcmDrivenLoop<double> loop;
 
   auto status_sub = builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_status>(
-          kLcmStatusChannel, &lcm));
+          kLcmStatusChannel, loop.get_mutable_lcm()));
+          //kLcmStatusChannel, &lcm));
   auto status_receiver = builder.AddSystem<IiwaStatusReceiver>();
   auto plan_sub =
       builder.AddSystem(systems::lcm::LcmSubscriberSystem::Make<robot_plan_t>(
-          kLcmPlanChannel, &lcm));
+          kLcmPlanChannel, loop.get_mutable_lcm()));
+          //kLcmPlanChannel, &lcm));
   auto plan_source =
       builder.AddSystem<IiwaPlanSource>(GetDrakePath() + kIiwaUrdf);
   auto target_demux =
       builder.AddSystem<systems::Demultiplexer>(kNumJoints * 2, kNumJoints);
   auto command_pub = builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_command>(
-          kLcmCommandChannel, &lcm));
-  command_pub->set_publish_period(kIiwaLcmStatusPeriod);
+          kLcmCommandChannel, loop.get_mutable_lcm()));
+          //kLcmCommandChannel, &lcm));
+  //command_pub->set_publish_period(kIiwaLcmStatusPeriod);
   auto command_sender = builder.AddSystem<IiwaCommandSender>();
 
   builder.Connect(plan_sub->get_output_port(0),
@@ -88,9 +94,15 @@ int DoMain() {
                   command_pub->get_input_port(0));
   auto diagram = builder.Build();
 
-  lcm.StartReceiveThread();
+  //lcm.StartReceiveThread();
   drake::log()->info("controller started");
 
+  loop.Initialize(*diagram, nullptr, status_sub);
+
+  loop.Run<lcmt_iiwa_status>();
+  return 0;
+
+  /*
   // Loops until the first status message arrives.
   std::unique_ptr<systems::Context<double>> initial_context =
       diagram->CreateDefaultContext();
@@ -121,6 +133,7 @@ int DoMain() {
     }
     simulator.StepTo(iiwa_time);
   }
+  */
 }
 
 }  // namespace

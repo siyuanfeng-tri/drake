@@ -104,6 +104,14 @@ drake_cc_googletest(
 )
 
 drake_cc_googletest(
+    name = "publish_test",
+    deps = [
+        ":simulator",
+        "//drake/systems/framework",
+    ],
+)
+
+drake_cc_googletest(
     name = "explicit_euler_integrator_test",
     deps = [
         ":explicit_euler_integrator",

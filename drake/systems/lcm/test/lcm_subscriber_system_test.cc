@@ -49,6 +49,16 @@ void TestSubscriber(drake::lcm::DrakeMockLcm* lcm,
   EXPECT_EQ(basic_vector.size(), kDim);
   Eigen::VectorBlock<const VectorX<double>> value = basic_vector.get_value();
 
+  double t0 = output->get_vector_data(1)->GetAtIndex(0);
+  usleep(1000000);
+
+  lcm->InduceSubscriberCallback(dut->get_channel_name(), &buffer[0],
+      message.getEncodedSize());
+  dut->CalcOutput(*context.get(), output.get());
+  double t1 = output->get_vector_data(1)->GetAtIndex(0);
+
+  std::cout << t1 - t0 << std::endl;
+
   for (int i = 0; i < kDim; ++i) {
     EXPECT_EQ(value[i], i);
   }

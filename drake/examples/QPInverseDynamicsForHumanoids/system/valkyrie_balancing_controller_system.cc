@@ -21,6 +21,8 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/primitives/constant_value_source.h"
 
+#include "drake/systems/lcm/lcm_driven_loop.h"
+
 namespace drake {
 namespace examples {
 namespace qp_inverse_dynamics {
@@ -48,8 +50,9 @@ void controller_loop() {
       kModelFileName, multibody::joints::kRollPitchYaw, robot.get());
 
   systems::DiagramBuilder<double> builder;
+  systems::lcm::LcmDrivenLoop<double> loop;
 
-  lcm::DrakeLcm lcm;
+  // lcm::DrakeLcm lcm;
 
   RobotStateMsgToHumanoidStatusSystem* rs_msg_to_rs =
       builder.AddSystem(std::make_unique<RobotStateMsgToHumanoidStatusSystem>(
@@ -64,10 +67,10 @@ void controller_loop() {
 
   auto& robot_state_subscriber = *builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<bot_core::robot_state_t>(
-          "EST_ROBOT_STATE", &lcm));
+          "EST_ROBOT_STATE", loop.get_mutable_lcm()));
   auto& atlas_command_publisher = *builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<bot_core::atlas_command_t>(
-          "ROBOT_COMMAND", &lcm));
+          "ROBOT_COMMAND", loop.get_mutable_lcm()));
 
   // lcm -> rs
   builder.Connect(robot_state_subscriber.get_output_port(0),
@@ -89,6 +92,19 @@ void controller_loop() {
 
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
 
+  loop.Initialize(*diagram, nullptr, &robot_state_subscriber);
+
+  // Sets plan eval's desired to the nominal state.
+  systems::Context<double>* plan_eval_context =
+      diagram->GetMutableSubsystemContext(loop.get_mutable_context(), plan_eval);
+  DRAKE_DEMAND(valkyrie::kRPYValkyrieDof == robot->get_num_positions());
+  VectorX<double> desired_q =
+      valkyrie::RPYValkyrieFixedPointState().head(valkyrie::kRPYValkyrieDof);
+  plan_eval->Initialize(desired_q, plan_eval_context->get_mutable_state());
+
+  loop.Run<bot_core::robot_state_t>();
+
+  /*
   auto context = diagram->CreateDefaultContext();
   auto output = diagram->AllocateOutput(*context);
   std::unique_ptr<systems::State<double>> tmp_state = context->CloneState();
@@ -145,6 +161,7 @@ void controller_loop() {
             diagram->GetSubsystemContext(*context, rs_msg_to_rs), 0);
     context->set_time(static_cast<double>(msg->utime) / 1e6);
   }
+  */
 }
 
 }  // end namespace qp_inverse_dynamics

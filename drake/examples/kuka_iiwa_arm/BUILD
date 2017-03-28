@@ -107,6 +107,7 @@ drake_cc_binary(
         "//drake/systems/analysis:simulator",
         "//drake/systems/controllers:pid_controlled_system",
         "//drake/systems/lcm",
+        "//drake/systems/lcm:lcm_driven_loop",
         "@bot_core_lcmtypes//:lib",
         "@gflags//:gflags",
         "@robotlocomotion_lcmtypes//:lib",

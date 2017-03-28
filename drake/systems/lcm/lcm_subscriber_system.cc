@@ -31,7 +31,8 @@ LcmSubscriberSystem::LcmSubscriberSystem(
     drake::lcm::DrakeLcmInterface* lcm)
     : channel_(channel),
       translator_(translator),
-      serializer_(std::move(serializer)) {
+      serializer_(std::move(serializer)),
+      received_timestamp_(0) {
   DRAKE_DEMAND((translator_ != nullptr) != (serializer_.get() != nullptr));
   DRAKE_DEMAND(lcm);
 
@@ -41,6 +42,8 @@ LcmSubscriberSystem::LcmSubscriberSystem(
   } else {
     DeclareAbstractOutputPort();
   }
+
+  DeclareOutputPort(kVectorValued, 1);
 
   set_name(make_name(channel_));
 }
@@ -86,6 +89,8 @@ void LcmSubscriberSystem::DoCalcOutput(const Context<double>&,
       translator_->Deserialize(
           received_message_.data(), received_message_.size(), output_vector);
     }
+    output->GetMutableVectorData(1)->GetAtIndex(0) =
+        static_cast<double>(received_timestamp_);
   } else {
     AbstractValue* const output_value = output->GetMutableData(0);
     DRAKE_ASSERT(output_value != nullptr);
@@ -95,19 +100,22 @@ void LcmSubscriberSystem::DoCalcOutput(const Context<double>&,
       serializer_->Deserialize(
           received_message_.data(), received_message_.size(), output_value);
     }
+    output->GetMutableVectorData(1)->GetAtIndex(0) = received_timestamp_;
   }
 }
 
 // This is only called if our output port is vector-valued.
 std::unique_ptr<BasicVector<double>> LcmSubscriberSystem::AllocateOutputVector(
     const OutputPortDescriptor<double>& descriptor) const {
-  DRAKE_DEMAND(descriptor.get_index() == 0);
+  DRAKE_DEMAND(descriptor.get_index() == 0 || descriptor.get_index() == 1);
   DRAKE_DEMAND(descriptor.get_data_type() == kVectorValued);
-  DRAKE_DEMAND(translator_ != nullptr);
-  DRAKE_DEMAND(serializer_ == nullptr);
-  auto result = translator_->AllocateOutputVector();
-  if (result) {
-    return result;
+  if (descriptor.get_index() == 0) {
+    DRAKE_DEMAND(translator_ != nullptr);
+    DRAKE_DEMAND(serializer_ == nullptr);
+    auto result = translator_->AllocateOutputVector();
+    if (result) {
+      return result;
+    }
   }
   return LeafSystem<double>::AllocateOutputVector(descriptor);
 }
@@ -134,11 +142,20 @@ void LcmSubscriberSystem::HandleMessage(const std::string& channel,
     std::lock_guard<std::mutex> lock(received_message_mutex_);
     received_message_.clear();
     received_message_.insert(received_message_.begin(), rbuf_begin, rbuf_end);
+
+    auto t_now = std::chrono::high_resolution_clock::now();
+    received_timestamp_ = std::chrono::duration<double, std::micro>(
+        t_now.time_since_epoch()).count();
   } else {
     std::cerr << "LcmSubscriberSystem: HandleMessage: WARNING: Received a "
               << "message for channel \"" << channel
               << "\" instead of channel \"" << channel_ << "\". Ignoring it."
               << std::endl;
+  }
+
+  // Wakes up whoever is sleeping on this.
+  if (notification_) {
+    notification_->notify();
   }
 }
 

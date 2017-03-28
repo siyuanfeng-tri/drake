@@ -15,6 +15,8 @@
 #include "drake/systems/lcm/lcm_translator_dictionary.h"
 #include "drake/systems/lcm/serializer.h"
 
+#include "drake/systems/lcm/semaphore.h"
+
 namespace drake {
 namespace systems {
 namespace lcm {
@@ -114,6 +116,21 @@ class LcmSubscriberSystem : public LeafSystem<double>,
    */
   const LcmAndVectorBaseTranslator& get_translator() const;
 
+  /**
+   * Returns the output port for time stamp.
+   */
+  const OutputPortDescriptor<double>& get_output_port_time_stamp() const {
+    return get_output_port(1);
+  }
+
+  /**
+   * Set the notification, so that every time a message is received, @p sem
+   * will be notified.
+   */
+  void set_notification(Semaphore* sem) {
+    notification_ = sem;
+  }
+
  protected:
   void DoCalcOutput(const Context<double>& context,
                     SystemOutput<double>* output) const override;
@@ -149,8 +166,13 @@ class LcmSubscriberSystem : public LeafSystem<double>,
   // The mutex that guards received_message_.
   mutable std::mutex received_message_mutex_;
 
+  // OS' time stamp in micro seconds when the last message handler is called.
+  double received_timestamp_;
+
   // The bytes of the most recently received LCM message.
   std::vector<uint8_t> received_message_;
+
+  Semaphore* notification_{nullptr};
 };
 
 }  // namespace lcm
