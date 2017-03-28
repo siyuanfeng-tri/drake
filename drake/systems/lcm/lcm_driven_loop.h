@@ -8,6 +8,30 @@ namespace drake {
 namespace systems {
 namespace lcm {
 
+class LcmMessageToTimeInterface {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(LcmMessageToTimeInterface)
+  virtual ~LcmMessageToTimeInterface() {}
+
+  virtual double GetTimeInSeconds(const AbstractValue& abstract_value) const = 0;
+
+ protected:
+  LcmMessageToTimeInterface() {}
+};
+
+template <typename MessageType>
+class UtimeMessageToSeconds : public LcmMessageToTimeInterface {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(UtimeMessageToSeconds)
+  UtimeMessageToSeconds() {}
+  ~UtimeMessageToSeconds() {}
+
+  double GetTimeInSeconds(const AbstractValue& abstract_value) const override {
+    const MessageType& msg = abstract_value.GetValue<MessageType>();
+    return static_cast<double>(msg.utime) / 1e6;
+  }
+};
+
 /**
  * This is a very crude first pass to implement a loop that's driven by a lcm
  * message. Moreover, context time is explicitly slaved to whatever time is in
@@ -51,20 +75,21 @@ namespace lcm {
  * connected with a ZOH block that only pulls from the actual subscriber when
  * time changes.
  */
-template <typename T>
 class LcmDrivenLoop {
  public:
   // The max count for semaphore_ needs to be 1. Otherwise the behavior is not
   // correct if we handle messages slower than the incoming rate.
-  LcmDrivenLoop() : semaphore_(1) {}
-
-  void Initialize(const System<T>& system, std::unique_ptr<Context<T>> context,
-                  LcmSubscriberSystem* driving_subscriber) {
+  LcmDrivenLoop(drake::lcm::DrakeLcm* lcm,
+                const System<double>& system, std::unique_ptr<Context<double>> context,
+                LcmSubscriberSystem* driving_subscriber,
+                std::unique_ptr<LcmMessageToTimeInterface> time_converter)
+      : lcm_(lcm), time_converter_(std::move(time_converter)), semaphore_(1) {
+    DRAKE_DEMAND(lcm != nullptr);
     DRAKE_DEMAND(driving_subscriber != nullptr);
 
     system_ = &system;
     driving_sub_ = driving_subscriber;
-    stepper_ = std::make_unique<Simulator<T>>(*system_, std::move(context));
+    stepper_ = std::make_unique<Simulator<double>>(*system_, std::move(context));
 
     driving_sub_->set_notification(&semaphore_);
 
@@ -73,21 +98,18 @@ class LcmDrivenLoop {
 
     stepper_->set_publish_every_time_step(false);
 
-    lcm_.StartReceiveThread();
+    lcm_->StartReceiveThread();
   }
 
-  template <typename MessageType>
   void Run() {
     // Wake up for the first message in driving_sub_, so that we can initialize
     // the time properly.
     semaphore_.wait();
 
-    // Explicitly eval the driving subscriber to get the lcm message.
+    // Get the time from the received message.
     driving_sub_->CalcOutput(*sub_context_, sub_output_.get());
-    // Ok, this is really screwy. This won't compile for any message that
-    // doesn't have a "utime" field.
-    const MessageType& msg = sub_output_->get_data(0)->GetValue<MessageType>();
-    T msg_time = static_cast<T>(msg.utime) / 1e6;
+    double msg_time =
+        time_converter_->GetTimeInSeconds(*(sub_output_->get_data(0)));
 
     // Init our time to the msg time.
     stepper_->get_mutable_context()->set_time(msg_time);
@@ -95,9 +117,9 @@ class LcmDrivenLoop {
 
     // Wall clock of the this computer when the lcm message arrived, in micro
     // seconds.
-    T wall_clock_now = sub_output_->get_vector_data(1)->GetAtIndex(0);
-    T wall_clock_prev = wall_clock_now;
-    T dt;
+    double wall_clock_now = sub_output_->get_vector_data(1)->GetAtIndex(0);
+    double wall_clock_prev = wall_clock_now;
+    double dt;
 
     while (true) {
       // Wake up only when there is a new message in driving_sub_.
@@ -109,10 +131,9 @@ class LcmDrivenLoop {
       wall_clock_prev = wall_clock_now;
       std::cout << "dt(wall clock): " << dt / 1e6 << std::endl;
 
-      // Get the lcm message.
-      const MessageType& msg =
-          sub_output_->get_data(0)->GetValue<MessageType>();
-      msg_time = static_cast<T>(msg.utime) / 1e6;
+      // Sets the context time to the lcm message's time.
+      msg_time =
+          time_converter_->GetTimeInSeconds(*(sub_output_->get_data(0)));
       std::cout << "msg t: " << msg_time << std::endl;
       std::cout << "msg dt: " << msg_time - stepper_->get_context().get_time()
                 << std::endl;
@@ -155,15 +176,15 @@ class LcmDrivenLoop {
     publish_on_every_received_message_ = flag;
   }
 
-  drake::lcm::DrakeLcm* get_mutable_lcm() { return &lcm_; }
-
-  Context<T>* get_mutable_context() {
+  Context<double>* get_mutable_context() {
     return stepper_->get_mutable_context();
   }
 
  private:
   // The lcm interface for publishing and subscribing.
-  drake::lcm::DrakeLcm lcm_;
+  drake::lcm::DrakeLcm* lcm_;
+
+  std::unique_ptr<LcmMessageToTimeInterface> time_converter_;
 
   bool publish_on_every_received_message_{true};
 
@@ -172,14 +193,14 @@ class LcmDrivenLoop {
   Semaphore semaphore_;
 
   // The system that does stuff.
-  const System<T>* system_;
+  const System<double>* system_;
 
   // THE message handler. stepper_.context's time will be latched to whatever
   // time is being subscribed in driving_sub_.
   LcmSubscriberSystem* driving_sub_;
 
   // Reusing the simulator to manage event handling and state progression.
-  std::unique_ptr<Simulator<T>> stepper_;
+  std::unique_ptr<Simulator<double>> stepper_;
 
   // Separate context and output port just to get the time out of
   // driving_sub_.. I can't think of a general way to get the correct sub

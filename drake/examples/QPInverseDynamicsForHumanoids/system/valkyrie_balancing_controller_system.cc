@@ -50,9 +50,7 @@ void controller_loop() {
       kModelFileName, multibody::joints::kRollPitchYaw, robot.get());
 
   systems::DiagramBuilder<double> builder;
-  systems::lcm::LcmDrivenLoop<double> loop;
-
-  // lcm::DrakeLcm lcm;
+  lcm::DrakeLcm lcm;
 
   RobotStateMsgToHumanoidStatusSystem* rs_msg_to_rs =
       builder.AddSystem(std::make_unique<RobotStateMsgToHumanoidStatusSystem>(
@@ -67,10 +65,10 @@ void controller_loop() {
 
   auto& robot_state_subscriber = *builder.AddSystem(
       systems::lcm::LcmSubscriberSystem::Make<bot_core::robot_state_t>(
-          "EST_ROBOT_STATE", loop.get_mutable_lcm()));
+          "EST_ROBOT_STATE", &lcm));
   auto& atlas_command_publisher = *builder.AddSystem(
       systems::lcm::LcmPublisherSystem::Make<bot_core::atlas_command_t>(
-          "ROBOT_COMMAND", loop.get_mutable_lcm()));
+          "ROBOT_COMMAND", &lcm));
 
   // lcm -> rs
   builder.Connect(robot_state_subscriber.get_output_port(0),
@@ -92,7 +90,8 @@ void controller_loop() {
 
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
 
-  loop.Initialize(*diagram, nullptr, &robot_state_subscriber);
+  systems::lcm::LcmDrivenLoop loop(&lcm, *diagram, nullptr, &robot_state_subscriber,
+      std::make_unique<systems::lcm::UtimeMessageToSeconds<bot_core::robot_state_t>>());
 
   // Sets plan eval's desired to the nominal state.
   systems::Context<double>* plan_eval_context =
@@ -102,66 +101,7 @@ void controller_loop() {
       valkyrie::RPYValkyrieFixedPointState().head(valkyrie::kRPYValkyrieDof);
   plan_eval->Initialize(desired_q, plan_eval_context->get_mutable_state());
 
-  loop.Run<bot_core::robot_state_t>();
-
-  /*
-  auto context = diagram->CreateDefaultContext();
-  auto output = diagram->AllocateOutput(*context);
-  std::unique_ptr<systems::State<double>> tmp_state = context->CloneState();
-  systems::UpdateActions<double> actions;
-
-  // Sets plan eval's desired to the nominal state.
-  systems::Context<double>* plan_eval_context =
-      diagram->GetMutableSubsystemContext(context.get(), plan_eval);
-  systems::State<double>* plan_eval_state =
-      plan_eval_context->get_mutable_state();
-  DRAKE_DEMAND(valkyrie::kRPYValkyrieDof == robot->get_num_positions());
-  VectorX<double> desired_q =
-      valkyrie::RPYValkyrieFixedPointState().head(valkyrie::kRPYValkyrieDof);
-  plan_eval->Initialize(desired_q, plan_eval_state);
-
-  lcm.StartReceiveThread();
-
-  drake::log()->info("controller started");
-
-  systems::UpdateActions<double> update_actions;
-
-  // Loops until the first status message arrives.
-  while (true) {
-    // Sets Context's time to the timestamp in the bot_core::robot_state_t msg.
-    const bot_core::robot_state_t* msg =
-        rs_msg_to_rs->EvalInputValue<bot_core::robot_state_t>(
-            diagram->GetSubsystemContext(*context, rs_msg_to_rs), 0);
-    context->set_time(static_cast<double>(msg->utime) / 1e6);
-    if (context->get_time() != 0) break;
-  }
-
-  double next_control_time =
-      diagram->CalcNextUpdateTime(*context, &update_actions);
-
-  while (true) {
-    // Computes control.
-    if (next_control_time <= context->get_time()) {
-      diagram->CalcUnrestrictedUpdate(*context, update_actions.events.front(),
-                                      tmp_state.get());
-      context->get_mutable_state()->CopyFrom(*tmp_state);
-
-      next_control_time =
-          diagram->CalcNextUpdateTime(*context, &update_actions);
-
-      // Sends the bot_core::atlas_command_t msg.
-      diagram->Publish(*context);
-    }
-
-    // TODO(siyuan): This is a busy polling loop on LCM message. Should switch
-    // to a descheduled version.
-    // Sets Context's time to the timestamp in the bot_core::robot_state_t msg.
-    const bot_core::robot_state_t* msg =
-        rs_msg_to_rs->EvalInputValue<bot_core::robot_state_t>(
-            diagram->GetSubsystemContext(*context, rs_msg_to_rs), 0);
-    context->set_time(static_cast<double>(msg->utime) / 1e6);
-  }
-  */
+  loop.Run();
 }
 
 }  // end namespace qp_inverse_dynamics
