@@ -43,6 +43,14 @@ void TestSubscriber(drake::lcm::DrakeMockLcm* lcm,
   lcm->InduceSubscriberCallback(dut->get_channel_name(), &buffer[0],
       message.getEncodedSize());
 
+  UpdateActions<double> actions;
+  std::unique_ptr<State<double>> tmp_state = context->CloneState();
+
+  dut->CalcNextUpdateTime(*context, &actions);
+  EXPECT_EQ(actions.events.size(), 1);
+
+  dut->CalcUnrestrictedUpdate(*context, actions.events.front(), tmp_state.get());
+  context->get_mutable_state()->CopyFrom(*tmp_state);
   dut->CalcOutput(*context.get(), output.get());
 
   const BasicVector<double>& basic_vector = *output->get_vector_data(0);

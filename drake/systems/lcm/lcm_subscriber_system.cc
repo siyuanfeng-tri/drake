@@ -105,6 +105,7 @@ void LcmSubscriberSystem::DoCalcUnrestrictedUpdate(
 }
 
 std::unique_ptr<AbstractValues> LcmSubscriberSystem::AllocateAbstractState() const {
+  std::cout << "haha\n" ;
   // Index 0 is the message, 1 is the message counter.
   std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(2);
   // VectorBase output.
