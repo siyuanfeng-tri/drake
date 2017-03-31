@@ -65,6 +65,61 @@ LcmSubscriberSystem::LcmSubscriberSystem(
 
 LcmSubscriberSystem::~LcmSubscriberSystem() {}
 
+void LcmSubscriberSystem::DoCalcNextUpdateTime(
+    const Context<double>& context, UpdateActions<double>* events) const {
+  std::unique_lock<std::mutex> lock(received_message_mutex_);
+  const int last_message_count = context.get_abstract_state<int>(1);
+  // Has a new message. Schedule an unrestricted update event.
+  if (last_message_count != received_message_count_) {
+    events->time = context.get_time() + 0.0001;
+    DiscreteEvent<double> event;
+    event.action = DiscreteEvent<double>::ActionType::kUnrestrictedUpdateAction;
+    events->events.push_back(event);
+  } else {
+    events->time = std::numeric_limits<double>::infinity();
+  }
+}
+
+void LcmSubscriberSystem::DoCalcUnrestrictedUpdate(
+    const Context<double>& context, State<double>* state) const {
+  AbstractValue& msg = state->get_mutable_abstract_state()->get_mutable_value(0);
+  AbstractValue& msg_ctr = state->get_mutable_abstract_state()->get_mutable_value(1);
+
+  if (translator_ != nullptr) {
+    VectorBase<double>* const output_vector = &msg.GetMutableValue<BasicVector<double>>();
+    std::lock_guard<std::mutex> lock(received_message_mutex_);
+    if (!received_message_.empty()) {
+      translator_->Deserialize(
+          received_message_.data(), received_message_.size(), output_vector);
+      msg_ctr.GetMutableValue<int>() = received_message_count_;
+    }
+  } else {
+    std::lock_guard<std::mutex> lock(received_message_mutex_);
+    if (!received_message_.empty()) {
+      serializer_->Deserialize(
+          received_message_.data(), received_message_.size(), &msg);
+      msg_ctr.GetMutableValue<int>() = received_message_count_;
+    }
+
+  }
+}
+
+std::unique_ptr<AbstractValues> LcmSubscriberSystem::AllocateAbstractState() const {
+  // Index 0 is the message, 1 is the message counter.
+  std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(2);
+  // VectorBase output.
+  if (translator_ != nullptr) {
+    DRAKE_DEMAND(serializer_ == nullptr);
+    auto v = std::make_unique<BasicVector<double>>(translator_->get_vector_size());
+    abstract_vals[0] = std::make_unique<VectorValue<double>>(std::move(v));
+  } else {
+    DRAKE_DEMAND(serializer_ != nullptr);
+    abstract_vals[0] = serializer_->CreateDefaultValue();
+  }
+  abstract_vals[1] = AbstractValue::Make<int>(0);
+  return std::make_unique<systems::AbstractValues>(std::move(abstract_vals));
+}
+
 std::string LcmSubscriberSystem::make_name(const std::string& channel) {
   return "LcmSubscriberSystem(" + channel + ")";
 }
@@ -73,7 +128,7 @@ const std::string& LcmSubscriberSystem::get_channel_name() const {
   return channel_;
 }
 
-void LcmSubscriberSystem::DoCalcOutput(const Context<double>&,
+void LcmSubscriberSystem::DoCalcOutput(const Context<double>& context,
                                        SystemOutput<double>* output) const {
   DRAKE_ASSERT((translator_ != nullptr) != (serializer_.get() != nullptr));
 
@@ -81,20 +136,13 @@ void LcmSubscriberSystem::DoCalcOutput(const Context<double>&,
     VectorBase<double>* const output_vector = output->GetMutableVectorData(0);
     DRAKE_ASSERT(output_vector != nullptr);
 
-    std::lock_guard<std::mutex> lock(received_message_mutex_);
-    if (!received_message_.empty()) {
-      translator_->Deserialize(
-          received_message_.data(), received_message_.size(), output_vector);
-    }
+    const BasicVector<double>& msg = context.get_abstract_state<BasicVector<double>>(0);
+    output_vector->SetFrom(msg);
   } else {
     AbstractValue* const output_value = output->GetMutableData(0);
     DRAKE_ASSERT(output_value != nullptr);
 
-    std::lock_guard<std::mutex> lock(received_message_mutex_);
-    if (!received_message_.empty()) {
-      serializer_->Deserialize(
-          received_message_.data(), received_message_.size(), output_value);
-    }
+    output_value->SetFrom(context.get_abstract_state()->get_value(0));
   }
 }
 
@@ -134,7 +182,6 @@ void LcmSubscriberSystem::HandleMessage(const std::string& channel,
     std::lock_guard<std::mutex> lock(received_message_mutex_);
     received_message_.clear();
     received_message_.insert(received_message_.begin(), rbuf_begin, rbuf_end);
-
     received_message_count_++;
     received_message_condition_variable_.notify_all();
   } else {

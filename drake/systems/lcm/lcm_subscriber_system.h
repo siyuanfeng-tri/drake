@@ -131,6 +131,14 @@ class LcmSubscriberSystem : public LeafSystem<double>,
   std::unique_ptr<BasicVector<double>> AllocateOutputVector(
       const OutputPortDescriptor<double>& descriptor) const override;
 
+  void DoCalcNextUpdateTime(const Context<double>& context,
+                            UpdateActions<double>* events) const override;
+
+  void DoCalcUnrestrictedUpdate(const Context<double>& context,
+                                State<double>* state) const override;
+
+  std::unique_ptr<AbstractValues> AllocateAbstractState() const override;
+
  private:
   // All constructors delegate to here.
   LcmSubscriberSystem(const std::string& channel,
