@@ -46,6 +46,8 @@ class DummySys : public systems::LeafSystem<double> {
 
     auto out_vector = GetMutableOutputVector(output, 0);
     out_vector(0) = static_cast<double>(msg->timestamp) / 1e3;
+
+    std::cout << "dummy: " << out_vector(0) << std::endl;
   }
 };
 
@@ -87,6 +89,7 @@ GTEST_TEST(LcmDrivenLoopTest, TestLoop) {
 
   // Makes the lcm driven loop.
   lcm::LcmDrivenLoop dut(*sys, *sub, nullptr, &lcm, std::move(msg_to_time));
+  dut.set_publish_on_every_received_message(false);
 
   // Starts the publishing thread, this will first sleep for long enough so that
   // dut can go sleep first.

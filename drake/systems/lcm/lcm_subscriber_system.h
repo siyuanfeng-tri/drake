@@ -139,6 +139,16 @@ class LcmSubscriberSystem : public LeafSystem<double>,
 
   std::unique_ptr<AbstractValues> AllocateAbstractState() const override;
 
+  void DoCalcDiscreteVariableUpdates(
+      const Context<double>& context, DiscreteState<double>* discrete_state) const override;
+
+  std::unique_ptr<DiscreteState<double>> AllocateDiscreteState() const override;
+
+  /*
+  void SetDefaultState(const Context<T>& context,
+                       State<T>* state) const final;
+                      */
+
  private:
   // All constructors delegate to here.
   LcmSubscriberSystem(const std::string& channel,
@@ -173,6 +183,9 @@ class LcmSubscriberSystem : public LeafSystem<double>,
 
   // A condition variable that's signaled every time the handler is called.
   mutable std::condition_variable received_message_condition_variable_;
+
+  const int state_index_msg_{0};
+  const int state_index_msg_ctr_{1};
 };
 
 }  // namespace lcm

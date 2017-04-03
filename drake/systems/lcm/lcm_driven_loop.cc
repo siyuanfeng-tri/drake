@@ -21,6 +21,7 @@ LcmDrivenLoop::LcmDrivenLoop(
   // that this can explicitly query the message.
   sub_context_ = driving_sub_.CreateDefaultContext();
   sub_output_ = driving_sub_.AllocateOutput(*sub_context_);
+  sub_swap_state_ = sub_context_->CloneState();
 
   // Disables simulator's publish on its internal time step.
   stepper_->set_publish_every_time_step(false);
@@ -30,7 +31,14 @@ LcmDrivenLoop::LcmDrivenLoop(
 }
 
 const AbstractValue& LcmDrivenLoop::WaitForMessage() {
+  UpdateActions<double> actions;
+
   message_count_ = driving_sub_.WaitForMessage(message_count_);
+
+  driving_sub_.CalcNextUpdateTime(*sub_context_, &actions);
+  driving_sub_.CalcUnrestrictedUpdate(*sub_context_, actions.events.front(), sub_swap_state_.get());
+  sub_context_->get_mutable_state()->CopyFrom(*sub_swap_state_);
+
   driving_sub_.CalcOutput(*sub_context_, sub_output_.get());
   return *(sub_output_->get_data(0));
 }
@@ -41,6 +49,9 @@ void LcmDrivenLoop::RunAssumingInitializedTo(double stop_time) {
 
   while (true) {
     msg_time = time_converter_->GetTimeInSeconds(WaitForMessage());
+    std::cout << "t now: " << stepper_->get_context().get_time() << "\n";
+    std::cout << "t nxt: " << msg_time << "\n";
+
     if (msg_time >= stop_time) break;
 
     stepper_->StepTo(msg_time);
@@ -56,6 +67,7 @@ void LcmDrivenLoop::RunAssumingInitializedTo(double stop_time) {
 void LcmDrivenLoop::RunWithDefaultInitializationTo(double stop_time) {
   const AbstractValue& first_msg = WaitForMessage();
   double msg_time = time_converter_->GetTimeInSeconds(first_msg);
+  std::cout << "t0 " << msg_time << std::endl;
   // Inits context time to the msg time.
   stepper_->get_mutable_context()->set_time(msg_time);
 

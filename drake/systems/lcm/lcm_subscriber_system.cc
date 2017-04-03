@@ -65,60 +65,97 @@ LcmSubscriberSystem::LcmSubscriberSystem(
 
 LcmSubscriberSystem::~LcmSubscriberSystem() {}
 
+/*
+void LcmSubscriberSystem::SetDefaultState(const Context<T>& context,
+                                          State<T>* state) const {
+  DRAKE_DEMAND(state->get_continuous_state().size() == 0);
+
+}
+*/
+
 void LcmSubscriberSystem::DoCalcNextUpdateTime(
     const Context<double>& context, UpdateActions<double>* events) const {
+  // Gets the last message count from either abstract state or discrete state.
+  int last_message_count;
+  if (translator_ == nullptr) {
+    DRAKE_ASSERT(serializer_ != nullptr);
+    last_message_count = context.get_abstract_state<int>(state_index_msg_ctr_);
+  } else {
+    DRAKE_ASSERT(serializer_ == nullptr);
+    last_message_count = static_cast<int>(context.get_discrete_state(state_index_msg_ctr_)->GetAtIndex(0));
+  }
+
   std::unique_lock<std::mutex> lock(received_message_mutex_);
-  const int last_message_count = context.get_abstract_state<int>(1);
   // Has a new message. Schedule an unrestricted update event.
   if (last_message_count != received_message_count_) {
     events->time = context.get_time() + 0.0001;
     DiscreteEvent<double> event;
-    event.action = DiscreteEvent<double>::ActionType::kUnrestrictedUpdateAction;
+    if (translator_ == nullptr)
+      event.action = DiscreteEvent<double>::ActionType::kUnrestrictedUpdateAction;
+    else
+      event.action = DiscreteEvent<double>::ActionType::kDiscreteUpdateAction;
     events->events.push_back(event);
   } else {
     events->time = std::numeric_limits<double>::infinity();
   }
 }
 
+void LcmSubscriberSystem::DoCalcDiscreteVariableUpdates(
+    const Context<double>& context, DiscreteState<double>* discrete_state) const {
+  DRAKE_ASSERT(translator_ != nullptr);
+  DRAKE_ASSERT(serializer_ == nullptr);
+
+  std::lock_guard<std::mutex> lock(received_message_mutex_);
+  if (!received_message_.empty()) {
+    translator_->Deserialize(
+        received_message_.data(), received_message_.size(),
+        discrete_state->get_mutable_discrete_state(state_index_msg_));
+    discrete_state->get_mutable_discrete_state(state_index_msg_ctr_)->SetAtIndex(0, received_message_count_);
+  }
+}
+
+std::unique_ptr<DiscreteState<double>> LcmSubscriberSystem::AllocateDiscreteState() const {
+  // Only make discrete states if we are outputing vector values.
+  if (translator_ != nullptr) {
+    DRAKE_DEMAND(serializer_ == nullptr);
+    std::vector<std::unique_ptr<BasicVector<double>>> discrete_state_vec(2);
+    discrete_state_vec[state_index_msg_] = this->AllocateOutputVector(this->get_output_port(0));
+    discrete_state_vec[state_index_msg_ctr_] = std::make_unique<BasicVector<double>>(1);
+    discrete_state_vec[state_index_msg_ctr_]->SetAtIndex(0, 0);
+    return std::make_unique<DiscreteState<double>>(std::move(discrete_state_vec));
+  }
+  DRAKE_DEMAND(serializer_ != nullptr);
+  return std::make_unique<DiscreteState<double>>();
+}
+
 void LcmSubscriberSystem::DoCalcUnrestrictedUpdate(
     const Context<double>& context, State<double>* state) const {
-  AbstractValue& msg = state->get_mutable_abstract_state()->get_mutable_value(0);
-  AbstractValue& msg_ctr = state->get_mutable_abstract_state()->get_mutable_value(1);
+  DRAKE_ASSERT(translator_ == nullptr);
+  DRAKE_ASSERT(serializer_ != nullptr);
 
-  if (translator_ != nullptr) {
-    VectorBase<double>* const output_vector = &msg.GetMutableValue<BasicVector<double>>();
-    std::lock_guard<std::mutex> lock(received_message_mutex_);
-    if (!received_message_.empty()) {
-      translator_->Deserialize(
-          received_message_.data(), received_message_.size(), output_vector);
-      msg_ctr.GetMutableValue<int>() = received_message_count_;
-    }
-  } else {
-    std::lock_guard<std::mutex> lock(received_message_mutex_);
-    if (!received_message_.empty()) {
-      serializer_->Deserialize(
-          received_message_.data(), received_message_.size(), &msg);
-      msg_ctr.GetMutableValue<int>() = received_message_count_;
-    }
+  AbstractValue& msg = state->get_mutable_abstract_state()->get_mutable_value(state_index_msg_);
+  AbstractValue& msg_ctr = state->get_mutable_abstract_state()->get_mutable_value(state_index_msg_ctr_);
 
+  std::lock_guard<std::mutex> lock(received_message_mutex_);
+  if (!received_message_.empty()) {
+    serializer_->Deserialize(
+        received_message_.data(), received_message_.size(), &msg);
+    msg_ctr.GetMutableValue<int>() = received_message_count_;
   }
 }
 
 std::unique_ptr<AbstractValues> LcmSubscriberSystem::AllocateAbstractState() const {
-  std::cout << "haha\n" ;
-  // Index 0 is the message, 1 is the message counter.
-  std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(2);
-  // VectorBase output.
-  if (translator_ != nullptr) {
-    DRAKE_DEMAND(serializer_ == nullptr);
-    auto v = std::make_unique<BasicVector<double>>(translator_->get_vector_size());
-    abstract_vals[0] = std::make_unique<VectorValue<double>>(std::move(v));
-  } else {
-    DRAKE_DEMAND(serializer_ != nullptr);
-    abstract_vals[0] = serializer_->CreateDefaultValue();
+  // Only make abstract states if we are outputing abstract message.
+  if (serializer_ != nullptr) {
+    DRAKE_DEMAND(translator_ == nullptr);
+    // Index 0 is the message, 1 is the message counter.
+    std::vector<std::unique_ptr<systems::AbstractValue>> abstract_vals(2);
+    abstract_vals[state_index_msg_] = this->AllocateOutputAbstract(this->get_output_port(0));
+    abstract_vals[state_index_msg_ctr_] = AbstractValue::Make<int>(0);
+    return std::make_unique<systems::AbstractValues>(std::move(abstract_vals));
   }
-  abstract_vals[1] = AbstractValue::Make<int>(0);
-  return std::make_unique<systems::AbstractValues>(std::move(abstract_vals));
+  DRAKE_DEMAND(translator_ != nullptr);
+  return std::make_unique<AbstractValues>();
 }
 
 std::string LcmSubscriberSystem::make_name(const std::string& channel) {
@@ -134,16 +171,15 @@ void LcmSubscriberSystem::DoCalcOutput(const Context<double>& context,
   DRAKE_ASSERT((translator_ != nullptr) != (serializer_.get() != nullptr));
 
   if (translator_ != nullptr) {
-    VectorBase<double>* const output_vector = output->GetMutableVectorData(0);
+    BasicVector<double>* const output_vector = output->GetMutableVectorData(0);
     DRAKE_ASSERT(output_vector != nullptr);
 
-    const BasicVector<double>& msg = context.get_abstract_state<BasicVector<double>>(0);
-    output_vector->SetFrom(msg);
+    output_vector->SetFrom(*context.get_discrete_state(state_index_msg_));
   } else {
     AbstractValue* const output_value = output->GetMutableData(0);
     DRAKE_ASSERT(output_value != nullptr);
 
-    output_value->SetFrom(context.get_abstract_state()->get_value(0));
+    output_value->SetFrom(context.get_abstract_state()->get_value(state_index_msg_));
   }
 }
 
