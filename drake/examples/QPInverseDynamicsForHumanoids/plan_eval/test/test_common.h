@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/generic_plan.h"
+#include "drake/multibody/joints/floating_base_types.h"
+#include "drake/multibody/parsers/urdf_parser.h"
 
 namespace drake {
 namespace examples {
@@ -16,11 +18,13 @@ namespace qp_inverse_dynamics {
 // making / evaluating a Plan.
 class GenericPlanTest : public ::testing::Test {
  protected:
-  // Assumes robot_ and dut_ have already allocated.
-  void Initialize(const std::string& alias_groups_path,
-                  const std::string& control_param_path) {
-    DRAKE_DEMAND(robot_ != nullptr);
-    DRAKE_DEMAND(dut_ != nullptr);
+  void AllocateRescourse(
+      const std::string& robot_path,
+      const std::string& alias_groups_path,
+      const std::string& control_param_path) {
+    robot_ = std::make_unique<RigidBodyTree<double>>();
+    parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
+        robot_path, multibody::joints::kFixed, robot_.get());
 
     alias_groups_ =
         std::make_unique<param_parsers::RigidBodyTreeAliasGroups<double>>(
@@ -31,7 +35,9 @@ class GenericPlanTest : public ::testing::Test {
     params_->LoadFromFile(control_param_path, *alias_groups_);
 
     robot_status_ = std::make_unique<HumanoidStatus>(*robot_, *alias_groups_);
-    std::default_random_engine generator(123);
+  }
+
+  void SetRandomConfiguration(std::default_random_engine& generator) {
     std::normal_distribution<double> normal;
     VectorX<double> q = robot_->getRandomConfiguration(generator);
     VectorX<double> v(robot_->get_num_velocities());
@@ -40,9 +46,6 @@ class GenericPlanTest : public ::testing::Test {
     }
     double time_now = 0.2;
     robot_status_->UpdateKinematics(time_now, q, v);
-
-    // Initializes the plan using the current robot status.
-    dut_->Initialize(*robot_status_, *params_, *alias_groups_);
   }
 
   std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};

@@ -66,13 +66,11 @@ class DummyPlanTest : public GenericPlanTest {
         "/examples/QPInverseDynamicsForHumanoids/"
         "config/iiwa.id_controller_config";
 
-    robot_ = std::make_unique<RigidBodyTree<double>>();
-    parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        kModelPath, multibody::joints::kFixed, robot_.get());
-
+    std::default_random_engine generator(123);
+    AllocateRescourse(kModelPath, kAliasGroupsPath, kControlConfigPath);
+    SetRandomConfiguration(generator);
     dut_ = std::unique_ptr<GenericPlan<double>>(new DummyPlan<double>());
-
-    Initialize(kAliasGroupsPath, kControlConfigPath);
+    dut_->Initialize(*robot_status_, *params_, *alias_groups_);
   }
 };
 
