@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/generic_plan.h"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
@@ -18,10 +19,11 @@ namespace qp_inverse_dynamics {
 // making / evaluating a Plan.
 class GenericPlanTest : public ::testing::Test {
  protected:
-  void AllocateRescourse(
-      const std::string& robot_path,
-      const std::string& alias_groups_path,
-      const std::string& control_param_path) {
+  // Allocates robot_, alias_groups_, params_, and robot_status_. dut_ should
+  // be allocated in individual tests depending on which plan is under test.
+  void AllocateRescourse(const std::string& robot_path,
+                         const std::string& alias_groups_path,
+                         const std::string& control_param_path) {
     robot_ = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
         robot_path, multibody::joints::kFixed, robot_.get());
@@ -37,6 +39,8 @@ class GenericPlanTest : public ::testing::Test {
     robot_status_ = std::make_unique<HumanoidStatus>(*robot_, *alias_groups_);
   }
 
+  // Uses the given random number generator to set q and v in robot_status_.
+  // Also sets time = 0.2s.
   void SetRandomConfiguration(std::default_random_engine& generator) {
     std::normal_distribution<double> normal;
     VectorX<double> q = robot_->getRandomConfiguration(generator);
@@ -48,12 +52,54 @@ class GenericPlanTest : public ::testing::Test {
     robot_status_->UpdateKinematics(time_now, q, v);
   }
 
+  // Returns kp * (q_d - q) + kd* (v_d - v) + vd_d, where q v are from
+  // robot_status_ and kp and kd are from params_.
+  VectorX<double> ComputeExpectedDoFAcceleration(
+      const VectorX<double>& q_d, const VectorX<double>& v_d,
+      const VectorX<double>& vd_d) const {
+    VectorX<double> kp, kd;
+    params_->LookupDesiredDofMotionGains(&kp, &kd);
+
+    VectorX<double> expected_vd =
+        (kp.array() * (q_d - robot_status_->position()).array() +
+         kd.array() * (v_d - robot_status_->velocity()).array())
+            .matrix() +
+        vd_d;
+
+    return expected_vd;
+  }
+
+  // Returns a spatial acceleration using CartesianSetpoint, it is conceptually
+  // the same as ComputeExpectedDoFAcceleration(), with the exception of the
+  // rotation difference between pose_d and pose. Details are in control_utils.h
+  Vector6<double> ComputeExpectedBodyAcceleration(
+      const RigidBody<double>* body, const Isometry3<double> pose_d,
+      const Vector6<double> vel_d, const Vector6<double> acc_d) const {
+    // Finds the kp and kd gains from param.
+    Vector6<double> kp, kd;
+    params_->LookupDesiredBodyMotionGains(*body, &kp, &kd);
+    CartesianSetpoint<double> tracker(pose_d, vel_d, acc_d, kp, kd);
+
+    // Computes current body pose and velocity.
+    Isometry3<double> pose = robot_status_->robot().CalcBodyPoseInWorldFrame(
+        robot_status_->cache(), *body);
+    Vector6<double> vel =
+        robot_status_->robot().CalcBodySpatialVelocityInWorldFrame(
+            robot_status_->cache(), *body);
+
+    Vector6<double> expected_pose_acc =
+        tracker.ComputeTargetAcceleration(pose, vel);
+
+    return expected_pose_acc;
+  }
+
   std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
   std::unique_ptr<param_parsers::RigidBodyTreeAliasGroups<double>>
       alias_groups_{nullptr};
   std::unique_ptr<param_parsers::ParamSet> params_{nullptr};
   std::unique_ptr<HumanoidStatus> robot_status_{nullptr};
 
+  // Plan under test.
   std::unique_ptr<GenericPlan<double>> dut_{nullptr};
 };
 
