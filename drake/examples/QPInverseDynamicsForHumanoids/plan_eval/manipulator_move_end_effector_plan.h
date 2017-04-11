@@ -38,7 +38,19 @@ class ManipulatorMoveEndEffectorPlan : public GenericPlan<T> {
    * This function assumes that the bytes in @p message_bytes encodes a valid
    * lcmt_manipulator_plan_move_end_effector message, from which the desired
    * poses (x_i) for the end effector and timing (t_i) are extracted and used
-   * to construct a Cartesian spline.
+   * to construct a Cartesian spline. Let t_now be the time in @p robot_stauts.
+   * If t_0 = 0 (first time stamp in @p message_bytes is zero), the spline is
+   * constructed with
+   * MakeCubicLinearWithEndLinearVelocity(t_i + t_now, x_i, 0, 0), which starts
+   * immediately from x_0 regardless of what's the current planned desired
+   * pose and velocity. This introduces a discontinuity in the interpolated
+   * desired position and velocity when interpolating, which can cause large
+   * discontinuity in output and instability on robot.
+   * If t_0 > 0, the spline is constructed with
+   * MakeCubicLinearWithEndLinearVelocity({0, t_i} + t_now,
+   * {x_d_now, x_i}, xd_d_now, 0),
+   * where x_d_now and xd_d_now are the current desired pose and velocity of
+   * the end effector. This results in a smoother transition to the new plan.
    */
   void HandlePlanMessageGenericPlanDerived(
       const HumanoidStatus& robot_stauts,
