@@ -68,6 +68,9 @@ class ManipPlanTest : public GenericPlanTest {
     std::default_random_engine generator(123);
     AllocateRescourse(kModelPath, kAliasGroupsPath, kControlConfigPath);
     SetRandomConfiguration(generator);
+
+    ee_body_ = alias_groups_->get_body(
+        ManipulatorMoveEndEffectorPlan<double>::kEndEffectorAliasGroupName);
   }
 
   // Checks that @p qp_input matches (the modes and weights are specified in
@@ -115,6 +118,19 @@ class ManipPlanTest : public GenericPlanTest {
     }
   }
   */
+
+  Isometry3<double> get_end_effector_pose() const {
+    return robot_status_->robot().CalcBodyPoseInWorldFrame(
+        robot_status_->cache(), *ee_body_);
+  }
+
+  Vector6<double> get_end_effector_velocity() const {
+    return robot_status_->robot().CalcBodySpatialVelocityInWorldFrame(
+        robot_status_->cache(), *ee_body_);
+  }
+
+  // End effector body pointer.
+  const RigidBody<double>* ee_body_;
 };
 
 // Test HandlePlanMessageGenericPlanDerived().
@@ -199,9 +215,61 @@ TEST_F(ManipPlanTest, MoveJointsHandleMessageTest) {
     // Tolerance is low because the knot points are stored as floats in the
     // lcm message..
     EXPECT_TRUE(
-        expected_trajs.is_approx(dut_->get_dof_trajectory(), 1e-7));
+        expected_trajs.is_approx(dut_->get_dof_trajectory(), 1e-3));
   }
 }
+
+TEST_F(ManipPlanTest, MoveEndEffectorInitializeTest) {
+  dut_ = std::make_unique<ManipulatorMoveEndEffectorPlan<double>>();
+  dut_->Initialize(*robot_status_, *params_, *alias_groups_);
+
+  // There should be no contacts, 1 tracked body for move end effector plan.
+  EXPECT_TRUE(dut_->get_planned_contact_state().empty());
+  EXPECT_EQ(dut_->get_body_trajectories().size(), 1);
+
+  // The desired position interpolated at any time should be equal to the
+  // current posture.
+  // The desired velocity and acceleration should be zero.
+  std::vector<double> test_times = {robot_status_->time() - 0.5,
+                                    robot_status_->time(),
+                                    robot_status_->time() + 3};
+
+  const PiecewiseCartesianTrajectory<double>& ee_traj =
+      dut_->get_body_trajectory(ee_body_);
+  const Isometry3<double> ee_pose = get_end_effector_pose();
+
+  for (double time : test_times) {
+    // Dof trajectory.
+    EXPECT_TRUE(
+        drake::CompareMatrices(robot_status_->position(),
+                               dut_->get_dof_trajectory().get_position(time),
+                               1e-12, drake::MatrixCompareType::absolute));
+
+    EXPECT_TRUE(drake::CompareMatrices(
+        VectorX<double>::Zero(robot_->get_num_velocities()),
+        dut_->get_dof_trajectory().get_velocity(time), 1e-12,
+        drake::MatrixCompareType::absolute));
+
+    EXPECT_TRUE(drake::CompareMatrices(
+        VectorX<double>::Zero(robot_->get_num_velocities()),
+        dut_->get_dof_trajectory().get_acceleration(time), 1e-12,
+        drake::MatrixCompareType::absolute));
+
+    // End effector trajectory.
+    EXPECT_TRUE(drake::CompareMatrices(ee_pose.matrix(),
+                                       ee_traj.get_pose(time).matrix(), 1e-12,
+                                       drake::MatrixCompareType::absolute));
+
+    EXPECT_TRUE(drake::CompareMatrices(Vector6<double>::Zero(),
+                                       ee_traj.get_velocity(time), 1e-12,
+                                       drake::MatrixCompareType::absolute));
+
+    EXPECT_TRUE(drake::CompareMatrices(Vector6<double>::Zero(),
+                                       ee_traj.get_acceleration(time), 1e-12,
+                                       drake::MatrixCompareType::absolute));
+  }
+}
+
 
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
