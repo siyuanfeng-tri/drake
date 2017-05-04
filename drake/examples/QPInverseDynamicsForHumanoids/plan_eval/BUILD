@@ -17,6 +17,25 @@ package(
 )
 
 drake_cc_library(
+    name = "humanoid_plan",
+    srcs = [
+        "humanoid_manipulation_plan.cc",
+        "humanoid_plan.cc",
+    ],
+    hdrs = [
+        "humanoid_manipulation_plan.h",
+        "humanoid_plan.h",
+    ],
+    deps = [
+        ":generic_plan",
+        "//drake/examples/QPInverseDynamicsForHumanoids:lcm_utils",
+        "//drake/systems/controllers:zmp_planner",
+        "//drake/util:util",
+        "@robotlocomotion_lcmtypes//:lib",
+    ],
+)
+
+drake_cc_library(
     name = "generic_plan",
     srcs = [
         "generic_plan.cc",
