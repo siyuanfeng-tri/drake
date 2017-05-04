@@ -18,6 +18,12 @@ using std::make_unique;
 namespace {
 constexpr int kStateIndexMessage = 0;
 constexpr int kStateIndexMessageCount = 1;
+
+struct RawMessage {
+  int message_count;
+  std::vector<uint8_t> message;
+};
+
 }  // namespace
 
 // TODO(jwnimmer-tri) The "serializer xor translator" disjoint implementations
@@ -72,12 +78,22 @@ LcmSubscriberSystem::~LcmSubscriberSystem() {}
 
 void LcmSubscriberSystem::SetDefaultState(const Context<double>& context,
                                           State<double>* state) const {
+  RawMessage msg;
+  std::unique_lock<std::mutex> lock(received_message_mutex_);
+  msg.message_count = received_message_count_;
+  msg.message = received_message_;
+  lock.unlock();
+
+  Value<RawMessage> abs_msg(msg);
+
   if (translator_ != nullptr) {
     DRAKE_DEMAND(serializer_ == nullptr);
-    ProcessMessageAndStoreToDiscreteState(state->get_mutable_discrete_state());
+    ProcessMessageAndStoreToDiscreteState(
+        abs_msg, state->get_mutable_discrete_state());
   } else {
     DRAKE_DEMAND(translator_ == nullptr);
-    ProcessMessageAndStoreToAbstractState(state->get_mutable_abstract_state());
+    ProcessMessageAndStoreToAbstractState(
+        abs_msg, state->get_mutable_abstract_state());
   }
 }
 
@@ -86,33 +102,34 @@ void LcmSubscriberSystem::SetDefaultState(const Context<double>& context,
 // However, this computational concern will not exist once caching is properly
 // implemented and in place. Same for ProcessMessageAndStoreToAbstractState()
 void LcmSubscriberSystem::ProcessMessageAndStoreToDiscreteState(
-    DiscreteValues<double>* discrete_state) const {
+    const AbstractValue& msg, DiscreteValues<double>* discrete_state) const {
   DRAKE_ASSERT(translator_ != nullptr);
   DRAKE_ASSERT(serializer_ == nullptr);
 
-  std::lock_guard<std::mutex> lock(received_message_mutex_);
-  if (!received_message_.empty()) {
+  const RawMessage& raw_msg = msg.GetValue<RawMessage>();
+  discrete_state->get_mutable_vector(kStateIndexMessageCount)
+      ->SetAtIndex(0, raw_msg.message_count);
+  if (!raw_msg.message.empty()) {
     translator_->Deserialize(
-        received_message_.data(), received_message_.size(),
+        raw_msg.message.data(), raw_msg.message.size(),
         discrete_state->get_mutable_vector(kStateIndexMessage));
   }
-  discrete_state->get_mutable_vector(kStateIndexMessageCount)
-      ->SetAtIndex(0, received_message_count_);
 }
 
 void LcmSubscriberSystem::ProcessMessageAndStoreToAbstractState(
+    const AbstractValue& msg,
     AbstractValues* abstract_state) const {
   DRAKE_ASSERT(translator_ == nullptr);
   DRAKE_ASSERT(serializer_ != nullptr);
 
-  std::lock_guard<std::mutex> lock(received_message_mutex_);
-  if (!received_message_.empty()) {
+  const RawMessage& raw_msg = msg.GetValue<RawMessage>();
+  abstract_state->get_mutable_value(kStateIndexMessageCount).
+      GetMutableValue<int>() = raw_msg.message_count;
+  if (!raw_msg.message.empty()) {
     serializer_->Deserialize(
-        received_message_.data(), received_message_.size(),
+        raw_msg.message.data(), raw_msg.message.size(),
         &abstract_state->get_mutable_value(kStateIndexMessage));
   }
-  abstract_state->get_mutable_value(kStateIndexMessageCount).
-      GetMutableValue<int>() = received_message_count_;
 }
 
 void LcmSubscriberSystem::DoCalcNextUpdateTime(
@@ -135,11 +152,17 @@ void LcmSubscriberSystem::DoCalcNextUpdateTime(
   if (last_message_count != received_message_count_) {
     // TODO(siyuan): should be context.get_time() once #5725 is resolved.
     *time = context.get_time() + 0.0001;
+    RawMessage msg;
+    msg.message_count = received_message_count_;
+    msg.message = received_message_;
+    auto trigger = std::make_unique<Trigger>(Trigger::TriggerType::kTimed,
+        AbstractValue::Make<RawMessage>(msg));
+
     if (translator_ == nullptr) {
-      UnrestrictedUpdateEvent<double> event(Trigger::TriggerType::kTimed);
+      UnrestrictedUpdateEvent<double> event(std::move(trigger));
       event.add_to_combined(events);
     } else {
-      DiscreteUpdateEvent<double> event(Trigger::TriggerType::kTimed);
+      DiscreteUpdateEvent<double> event(std::move(trigger));
       event.add_to_combined(events);
     }
   } else {

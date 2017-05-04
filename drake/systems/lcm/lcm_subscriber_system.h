@@ -147,7 +147,10 @@ class LcmSubscriberSystem : public LeafSystem<double>,
   void DoCalcUnrestrictedUpdate(const Context<double>& context,
       const std::vector<const UnrestrictedUpdateEvent<double>*>& events,
       State<double>* state) const override {
-    ProcessMessageAndStoreToAbstractState(state->get_mutable_abstract_state());
+    DRAKE_DEMAND(events.size() == 1);
+    ProcessMessageAndStoreToAbstractState(
+        *(events.front()->get_trigger().get_data()),
+        state->get_mutable_abstract_state());
   }
 
   std::unique_ptr<AbstractValues> AllocateAbstractState() const override;
@@ -155,7 +158,9 @@ class LcmSubscriberSystem : public LeafSystem<double>,
   void DoCalcDiscreteVariableUpdates(const Context<double>& context,
       const std::vector<const DiscreteUpdateEvent<double>*>& events,
       DiscreteValues<double>* discrete_state) const override {
-    ProcessMessageAndStoreToDiscreteState(discrete_state);
+    DRAKE_DEMAND(events.size() == 1);
+    ProcessMessageAndStoreToDiscreteState(
+        *(events.front()->get_trigger().get_data()), discrete_state);
   }
 
   std::unique_ptr<DiscreteValues<double>> AllocateDiscreteState()
@@ -172,9 +177,11 @@ class LcmSubscriberSystem : public LeafSystem<double>,
                       drake::lcm::DrakeLcmInterface* lcm);
 
   void ProcessMessageAndStoreToDiscreteState(
+      const AbstractValue& msg,
       DiscreteValues<double>* discrete_state) const;
 
   void ProcessMessageAndStoreToAbstractState(
+      const AbstractValue& msg,
       AbstractValues* abstract_state) const;
 
   // Callback entry point from LCM into this class. Also wakes up one thread
