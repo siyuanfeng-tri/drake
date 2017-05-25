@@ -1,0 +1,8 @@
+package drake;
+
+struct lcmt_contact_state {
+  int64_t timestamp;
+
+  int32_t num_bodies_in_contact;
+  lcmt_contact_information bodies_in_contact[num_bodies_in_contact];
+}

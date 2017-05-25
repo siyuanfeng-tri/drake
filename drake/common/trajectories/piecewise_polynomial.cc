@@ -264,13 +264,6 @@ bool PiecewisePolynomial<CoefficientType>::isApprox(
 }
 
 template <typename CoefficientType>
-void PiecewisePolynomial<CoefficientType>::shiftRight(double offset) {
-  for (auto it = breaks.begin(); it != breaks.end(); ++it) {
-    *it += offset;
-  }
-}
-
-template <typename CoefficientType>
 void PiecewisePolynomial<CoefficientType>::setPolynomialMatrixBlock(
     const typename PiecewisePolynomial<CoefficientType>::PolynomialMatrix&
         replacement,

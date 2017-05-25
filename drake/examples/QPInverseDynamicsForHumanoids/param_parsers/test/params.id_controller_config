@@ -133,16 +133,34 @@ contact {
         y: 0.05
         z: -0.09
     }
+    contact_normal {
+        x: 0
+        y: 0
+        z: 1
+    }
+
     contact_point {
         x: 0.2
         y: -0.05
         z: -0.09
     }
+    contact_normal {
+        x: 0
+        y: 0
+        z: 1
+    }
+
     contact_point {
         x: -0.05
         y: -0.05
         z: -0.09
     }
+    contact_normal {
+        x: 0
+        y: 0
+        z: 1
+    }
+
     contact_point {
         x: -0.05
         y: 0.05

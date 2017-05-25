@@ -1,0 +1,16 @@
+package drake;
+
+struct lcmt_dof_keyframe {
+  // Time in milliseconds.
+  int64_t timestamp;
+
+  // TODO: support floating base.
+  // Assumes that this is in the generalized coordinate order.
+  int32_t num_dof;
+  double position[num_dof];
+  double velocity[num_dof];
+  double acceleration[num_dof];
+
+  // TODO: we probably need to better define these.
+  int32_t constraint_mode[num_dof];
+}

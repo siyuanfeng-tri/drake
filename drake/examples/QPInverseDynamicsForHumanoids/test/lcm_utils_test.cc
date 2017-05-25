@@ -105,7 +105,8 @@ static void TestEncodeContactInformation(const ContactInformation& info,
             info.num_basis_per_contact_point());
   TestEigenMatrixAndStdVectorOfStdVector(info.contact_points(),
                                          msg.contact_points);
-  TestEigenVectorAndCArray(info.normal(), msg.normal);
+  TestEigenMatrixAndStdVectorOfStdVector(info.contact_normals(),
+                                         msg.contact_normals);
   EXPECT_DOUBLE_EQ(msg.mu, info.mu());
   EXPECT_DOUBLE_EQ(msg.Kd, info.Kd());
   EXPECT_DOUBLE_EQ(msg.weight, info.weight());
@@ -343,7 +344,7 @@ TEST_F(LcmUtilsTests, TestEncodeDecodeQpInput) {
   contact.mutable_weight() = -1;
   contact.mutable_acceleration_constraint_type() = ConstraintType::Hard;
   contact.mutable_Kd() = 1;
-  contact.mutable_normal() = Vector3<double>(3, 2, 1).normalized();
+  contact.mutable_contact_normals() = Vector3<double>(3, 2, 1).normalized();
   qp_input.mutable_contact_information().emplace("leftFoot", contact);
 
   DesiredBodyMotion pelv_motion(*tree_->FindBody("pelvis"));

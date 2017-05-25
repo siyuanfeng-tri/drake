@@ -35,6 +35,8 @@ class PiecewiseFunction {
 
   double getEndTime() const;
 
+  void shiftRight(double offset);
+
   /**
    * Returns true iff `t >= getStartTime() && t <= getEndTime()`.
    */

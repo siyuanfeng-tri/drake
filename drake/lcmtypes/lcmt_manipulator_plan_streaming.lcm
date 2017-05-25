@@ -1,0 +1,15 @@
+package drake;
+
+struct lcmt_manipulator_plan_streaming
+{
+  // Time steps in microseconds.
+  int64_t timestamp;
+
+  int32_t num_joints;
+
+  // In the order of the generalized coordinate.
+  // Assuming the size of position is the same as velocity.
+  double desired_position[num_joints];
+  double desired_velocity[num_joints];
+  double desired_acceleration[num_joints];
+}

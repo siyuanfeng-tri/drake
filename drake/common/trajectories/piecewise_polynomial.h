@@ -312,8 +312,6 @@ class PiecewisePolynomial final : public PiecewisePolynomialBase {
    */
   bool isApprox(const PiecewisePolynomial& other, double tol) const;
 
-  void shiftRight(double offset);
-
   void setPolynomialMatrixBlock(const PolynomialMatrix& replacement,
                                 int segment_number, Eigen::Index row_start = 0,
                                 Eigen::Index col_start = 0);

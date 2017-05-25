@@ -1,0 +1,12 @@
+package drake;
+
+struct lcmt_dof_trajectory {
+  // Time in milliseconds.
+  int64_t timestamp;
+
+  int32_t num_knots;
+  lcmt_dof_keyframe knots[num_knots];
+
+  // TODO: we probably need to better define these.
+  int32_t interpolation_mode[num_knots];
+}

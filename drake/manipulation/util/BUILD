@@ -23,6 +23,40 @@ drake_cc_library(
 )
 
 drake_cc_library(
+    name = "cartesian_trajectory_translator",
+    srcs = ["cartesian_trajectory_translator.cc"],
+    hdrs = ["cartesian_trajectory_translator.h"],
+    deps = [
+        ":trajectory_utils",
+        "//drake/lcmtypes:cartesian_trajectory",
+        "//drake/util:lcm_util",
+    ],
+)
+
+drake_cc_library(
+    name = "dof_trajectory_translator",
+    srcs = ["dof_trajectory_translator.cc"],
+    hdrs = ["dof_trajectory_translator.h"],
+    deps = [
+        ":trajectory_utils",
+        "//drake/lcmtypes:dof_trajectory",
+        "//drake/util:util",
+    ],
+)
+
+drake_cc_library(
+    name = "motion_plan_translator",
+    srcs = ["motion_plan_translator.cc"],
+    hdrs = ["motion_plan_translator.h"],
+    deps = [
+        ":dof_trajectory_translator",
+        ":cartesian_trajectory_translator",
+        "//drake/lcmtypes:motion_plan",
+        "//drake/util:util",
+    ],
+)
+
+drake_cc_library(
     name = "trajectory_utils",
     srcs = [
         "trajectory_utils.cc",

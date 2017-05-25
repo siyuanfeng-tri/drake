@@ -252,6 +252,11 @@ class ContactInformation {
 
   /// @name Accessors
   /// @{
+  inline const Vector3<double>& desired_force() const { return desired_force_; }
+  inline Vector3<double>& mutable_desired_force() { return desired_force_; }
+  inline const Vector3<double>& desired_force_weight() const { return desired_force_weight_; }
+  inline Vector3<double>& mutable_desired_force_weight() { return desired_force_weight_; }
+
   inline double mu() const { return mu_; }
   inline double weight() const { return weight_; }
   inline double Kd() const { return Kd_; }
@@ -262,20 +267,25 @@ class ContactInformation {
     return contact_points_;
   }
 
-  inline const Vector3<double>& normal() const { return normal_; }
+  inline const Matrix3X<double>& contact_normals() const {
+    return contact_normals_;
+  }
+
   inline const RigidBody<double>& body() const { return *body_; }
   inline int num_basis_per_contact_point() const {
     return num_basis_per_contact_point_;
   }
 
   inline Matrix3X<double>& mutable_contact_points() { return contact_points_; }
+  inline Matrix3X<double>& mutable_contact_normals() {
+    return contact_normals_;
+  }
   inline double& mutable_mu() { return mu_; }
   inline double& mutable_weight() { return weight_; }
   inline double& mutable_Kd() { return Kd_; }
   inline ConstraintType& mutable_acceleration_constraint_type() {
     return acceleration_constraint_type_;
   }
-  inline Vector3<double>& mutable_normal() { return normal_; }
   inline int& mutable_num_basis_per_contact_point() {
     return num_basis_per_contact_point_;
   }
@@ -288,11 +298,11 @@ class ContactInformation {
   const RigidBody<double>* body_;
   // Offsets of the contact point specified in the body frame.
   Matrix3X<double> contact_points_;
+  // Specified in the body frame.
+  Matrix3X<double> contact_normals_;
 
-  // TODO(siyuan.feng): Normal is currently assumed to be the same for all
-  // the contact points.
-  // Contact normal specified in the body frame.
-  Vector3<double> normal_;
+  Vector3<double> desired_force_{Vector3<double>::Zero()};
+  Vector3<double> desired_force_weight_{Vector3<double>::Zero()};
 
   int num_basis_per_contact_point_;
 
@@ -436,6 +446,41 @@ class DesiredCentroidalMomentumDot : public ConstrainedValues {
 std::ostream& operator<<(std::ostream& out,
                          const DesiredCentroidalMomentumDot& input);
 
+
+class ManipulationObjective {
+ public:
+  ManipulationObjective(const RigidBody<double>& object,
+      const std::vector<const RigidBody<double>*>& robot_bodies_in_contact,
+      const RigidBody<double>& world);
+
+  bool is_static() const { return static_object_; }
+
+  const DesiredBodyMotion& get_desired_motion() const { return desired_motion_; }
+
+  const DesiredCentroidalMomentumDot&
+  get_desired_centroidal_momentum_dot() const {
+    return desired_centroidal_momentum_dot_;
+  }
+
+  const std::unordered_map<const RigidBody<double>*, ContactInformation>&
+  get_robot_contacts() const {
+    return robot_contacts_;
+  }
+
+  const ContactInformation& get_world_contact() const {
+    return world_contact_;
+  }
+
+ private:
+  bool static_object_;
+  DesiredBodyMotion desired_motion_;
+  DesiredCentroidalMomentumDot desired_centroidal_momentum_dot_;
+
+  std::unordered_map<const RigidBody<double>*, ContactInformation> robot_contacts_;
+  ContactInformation world_contact_;
+};
+
+
 /**
  * Input to the QP inverse dynamics controller.
  */
@@ -502,6 +547,9 @@ class QpInput {
   /// @}
 
  private:
+  // Manipulation objectives.
+  std::unordered_map<std::string, ManipulationObjective> manipulation_objectives_;
+
   // Contact information
   std::unordered_map<std::string, ContactInformation> contact_info_;
 

@@ -86,6 +86,69 @@ GTEST_TEST(testQPInverseDynamicsController, testForIiwa) {
                                      1e-9, drake::MatrixCompareType::absolute));
 }
 
+GTEST_TEST(testQPInverseDynamicsController, applyFixedAmountOfForce) {
+  std::string urdf = drake::GetDrakePath() +
+                     "/manipulation/models/iiwa_description/urdf/"
+                     "iiwa14_polytope_collision.urdf";
+  std::string alias_groups_config = drake::GetDrakePath() +
+                                    "/examples/QPInverseDynamicsForHumanoids/"
+                                    "config/iiwa.alias_groups";
+  std::string controller_config = drake::GetDrakePath() +
+                                  "/examples/QPInverseDynamicsForHumanoids/"
+                                  "config/iiwa.id_controller_config";
+
+  auto robot = std::make_unique<RigidBodyTree<double>>();
+  parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
+      urdf, multibody::joints::kFixed, robot.get());
+
+  param_parsers::RigidBodyTreeAliasGroups<double> alias_groups(*robot);
+  alias_groups.LoadFromFile(alias_groups_config);
+
+  param_parsers::ParamSet paramset;
+  paramset.LoadFromFile(controller_config, alias_groups);
+
+  HumanoidStatus robot_status(*robot, alias_groups);
+
+  QPController con;
+  std::vector<std::string> contact_group_names = {"flange"};
+  std::vector<std::string> tracked_body_names = {};
+  QpInput input = paramset.MakeQpInput(
+      contact_group_names, tracked_body_names, alias_groups);
+  std::cout << input;
+
+  // TODO: dont make these manually.
+  input.mutable_contact_information().at("iiwa_link_ee").mutable_desired_force() =
+      Vector3<double>(-10, 0, 0);
+  input.mutable_contact_information().at("iiwa_link_ee").mutable_desired_force_weight() =
+      Vector3<double>(10, 10, 10);
+
+  QpOutput output(GetDofNames(*robot));
+
+  // Sets up desired q and v.
+  VectorX<double> q = VectorX<double>::Zero(robot->get_num_positions());
+  VectorX<double> v = VectorX<double>::Zero(robot->get_num_velocities());
+
+  q[1] = 45. / 180. * M_PI;
+  q[3] = -q[1];
+
+  robot_status.Update(0, q, v,
+                      VectorX<double>::Zero(robot->get_num_actuators()),
+                      Vector6<double>::Zero(), Vector6<double>::Zero());
+
+  input.mutable_desired_dof_motions().mutable_values().setZero();
+
+  // Calls inverse dynamics controller.
+  std::cout << input;
+  int status = con.Control(robot_status, input, &output);
+  EXPECT_EQ(status, 0);
+
+  EXPECT_TRUE(drake::CompareMatrices(input.desired_dof_motions().values(),
+                                     output.vd(), 1e-9,
+                                     drake::MatrixCompareType::absolute));
+
+  std::cout << output;
+}
+
 }  // namespace qp_inverse_dynamics
 }  // namespace examples
 }  // namespace drake

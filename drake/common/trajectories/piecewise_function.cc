@@ -26,6 +26,12 @@ PiecewiseFunction::~PiecewiseFunction() {
   // empty
 }
 
+void PiecewiseFunction::shiftRight(double offset) {
+  for (auto it = breaks.begin(); it != breaks.end(); ++it) {
+    *it += offset;
+  }
+}
+
 bool PiecewiseFunction::isTimeInRange(double time) const {
   return (time >= getStartTime() && time <= getEndTime());
 }

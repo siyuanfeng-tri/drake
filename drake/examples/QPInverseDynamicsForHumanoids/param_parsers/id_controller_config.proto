@@ -60,7 +60,7 @@ message ContactConfig {
 
     // The contact point and norm are specified in the body frame.
     repeated Vec3 contact_point = 5;
-    Vec3 contact_normal = 6;
+    repeated Vec3 contact_normal = 6;
 
     // Number of basis vectors used to approximate the friction cone.
     int32 num_basis_per_contact_point = 7;

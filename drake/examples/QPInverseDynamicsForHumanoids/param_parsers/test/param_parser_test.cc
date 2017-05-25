@@ -53,18 +53,29 @@ TEST_F(ParamParserTests, ContactInformation) {
   // Contacts:
   //   default:
   //     weight: 1e5
-  //     contact_points: [0, 0, 0]
+  //     contact_point: [0, 0, 0]
   //     Kd: 8
   //     mu: 1
   //     num_basis_per_contact_point: 3
-  //     normal: [0, 0, 1]
+  //     contact_normal: [0, 0, 1]
   //
   //   left_foot:
-  //     contact_points:
-  //       [[0.2, 0.05, -0.09],
-  //       [0.2, -0.05, -0.09],
-  //       [-0.05, -0.05, -0.09],
-  //       [-0.05, 0.05, -0.09]]
+  //     contact_point:
+  //       [0.2, 0.05, -0.09]
+  //     contact_point:
+  //       [0.2, -0.05, -0.09]
+  //     contact_point:
+  //       [-0.05, -0.05, -0.09]
+  //     contact_point:
+  //       [-0.05, 0.05, -0.09]
+  //     contact_normal:
+  //       [0, 0, 1]
+  //     contact_normal:
+  //       [0, 0, 1]
+  //     contact_normal:
+  //       [0, 0, 1]
+  //     contact_normal:
+  //       [0, 0, 1]
   //     num_basis_per_contact_point: 5
   //     weight: -1
   std::unordered_map<std::string, ContactInformation> contacts =
@@ -78,8 +89,6 @@ TEST_F(ParamParserTests, ContactInformation) {
     EXPECT_EQ(contact.num_basis_per_contact_point(), 5);
     EXPECT_EQ(contact.weight(), -1);
     EXPECT_EQ(contact.acceleration_constraint_type(), ConstraintType::Hard);
-    EXPECT_TRUE(CompareMatrices(contact.normal(), Vector3<double>(0, 0, 1),
-                                kTolerance, MatrixCompareType::absolute));
     EXPECT_EQ(contact.contact_points().cols(), 4);
     EXPECT_TRUE(CompareMatrices(contact.contact_points().col(0),
                                 Vector3<double>(0.2, 0.05, -0.09), kTolerance,
@@ -93,6 +102,11 @@ TEST_F(ParamParserTests, ContactInformation) {
     EXPECT_TRUE(CompareMatrices(contact.contact_points().col(3),
                                 Vector3<double>(-0.05, 0.05, -0.09), kTolerance,
                                 MatrixCompareType::absolute));
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_TRUE(CompareMatrices(contact.contact_normals().col(i),
+                                  Vector3<double>::UnitZ(), kTolerance,
+                                  MatrixCompareType::absolute));
+    }
   }
 
   {
@@ -104,11 +118,12 @@ TEST_F(ParamParserTests, ContactInformation) {
     EXPECT_EQ(contact.num_basis_per_contact_point(), 3);
     EXPECT_EQ(contact.weight(), 1e5);
     EXPECT_EQ(contact.acceleration_constraint_type(), ConstraintType::Soft);
-    EXPECT_TRUE(CompareMatrices(contact.normal(), Vector3<double>(0, 0, 1),
-                                kTolerance, MatrixCompareType::absolute));
     EXPECT_EQ(contact.contact_points().cols(), 1);
     EXPECT_TRUE(CompareMatrices(contact.contact_points().col(0),
                                 Vector3<double>::Zero(), kTolerance,
+                                MatrixCompareType::absolute));
+    EXPECT_TRUE(CompareMatrices(contact.contact_normals().col(0),
+                                Vector3<double>::UnitZ(), kTolerance,
                                 MatrixCompareType::absolute));
   }
 
@@ -347,11 +362,12 @@ TEST_F(ParamParserTests, MakeQpInputFromGroupNames) {
   EXPECT_EQ(contact.num_basis_per_contact_point(), 3);
   EXPECT_EQ(contact.weight(), 1e5);
   EXPECT_EQ(contact.acceleration_constraint_type(), ConstraintType::Soft);
-  EXPECT_TRUE(CompareMatrices(contact.normal(), Vector3<double>(0, 0, 1),
-                              kTolerance, MatrixCompareType::absolute));
   EXPECT_EQ(contact.contact_points().cols(), 1);
   EXPECT_TRUE(CompareMatrices(contact.contact_points().col(0),
                               Vector3<double>::Zero(), kTolerance,
+                              MatrixCompareType::absolute));
+  EXPECT_TRUE(CompareMatrices(contact.contact_normals().col(0),
+                              Vector3<double>::UnitZ(), kTolerance,
                               MatrixCompareType::absolute));
 
   // Tests for contact force basis regularization.

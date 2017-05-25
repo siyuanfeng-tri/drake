@@ -37,18 +37,23 @@ const ParamType& FindParam(
 }
 
 ContactParam ParseContactParam(const ContactConfig& config) {
+  DRAKE_DEMAND(config.contact_point_size() == config.contact_normal_size());
+
   ContactParam param;
 
   param.name = config.name();
   param.contact_points.resize(3, config.contact_point_size());
+  param.contact_normals.resize(3, config.contact_normal_size());
   for (int i = 0; i < config.contact_point_size(); ++i) {
     param.contact_points.col(i) = Vector3<double>(config.contact_point(i).x(),
                                                   config.contact_point(i).y(),
                                                   config.contact_point(i).z());
+    param.contact_normals.col(i) =
+        Vector3<double>(config.contact_normal(i).x(),
+                        config.contact_normal(i).y(),
+                        config.contact_normal(i).z());
+    param.contact_normals.col(i).normalize();
   }
-  param.normal =
-      Vector3<double>(config.contact_normal().x(), config.contact_normal().y(),
-                      config.contact_normal().z());
   param.num_basis_per_contact_point = config.num_basis_per_contact_point();
   param.mu = config.mu();
   param.kd = config.kd();
@@ -167,7 +172,9 @@ std::ostream& operator<<(std::ostream& out, const ContactParam& param) {
   out << "  contact_points:\n";
   for (int i = 0; i < param.contact_points.cols(); ++i)
     out << "    " << param.contact_points.col(i).transpose() << "\n";
-  out << "  normal: " << param.normal.transpose() << "\n";
+  out << "  contact_normals:\n";
+  for (int i = 0; i < param.contact_normals.cols(); ++i)
+    out << "    " << param.contact_normals.col(i).transpose() << "\n";
   out << "  num_basis_per_contact_point: " << param.num_basis_per_contact_point
       << "\n";
   out << "  mu: " << param.mu << "\n";
@@ -271,7 +278,7 @@ ContactInformation ParamSet::MakeContactInformationFromParam(
   } else {
     contact.mutable_acceleration_constraint_type() = ConstraintType::Skip;
   }
-  contact.mutable_normal() = param.normal.normalized();
+  contact.mutable_contact_normals() = param.contact_normals;
   contact.mutable_mu() = param.mu;
   contact.mutable_Kd() = param.kd;
 

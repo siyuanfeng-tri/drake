@@ -107,7 +107,6 @@ ContactInformation::ContactInformation(const RigidBody<double>& body,
     : body_(&body),
       num_basis_per_contact_point_(num_basis),
       acceleration_constraint_type_(ConstraintType::Hard) {
-  normal_ = Vector3<double>(0, 0, 1);
   mu_ = 1;
   if (num_basis_per_contact_point_ < 3)
     throw std::runtime_error("Number of basis per contact point must be >= 3.");
@@ -125,23 +124,25 @@ MatrixX<double> ContactInformation::ComputeBasisMatrix(
   Vector3<double> t1, t2, tangent_vec, base;
   double theta;
 
-  // Computes the tangent vectors that are perpendicular to normal_.
-  if (std::abs(1 - normal_[2]) < Eigen::NumTraits<double>::epsilon()) {
-    t1 << 1, 0, 0;
-  } else if (std::abs(1 + normal_[2]) < Eigen::NumTraits<double>::epsilon()) {
-    // same for the reflected case
-    t1 << -1, 0, 0;
-  } else {
-    t1 << normal_[1], -normal_[0], 0;
-    t1 /= sqrt(normal_[1] * normal_[1] + normal_[0] * normal_[0]);
-  }
-  t2 = t1.cross(normal_);
-
   for (int i = 0; i < contact_points_.cols(); ++i) {
+    const auto normal = contact_normals_.col(i);
+    // Computes the tangent vectors that are perpendicular to normal.
+    if (std::abs(1 - normal[2]) < Eigen::NumTraits<double>::epsilon()) {
+      t1 << 1, 0, 0;
+    } else if (std::abs(1 + normal[2]) < Eigen::NumTraits<double>::epsilon()) {
+      // same for the reflected case
+      t1 << -1, 0, 0;
+    } else {
+      t1 << normal[1], -normal[0], 0;
+      t1 /= sqrt(normal[1] * normal[1] + normal[0] * normal[0]);
+    }
+    t2 = t1.cross(normal);
+
     for (int k = 0; k < num_basis_per_contact_point_; ++k) {
+
       theta = k * 2 * M_PI / num_basis_per_contact_point_;
       tangent_vec = cos(theta) * t1 + sin(theta) * t2;
-      base = (normal_ + mu_ * tangent_vec).normalized();
+      base = (normal + mu_ * tangent_vec).normalized();
       // Rotate basis into world frame.
       basis.block(3 * i, num_basis_per_contact_point_ * i + k, 3, 1) =
           body_rot * base;
@@ -230,8 +231,11 @@ VectorX<double> ContactInformation::ComputeLinearVelocityAtContactPoints(
 }
 
 bool ContactInformation::is_valid() const {
-  if (std::abs(normal_.norm() - 1) >= Eigen::NumTraits<double>::epsilon()) {
-    return false;
+  for (int i = 0; i < contact_normals_.cols(); ++i) {
+    if (std::abs(contact_normals_.col(i).norm() - 1) >=
+        Eigen::NumTraits<double>::epsilon()) {
+      return false;
+    }
   }
   if (!contact_points_.allFinite()) {
     return false;
@@ -263,7 +267,7 @@ bool ContactInformation::operator==(const ContactInformation& other) const {
   if (!contact_points_.isApprox(other.contact_points_)) {
     return false;
   }
-  if (!normal_.isApprox(other.normal_)) {
+  if (!contact_normals_.isApprox(other.contact_normals_)) {
     return false;
   }
   if (num_basis_per_contact_point_ != other.num_basis_per_contact_point_) {
@@ -290,7 +294,10 @@ std::ostream& operator<<(std::ostream& out, const ContactInformation& contact) {
       << "\n";
   for (int j = 0; j < contact.contact_points().cols(); ++j)
     out << contact.contact_points().col(j).transpose() << "\n";
-  out << "normal in body frame: " << contact.normal().transpose() << "\n";
+  out << "contact normals in body frame: "
+      << "\n";
+  for (int j = 0; j < contact.contact_points().cols(); ++j)
+    out << contact.contact_normals().col(j).transpose() << "\n";
   out << "mu: " << contact.mu() << "\n";
   out << contact.acceleration_constraint_type();
   out << "weight: " << contact.weight() << "\n";
@@ -369,6 +376,17 @@ std::ostream& operator<<(std::ostream& out,
   }
   return out;
 }
+
+ManipulationObjective::ManipulationObjective(const RigidBody<double>& object,
+    const std::vector<const RigidBody<double>*>& robot_bodies_in_contact,
+    const RigidBody<double>& world)
+    : desired_motion_(DesiredBodyMotion(object)),
+      world_contact_(ContactInformation(world)) {
+  for (const RigidBody<double>* body : robot_bodies_in_contact) {
+    robot_contacts_.emplace(body, ContactInformation(*body));
+  }
+}
+
 
 bool QpInput::is_valid(int num_vd) const {
   if (num_vd != desired_dof_motions_.size()) {

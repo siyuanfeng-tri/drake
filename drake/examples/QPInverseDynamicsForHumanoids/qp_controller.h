@@ -57,6 +57,9 @@ class QPController {
   MatrixX<double> JB_;
   VectorX<double> point_forces_;
 
+  MatrixX<double> summed_contact_forces_;
+  VectorX<double> desired_contact_forces_;
+
   MatrixX<double> mass_matrix_;
   VectorX<double> dynamics_bias_;
 
@@ -123,6 +126,8 @@ class QPController {
   drake::solvers::LinearConstraint* ineq_torque_limit_{nullptr};
 
   std::vector<drake::solvers::QuadraticCost*> cost_contacts_;
+  drake::solvers::QuadraticCost* cost_contacts_forces_;
+
   drake::solvers::QuadraticCost* cost_cen_mom_dot_{nullptr};
   std::vector<drake::solvers::QuadraticCost*> cost_body_motion_;
   drake::solvers::QuadraticCost* cost_dof_motion_{nullptr};

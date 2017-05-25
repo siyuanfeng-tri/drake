@@ -37,15 +37,22 @@ drake_cc_library(
 drake_cc_library(
     name = "manipulator_plans",
     srcs = [
+        "manipulator_plan.cc",
         "manipulator_move_end_effector_plan.cc",
+        "manipulator_streaming_plan.cc",
     ],
     hdrs = [
+        "manipulator_plan.h",
         "manipulator_move_end_effector_plan.h",
+        "manipulator_streaming_plan.h",
     ],
     deps = [
         ":generic_plan",
         "//drake/common:unused",
+        "//drake/examples/QPInverseDynamicsForHumanoids:lcm_utils",
         "//drake/lcmtypes:manipulator_plan_move_end_effector",
+        "//drake/lcmtypes:manipulator_plan_streaming",
+        "//drake/manipulation/util:motion_plan_translator",
         "//drake/util:lcm_util",
     ],
 )
@@ -60,10 +67,12 @@ drake_cc_googletest(
     deps = [
         ":manipulator_plans",
         ":test_common",
+        "//drake/common:copyable_unique_ptr",
         "//drake/common:drake_path",
         "//drake/common:eigen_matrix_compare",
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/parsers",
+        "//drake/systems/framework:value",
     ],
 )
 

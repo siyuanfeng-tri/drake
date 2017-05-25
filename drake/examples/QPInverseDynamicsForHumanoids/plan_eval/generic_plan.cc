@@ -75,6 +75,41 @@ void GenericPlan<T>::UpdateQpInput(
       paramset.MakeQpInput(contact_bodies, tracked_bodies, alias_groups);
 
   // Generates desired acceleration for tracked bodies.
+  UpdateBodyMotion(robot_status, paramset, alias_groups,
+      &(qp_input->mutable_desired_body_motions()));
+
+  // Generates desired acceleration for all dof.
+  UpdateDofMotion(robot_status, paramset, alias_groups,
+      &(qp_input->mutable_desired_dof_motions()));
+
+  // Calls custom update.
+  UpdateQpInputGenericPlanDerived(robot_status, paramset, alias_groups,
+                                  qp_input);
+}
+
+template <typename T>
+void GenericPlan<T>::UpdateDofMotion(const HumanoidStatus& robot_status,
+      const param_parsers::ParamSet& paramset,
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+      DesiredDofMotions* dof_motions) const {
+  const T interp_time = robot_status.time();
+  VectorX<T> kp, kd;
+  paramset.LookupDesiredDofMotionGains(&kp, &kd);
+  const manipulation::PiecewiseCubicTrajectory<T>& dof_traj = dof_trajectory_;
+  VectorSetpoint<T> tracker(dof_traj.get_position(interp_time),
+                            dof_traj.get_velocity(interp_time),
+                            dof_traj.get_acceleration(interp_time), kp, kd);
+
+  dof_motions->mutable_values() =
+      tracker.ComputeTargetAcceleration(robot_status.position(),
+                                        robot_status.velocity());
+}
+
+template <typename T>
+void GenericPlan<T>::UpdateBodyMotion(const HumanoidStatus& robot_status,
+      const param_parsers::ParamSet& paramset,
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+      std::unordered_map<std::string, DesiredBodyMotion>* body_motions) const {
   const T interp_time = robot_status.time();
   for (const auto& body_motion_pair : body_trajectories_) {
     const RigidBody<T>* body = body_motion_pair.first;
@@ -93,26 +128,9 @@ void GenericPlan<T>::UpdateQpInput(
     Vector6<T> velocity =
         robot_status.robot().CalcBodySpatialVelocityInWorldFrame(
             robot_status.cache(), *body);
-    qp_input->mutable_desired_body_motions()
-        .at(body->get_name())
+    body_motions->at(body->get_name())
         .mutable_values() = tracker.ComputeTargetAcceleration(pose, velocity);
   }
-
-  // Generates desired acceleration for all dof.
-  VectorX<T> kp, kd;
-  paramset.LookupDesiredDofMotionGains(&kp, &kd);
-  const manipulation::PiecewiseCubicTrajectory<T>& dof_traj = dof_trajectory_;
-  VectorSetpoint<T> tracker(dof_traj.get_position(interp_time),
-                            dof_traj.get_velocity(interp_time),
-                            dof_traj.get_acceleration(interp_time), kp, kd);
-
-  qp_input->mutable_desired_dof_motions().mutable_values() =
-      tracker.ComputeTargetAcceleration(robot_status.position(),
-                                        robot_status.velocity());
-
-  // Calls custom update.
-  UpdateQpInputGenericPlanDerived(robot_status, paramset, alias_groups,
-                                  qp_input);
 }
 
 template class GenericPlan<double>;

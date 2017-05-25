@@ -80,7 +80,7 @@ struct ContactParam {
   /// Specified in the body frame.
   Matrix3X<double> contact_points;
   /// Specified in the body frame.
-  Vector3<double> normal;
+  Matrix3X<double> contact_normals;
   int num_basis_per_contact_point;
   /// Friction coefficient.
   double mu;
@@ -101,7 +101,7 @@ struct ContactParam {
     if (mu != other.mu) return false;
     if (kd != other.kd) return false;
     if (weight != other.weight) return false;
-    if (!normal.isApprox(other.normal)) return false;
+    if (!contact_normals.isApprox(other.contact_normals)) return false;
     if (!contact_points.isApprox(other.contact_points)) return false;
     return true;
   }

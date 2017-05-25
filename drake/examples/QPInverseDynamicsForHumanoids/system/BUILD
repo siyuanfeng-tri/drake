@@ -78,6 +78,19 @@ drake_cc_library(
 )
 
 drake_cc_library(
+    name = "new_manipulator_plan_eval_system",
+    srcs = ["new_manipulator_plan_eval_system.cc"],
+    hdrs = ["new_manipulator_plan_eval_system.h"],
+    deps = [
+        ":plan_eval_base_system",
+        "//drake/common:copyable_unique_ptr",
+        "//drake/examples/QPInverseDynamicsForHumanoids/plan_eval:manipulator_plans",
+        "//drake/lcmtypes:motion_plan",
+        "//drake/lcmtypes:plan_eval_debug_info",
+    ],
+)
+
+drake_cc_library(
     name = "qp_controller_system",
     srcs = ["qp_controller_system.cc"],
     hdrs = ["qp_controller_system.h"],
@@ -117,6 +130,21 @@ drake_cc_library(
         "//drake/systems/lcm",
         "@bot_core_lcmtypes",
     ],
+)
+
+drake_cc_library(
+    name = "iiwa_controller",
+    hdrs = ["iiwa_controller.h"],
+    deps = [
+        ":joint_level_controller_system",
+        ":new_manipulator_plan_eval_system",
+        ":humanoid_status_translator_system",
+        ":qp_controller_system",
+        "//drake/multibody/parsers",
+        "//drake/systems/controllers:model_based_controller_base",
+        "//drake/systems/framework",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 drake_cc_binary(
@@ -216,4 +244,19 @@ drake_cc_googletest(
     ],
 )
 
+drake_cc_googletest(
+    name = "new_manip_plan_eval_test",
+    srcs = ["test/new_manip_plan_eval_test.cc"],
+    data = [
+        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa.alias_groups",
+        "//drake/examples/QPInverseDynamicsForHumanoids:config/iiwa.id_controller_config",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":new_manipulator_plan_eval_system",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/multibody/parsers",
+        "//drake/systems/framework",
+    ],
+)
 cpplint()

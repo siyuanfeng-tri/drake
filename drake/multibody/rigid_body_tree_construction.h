@@ -26,5 +26,8 @@ namespace multibody {
 void AddFlatTerrainToWorld(RigidBodyTreed* tree,
                            double box_size = 1000, double box_depth = 10);
 
+void AddBoxToWorld(const Isometry3<double>& pose, const Vector3<double>& sides,
+                   const std::string& name, RigidBodyTree<double>* tree);
+
 }  // namespace multibody
 }  // namespace drake

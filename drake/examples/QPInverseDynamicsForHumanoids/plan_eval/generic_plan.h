@@ -109,6 +109,12 @@ class GenericPlan {
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       const void* message_bytes, int message_length);
 
+  virtual void MakeDebugMessage(
+      const HumanoidStatus& robot_stauts,
+      const param_parsers::ParamSet& paramset,
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+      std::vector<uint8_t>* raw_bytes) const {}
+
   /**
    * Updates @p qp_input given the current state of the plan and measured robot
    * state in @p robot_status. Specifically, this function performs the
@@ -202,9 +208,9 @@ class GenericPlan {
    * Custom state mutation can be implemented here.
    */
   virtual void ModifyPlanGenericPlanDerived(
-      const HumanoidStatus& robot_stauts,
-      const param_parsers::ParamSet& paramset,
-      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) = 0;
+      const HumanoidStatus&,
+      const param_parsers::ParamSet&,
+      const param_parsers::RigidBodyTreeAliasGroups<T>&) {}
 
   /**
    * Custom message handling can be implemented here.
@@ -219,10 +225,10 @@ class GenericPlan {
    * Custom QpInput updates can be implemented here.
    */
   virtual void UpdateQpInputGenericPlanDerived(
-      const HumanoidStatus& robot_status,
-      const param_parsers::ParamSet& paramset,
-      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-      QpInput* qp_input) const = 0;
+      const HumanoidStatus&,
+      const param_parsers::ParamSet&,
+      const param_parsers::RigidBodyTreeAliasGroups<T>&,
+      QpInput*) const {}
 
   /**
    * Sets the planned contact state to @p contact_state.
@@ -259,6 +265,16 @@ class GenericPlan {
       const manipulation::PiecewiseCubicTrajectory<T>& traj) {
     dof_trajectory_ = traj;
   }
+
+  virtual void UpdateDofMotion(const HumanoidStatus& robot_status,
+      const param_parsers::ParamSet& paramset,
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+      DesiredDofMotions* dof_motions) const;
+
+  virtual void UpdateBodyMotion(const HumanoidStatus& robot_status,
+      const param_parsers::ParamSet& paramset,
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+      std::unordered_map<std::string, DesiredBodyMotion>* body_motions) const;
 
  private:
   // Planned set of bodies that are in contact.

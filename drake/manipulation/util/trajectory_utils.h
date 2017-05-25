@@ -37,6 +37,12 @@ class PiecewiseCubicTrajectory {
     qdd_ = qd_.derivative();
   }
 
+  void shift_right(double offset) {
+    q_.shiftRight(offset);
+    qd_.shiftRight(offset);
+    qdd_.shiftRight(offset);
+  }
+
   /**
    * Returns the interpolated position at @p time.
    */
@@ -206,6 +212,11 @@ class PiecewiseCartesianTrajectory {
     }
     acceleration.template tail<3>() = position_.get_acceleration(time);
     return acceleration;
+  }
+
+  void shift_right(double offset) {
+    position_.shift_right(offset);
+    orientation_.shiftRight(offset);
   }
 
   /**

@@ -1,0 +1,17 @@
+package drake;
+
+struct lcmt_motion_plan {
+  // Time in milliseconds.
+  int64_t timestamp;
+
+  // Contacts
+  int32_t num_contact_states;
+  lcmt_contact_state contact_states[num_contact_states];
+
+  // Joint space tracking.
+  lcmt_dof_trajectory dof_motion;
+
+  // Cartesian tracking.
+  int32_t num_body_motions;
+  lcmt_cartesian_trajectory body_motions[num_body_motions];
+}

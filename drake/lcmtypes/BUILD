@@ -34,6 +34,24 @@ lcm_cc_library(
 )
 
 lcm_cc_library(
+    name = "cartesian_keyframe",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_cartesian_keyframe.lcm"],
+    deps = [
+        "@bot_core_lcmtypes",
+    ],
+)
+
+lcm_cc_library(
+    name = "cartesian_trajectory",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_cartesian_trajectory.lcm"],
+    deps = [
+        ":cartesian_keyframe",
+    ],
+)
+
+lcm_cc_library(
     name = "constrained_values",
     lcm_package = "drake",
     lcm_srcs = ["lcmt_constrained_values.lcm"],
@@ -61,6 +79,15 @@ lcm_cc_library(
 )
 
 lcm_cc_library(
+    name = "contact_state",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_contact_state.lcm"],
+    deps = [
+        ":contact_information",
+    ],
+)
+
+lcm_cc_library(
     name = "desired_body_motion",
     lcm_package = "drake",
     lcm_srcs = ["lcmt_desired_body_motion.lcm"],
@@ -76,6 +103,21 @@ lcm_cc_library(
     name = "desired_dof_motions",
     lcm_package = "drake",
     lcm_srcs = ["lcmt_desired_dof_motions.lcm"],
+)
+
+lcm_cc_library(
+    name = "dof_keyframe",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_dof_keyframe.lcm"],
+)
+
+lcm_cc_library(
+    name = "dof_trajectory",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_dof_trajectory.lcm"],
+    deps = [
+        ":dof_keyframe",
+    ],
 )
 
 lcm_cc_library(
@@ -96,6 +138,24 @@ lcm_cc_library(
     lcm_srcs = ["lcmt_manipulator_plan_move_end_effector.lcm"],
     deps = [
         "@bot_core_lcmtypes",
+    ],
+)
+
+lcm_cc_library(
+    name = "manipulator_plan_streaming",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_manipulator_plan_streaming.lcm"],
+    deps = [],
+)
+
+lcm_cc_library(
+    name = "motion_plan",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_motion_plan.lcm"],
+    deps = [
+        ":contact_state",
+        ":dof_trajectory",
+        ":cartesian_trajectory",
     ],
 )
 

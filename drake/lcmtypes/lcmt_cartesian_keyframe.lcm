@@ -1,0 +1,17 @@
+package drake;
+
+struct lcmt_cartesian_keyframe {
+  // Time in milliseconds.
+  int64_t timestamp;
+
+  // Name of the rigid body that this objective is attached to.
+  string body_name;
+
+  bot_core.position_3d_t pose;
+  bot_core.twist_t velocity;
+  bot_core.twist_t acceleration;
+
+  // TODO: we probably need to better define these.
+  int32_t constraint_mode[6]; // First 3 are angular.
+  int32_t expressed_in_frame; // the expressed in frame.
+}

@@ -42,3 +42,54 @@ default_contact {
     }
     num_basis_per_contact_point: 4
 }
+
+contact {
+    name: "flange"
+    weight: 1e5
+    kd: 8
+    mu: 1
+    contact_point {
+        x: 0
+        y: 0.01
+        z: -0.01
+    }
+    contact_normal {
+        x: 0
+        y: 0
+        z: 1
+    }
+
+    contact_point {
+        x: 0
+        y: -0.01
+        z: -0.01
+    }
+    contact_normal {
+        x: 0
+        y: 0
+        z: 1
+    }
+
+    contact_point {
+        x: 0
+        y: -0.01
+        z: 0.01
+    }
+    contact_normal {
+        x: 0
+        y: 0
+        z: 1
+    }
+
+    contact_point {
+        x: 0
+        y: 0.01
+        z: 0.01
+    }
+    contact_normal {
+        x: -1
+        y: 0
+        z: 0
+    }
+    num_basis_per_contact_point: 4
+}

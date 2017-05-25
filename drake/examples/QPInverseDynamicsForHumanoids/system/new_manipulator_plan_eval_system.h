@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "drake/common/drake_copyable.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/plan_eval_base_system.h"
 
 namespace drake {
@@ -36,30 +37,19 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
   /**
    * Initializes the plan and gains. Must be called before execution.
    */
-  void Initialize(systems::State<double>* state);
+  void Initialize(const HumanoidStatus& status, systems::State<double>* state);
 
   /**
    * Initializes the plan and gains. Must be called before execution.
    */
-  void Initialize(systems::Context<double>* context) {
+  void Initialize(const HumanoidStatus& status, systems::Context<double>* context) {
     systems::State<double>* servo_state = context->get_mutable_state();
-    Initialize(servo_state);
+    Initialize(status, servo_state);
   }
 
-  /**
-   * Returns the input port for desired position and velocity.
-   */
-  inline const systems::InputPortDescriptor<double>&
-  get_input_port_desired_state() const {
-    return get_input_port(input_port_index_desired_state_);
-  }
-
-  /**
-   * Returns the input port for desired acceleration.
-   */
-  inline const systems::InputPortDescriptor<double>&
-  get_input_port_desired_acceleration() const {
-    return get_input_port(input_port_index_desired_acceleration_);
+  const systems::InputPortDescriptor<double>&
+  get_input_port_plan() const {
+    return get_input_port(input_port_index_plan_);
   }
 
   /**
@@ -81,12 +71,13 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
       const systems::Context<double>& context,
       systems::SystemOutput<double>* output) const override;
 
-  int input_port_index_desired_state_{};
-  int input_port_index_desired_acceleration_{};
+  int input_port_index_plan_{};
   int output_port_index_debug_info_{};
 
   int abs_state_index_plan_{};
   int abs_state_index_debug_{};
+
+  mutable int64_t last_plan_timestamp_{0};
 };
 
 }  // namespace qp_inverse_dynamics

@@ -229,6 +229,17 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
     }
   }
 
+  // Contact force regularization
+  // HACK
+  summed_contact_forces_ = MatrixX<double>::Zero(
+      3 * num_contact_body_, 3 * num_point_force_);
+  desired_contact_forces_ = VectorX<double>::Zero(3 * num_contact_body_);
+  cost_contacts_forces_ =
+      prog_->AddQuadraticCost(
+          MatrixX<double>::Zero(num_basis_, num_basis_),
+          VectorX<double>::Zero(num_basis_),
+          basis_).constraint().get();
+
   // Allocate inequality constraints.
   // Contact force scalar (Beta), which is constant and does not depend on the
   // robot configuration.
@@ -386,26 +397,26 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
   // http://groups.csail.mit.edu/robotics-center/public_papers/Kuindersma13.pdf
 
   // Stack the contact Jacobians and basis matrices for each contact link.
-  int rowIdx = 0;
+  int row_idx = 0;
   int colIdx = 0;
   for (const auto& contact_pair : input.contact_information()) {
     const ContactInformation& contact = contact_pair.second;
-    int force_dim = 3 * contact.num_contact_points();
-    int basis_dim = contact.num_basis();
-    basis_to_force_matrix_.block(rowIdx, colIdx, force_dim, basis_dim) =
+    const int force_dim = 3 * contact.num_contact_points();
+    const int basis_dim = contact.num_basis();
+    basis_to_force_matrix_.block(row_idx, colIdx, force_dim, basis_dim) =
         contact.ComputeBasisMatrix(rs.robot(), rs.cache());
-    stacked_contact_jacobians_.block(rowIdx, 0, force_dim, num_vd_) =
+    stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_) =
         contact.ComputeJacobianAtContactPoints(rs.robot(), rs.cache());
-    stacked_contact_jacobians_dot_times_v_.segment(rowIdx, force_dim) =
+    stacked_contact_jacobians_dot_times_v_.segment(row_idx, force_dim) =
         contact.ComputeJacobianDotTimesVAtContactPoints(rs.robot(), rs.cache());
-    stacked_contact_velocities_.segment(rowIdx, force_dim) =
+    stacked_contact_velocities_.segment(row_idx, force_dim) =
         contact.ComputeLinearVelocityAtContactPoints(rs.robot(), rs.cache());
 
-    rowIdx += force_dim;
+    row_idx += force_dim;
     colIdx += basis_dim;
   }
   JB_ = stacked_contact_jacobians_.transpose() * basis_to_force_matrix_;
-  DRAKE_ASSERT(rowIdx == num_point_force_ * 3);
+  DRAKE_ASSERT(row_idx == num_point_force_ * 3);
   DRAKE_ASSERT(colIdx == num_basis_);
 
   // TODO(siyuan.feng): This is assuming all the unactuated joints are at the
@@ -442,7 +453,7 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
   }
 
   // Contact constraints, 3 rows per contact point
-  rowIdx = 0;
+  row_idx = 0;
   int cost_ctr = 0, eq_ctr = 0;
   for (const auto& contact_pair : input.contact_information()) {
     const ContactInformation& contact = contact_pair.second;
@@ -451,30 +462,52 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     if (contact.acceleration_constraint_type() == ConstraintType::Soft) {
       cost_contacts_[cost_ctr]->UpdateCoefficients(
           contact.weight() *
-              stacked_contact_jacobians_.block(rowIdx, 0, force_dim, num_vd_)
+              stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_)
                   .transpose() *
-              stacked_contact_jacobians_.block(rowIdx, 0, force_dim, num_vd_),
+              stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_),
           contact.weight() *
-              stacked_contact_jacobians_.block(rowIdx, 0, force_dim, num_vd_)
+              stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_)
                   .transpose() *
-              (stacked_contact_jacobians_dot_times_v_.segment(rowIdx,
+              (stacked_contact_jacobians_dot_times_v_.segment(row_idx,
                                                               force_dim) +
                contact.Kd() *
-                   stacked_contact_velocities_.segment(rowIdx, force_dim)));
+                   stacked_contact_velocities_.segment(row_idx, force_dim)));
       cost_contacts_[cost_ctr++]->set_description(contact.body_name() +
                                                   " contact cost");
     } else {
       eq_contacts_[eq_ctr]->UpdateCoefficients(
-          stacked_contact_jacobians_.block(rowIdx, 0, force_dim, num_vd_),
-          -(stacked_contact_jacobians_dot_times_v_.segment(rowIdx, force_dim) +
+          stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_),
+          -(stacked_contact_jacobians_dot_times_v_.segment(row_idx, force_dim) +
             contact.Kd() *
-                stacked_contact_velocities_.segment(rowIdx, force_dim)));
+                stacked_contact_velocities_.segment(row_idx, force_dim)));
       eq_contacts_[eq_ctr++]->set_description(contact.body_name() +
                                               " contact eq");
     }
-    rowIdx += force_dim;
+    row_idx += force_dim;
   }
-  DRAKE_ASSERT(rowIdx == num_point_force_ * 3);
+  DRAKE_ASSERT(row_idx == num_point_force_ * 3);
+
+  // Contact forces, 3 rows per contact body.
+  row_idx = 0; int col_idx = 0;
+  for (const auto& contact_pair : input.contact_information()) {
+    const ContactInformation& contact = contact_pair.second;
+    for (int i = 0; i < contact.num_contact_points(); ++i) {
+      summed_contact_forces_.block<3,3>(row_idx, col_idx) =
+          contact.desired_force_weight().asDiagonal();
+      col_idx += 3;
+    }
+    desired_contact_forces_.segment<3>(row_idx) =
+        (contact.desired_force_weight().array() *
+         contact.desired_force().array()).matrix();
+    row_idx += 3;
+  }
+  MatrixX<double> tmp = summed_contact_forces_ * basis_to_force_matrix_;
+
+  DRAKE_DEMAND(row_idx == num_contact_body_ * 3);
+  DRAKE_DEMAND(col_idx == 3 * num_point_force_);
+  cost_contacts_forces_->UpdateQuadraticAndLinearTerms(
+      tmp.transpose() * tmp,
+      -tmp.transpose() * desired_contact_forces_);
 
   ////////////////////////////////////////////////////////////////////
   // Inequality constraints:

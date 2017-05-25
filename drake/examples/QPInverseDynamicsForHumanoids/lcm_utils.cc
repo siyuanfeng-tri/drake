@@ -292,11 +292,17 @@ void DecodeContactInformation(const RigidBodyTree<double>& robot,
   info->set_body(*robot.FindBody(msg.body_name));
   info->mutable_num_basis_per_contact_point() = msg.num_basis_per_contact_point;
   info->mutable_contact_points().resize(3, msg.num_contact_points);
+  info->mutable_contact_normals().resize(3, msg.num_contact_points);
   stdVectorOfStdVectorsToEigen(msg.contact_points,
                                info->mutable_contact_points());
-  cArrayToEigenVector(msg.normal, info->mutable_normal());
+  stdVectorOfStdVectorsToEigen(msg.contact_normals,
+                               info->mutable_contact_normals());
   info->mutable_mu() = msg.mu;
   info->mutable_Kd() = msg.Kd;
+
+  cArrayToEigenVector(msg.desired_force, info->mutable_desired_force());
+  cArrayToEigenVector(msg.desired_force_weight,
+      info->mutable_desired_force_weight());
 
   info->mutable_acceleration_constraint_type() =
       DecodeConstraintType(msg.acceleration_constraint_type);
@@ -318,7 +324,10 @@ void EncodeContactInformation(const ContactInformation& info,
   msg->num_contact_points = info.num_contact_points();
   msg->num_basis_per_contact_point = info.num_basis_per_contact_point();
   eigenToStdVectorOfStdVectors(info.contact_points(), msg->contact_points);
-  eigenVectorToCArray(info.normal(), msg->normal);
+  eigenToStdVectorOfStdVectors(info.contact_normals(), msg->contact_normals);
+
+  eigenVectorToCArray(info.desired_force(), msg->desired_force);
+  eigenVectorToCArray(info.desired_force_weight(), msg->desired_force_weight);
 
   msg->mu = info.mu();
   msg->Kd = info.Kd();
