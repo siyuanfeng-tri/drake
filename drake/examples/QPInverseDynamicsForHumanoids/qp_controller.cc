@@ -505,7 +505,7 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
 
   DRAKE_DEMAND(row_idx == num_contact_body_ * 3);
   DRAKE_DEMAND(col_idx == 3 * num_point_force_);
-  cost_contacts_forces_->UpdateQuadraticAndLinearTerms(
+  cost_contacts_forces_->UpdateCoefficients(
       tmp.transpose() * tmp,
       -tmp.transpose() * desired_contact_forces_);
 

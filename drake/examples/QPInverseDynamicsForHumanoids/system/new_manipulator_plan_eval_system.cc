@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "drake/common/copyable_unique_ptr.h"
+//#include "drake/common/copyable_unique_ptr.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_plan.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller_common.h"
@@ -32,9 +32,8 @@ ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
       DeclareAbstractOutputPort(debug_msg).get_index();
 
   // Declare states.
-  copyable_unique_ptr<GenericPlan<double>> plan(new ManipulatorPlan<double>());
-  auto plan_as_value = systems::AbstractValue::Make<copyable_unique_ptr<GenericPlan<double>>>(
-      plan);
+  auto plan_as_value = systems::AbstractValue::Make<GenericPlan<double>>(
+      ManipulatorPlan<double>());
 
   abs_state_index_plan_ =
       DeclareAbstractState(std::move(plan_as_value));
@@ -45,15 +44,13 @@ ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
 }
 
 void ManipulatorPlanEvalSystem::Initialize(const HumanoidStatus& current_status, systems::State<double>* state) {
-  copyable_unique_ptr<GenericPlan<double>>& plan_ptr =
-      get_mutable_abstract_value<copyable_unique_ptr<GenericPlan<double>>>(
-          state, abs_state_index_plan_);
-
-  plan_ptr->Initialize(current_status, get_paramset(), get_alias_groups());
+  GenericPlan<double>& plan = get_mutable_abstract_value<GenericPlan<double>>(
+      state, abs_state_index_plan_);
+  plan.Initialize(current_status, get_paramset(), get_alias_groups());
 
   QpInput& qp_input = get_mutable_qp_input(state);
   const std::vector<std::string> empty;
-  plan_ptr->UpdateQpInput(current_status, get_paramset(), get_alias_groups(), &qp_input);
+  plan.UpdateQpInput(current_status, get_paramset(), get_alias_groups(), &qp_input);
 }
 
 void ManipulatorPlanEvalSystem::DoExtendedCalcOutput(
@@ -80,9 +77,8 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
           context, input_port_index_plan_);
 
   // Gets the plan from abstract state.
-  copyable_unique_ptr<GenericPlan<double>>& plan_ptr =
-      get_mutable_abstract_value<copyable_unique_ptr<GenericPlan<double>>>(
-          state, abs_state_index_plan_);
+  GenericPlan<double>& plan = get_mutable_abstract_value<GenericPlan<double>>(
+      state, abs_state_index_plan_);
 
   bool new_plan_flag = false;
   if (last_plan_timestamp_ != msg->timestamp) {
@@ -94,16 +90,16 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
     std::vector<uint8_t> raw_msg_bytes;
     raw_msg_bytes.resize(msg->getEncodedSize());
     msg->encode(raw_msg_bytes.data(), 0, raw_msg_bytes.size());
-    plan_ptr->HandlePlanMessage(*robot_status, get_paramset(),
+    plan.HandlePlanMessage(*robot_status, get_paramset(),
         get_alias_groups(), raw_msg_bytes.data(), raw_msg_bytes.size());
   }
 
   // Runs controller.
-  plan_ptr->ModifyPlan(*robot_status, get_paramset(), get_alias_groups());
+  plan.ModifyPlan(*robot_status, get_paramset(), get_alias_groups());
 
   // Updates the QpInput in AbstractState.
   QpInput& qp_input = get_mutable_qp_input(state);
-  plan_ptr->UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input);
+  plan.UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input);
 
   /*
   // Generates debugging info.
