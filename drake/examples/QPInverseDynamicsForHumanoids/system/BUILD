@@ -83,7 +83,6 @@ drake_cc_library(
     hdrs = ["new_manipulator_plan_eval_system.h"],
     deps = [
         ":plan_eval_base_system",
-        "//drake/common:copyable_unique_ptr",
         "//drake/examples/QPInverseDynamicsForHumanoids/plan_eval:manipulator_plans",
         "//drake/lcmtypes:motion_plan",
         "//drake/lcmtypes:plan_eval_debug_info",

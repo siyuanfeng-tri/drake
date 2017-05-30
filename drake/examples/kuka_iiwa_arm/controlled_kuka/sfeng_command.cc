@@ -121,7 +121,7 @@ void MakeContact(const RigidBodyTree<double>& robot,
 
   ContactInformation contact = params.MakeContactInformation(
       *robot.FindBody("iiwa_link_ee"));
-  contact.mutable_desired_force() = Vector3<double>(-10, 0, 0);
+  contact.mutable_desired_force() = Vector3<double>(-2, 0, 0);
   contact.mutable_desired_force_weight() = Vector3<double>(10, 10, 10);
 
   msg.num_contact_states = 1;

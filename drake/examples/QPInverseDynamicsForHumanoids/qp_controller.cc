@@ -41,12 +41,14 @@ void QPController::AddAsCosts(const Eigen::MatrixBase<DerivedA>& A,
 
   tmp_vd_mat_.setZero();
   tmp_vd_vec_.setZero();
+  double c = 0;
   for (int d : idx) {
     double weight = weights[d];
     tmp_vd_mat_ += weight * A.row(d).transpose() * A.row(d);
     tmp_vd_vec_ += weight * A.row(d).transpose() * b.row(d);
+    c += 0.5 * weight * b.row(d) * b.row(d);
   }
-  cost->UpdateCoefficients(tmp_vd_mat_, tmp_vd_vec_);
+  cost->UpdateCoefficients(tmp_vd_mat_, tmp_vd_vec_, c);
 }
 
 void QPController::SetTempMatricesToZero() {
@@ -91,14 +93,20 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
   // Figure out size of the constrained dimensions of body motions.
   int num_body_motion_as_cost = 0;
   int num_body_motion_as_eq = 0;
-  int body_ctr = 0;
   for (const auto& pair : all_body_motions) {
     const DesiredBodyMotion& body_motion = pair.second;
+    const std::string& body_name = pair.first;
+    // This body is in contact, and we don't want to control its pose when
+    // in contact, so skipping it.
+    if (!body_motion.control_during_contact() &&
+        all_contacts.find(body_name) != all_contacts.end()) {
+      continue;
+    }
+
     if (!body_motion.GetConstraintTypeIndices(ConstraintType::Soft).empty())
       num_body_motion_as_cost++;
     if (!body_motion.GetConstraintTypeIndices(ConstraintType::Hard).empty())
       num_body_motion_as_eq++;
-    body_ctr++;
   }
 
   // Figure out size of the constrained dimensions of desired dof motions.
@@ -239,6 +247,7 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
           MatrixX<double>::Zero(num_basis_, num_basis_),
           VectorX<double>::Zero(num_basis_),
           basis_).constraint().get();
+  cost_contacts_forces_->set_description("all contact forces");
 
   // Allocate inequality constraints.
   // Contact force scalar (Beta), which is constant and does not depend on the
@@ -416,8 +425,8 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     colIdx += basis_dim;
   }
   JB_ = stacked_contact_jacobians_.transpose() * basis_to_force_matrix_;
-  DRAKE_ASSERT(row_idx == num_point_force_ * 3);
-  DRAKE_ASSERT(colIdx == num_basis_);
+  DRAKE_DEMAND(row_idx == num_point_force_ * 3);
+  DRAKE_DEMAND(colIdx == num_basis_);
 
   // TODO(siyuan.feng): This is assuming all the unactuated joints are at the
   // top. Need to lift the assumption.
@@ -460,6 +469,11 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     int force_dim = 3 * contact.num_contact_points();
     // As cost
     if (contact.acceleration_constraint_type() == ConstraintType::Soft) {
+      auto b = stacked_contact_jacobians_dot_times_v_.segment(row_idx,
+                                                              force_dim) +
+               contact.Kd() *
+                   stacked_contact_velocities_.segment(row_idx, force_dim);
+
       cost_contacts_[cost_ctr]->UpdateCoefficients(
           contact.weight() *
               stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_)
@@ -467,11 +481,8 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
               stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_),
           contact.weight() *
               stacked_contact_jacobians_.block(row_idx, 0, force_dim, num_vd_)
-                  .transpose() *
-              (stacked_contact_jacobians_dot_times_v_.segment(row_idx,
-                                                              force_dim) +
-               contact.Kd() *
-                   stacked_contact_velocities_.segment(row_idx, force_dim)));
+                  .transpose() * b,
+          0.5 * contact.weight() * b.squaredNorm());
       cost_contacts_[cost_ctr++]->set_description(contact.body_name() +
                                                   " contact cost");
     } else {
@@ -485,29 +496,33 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     }
     row_idx += force_dim;
   }
-  DRAKE_ASSERT(row_idx == num_point_force_ * 3);
+  DRAKE_DEMAND(row_idx == num_point_force_ * 3);
 
   // Contact forces, 3 rows per contact body.
-  row_idx = 0; int col_idx = 0;
-  for (const auto& contact_pair : input.contact_information()) {
-    const ContactInformation& contact = contact_pair.second;
-    for (int i = 0; i < contact.num_contact_points(); ++i) {
-      summed_contact_forces_.block<3,3>(row_idx, col_idx) =
+  if (!input.contact_information().empty()) {
+    row_idx = 0; int col_idx = 0;
+    for (const auto& contact_pair : input.contact_information()) {
+      const ContactInformation& contact = contact_pair.second;
+      for (int i = 0; i < contact.num_contact_points(); ++i) {
+        summed_contact_forces_.block<3,3>(row_idx, col_idx) =
           contact.desired_force_weight().asDiagonal();
-      col_idx += 3;
-    }
-    desired_contact_forces_.segment<3>(row_idx) =
+        col_idx += 3;
+      }
+      desired_contact_forces_.segment<3>(row_idx) =
         (contact.desired_force_weight().array() *
          contact.desired_force().array()).matrix();
-    row_idx += 3;
-  }
-  MatrixX<double> tmp = summed_contact_forces_ * basis_to_force_matrix_;
+      row_idx += 3;
+    }
 
-  DRAKE_DEMAND(row_idx == num_contact_body_ * 3);
-  DRAKE_DEMAND(col_idx == 3 * num_point_force_);
-  cost_contacts_forces_->UpdateCoefficients(
-      tmp.transpose() * tmp,
-      -tmp.transpose() * desired_contact_forces_);
+    MatrixX<double> tmp = summed_contact_forces_ * basis_to_force_matrix_;
+
+    DRAKE_DEMAND(row_idx == num_contact_body_ * 3);
+    DRAKE_DEMAND(col_idx == 3 * num_point_force_);
+    cost_contacts_forces_->UpdateCoefficients(
+        tmp.transpose() * tmp,
+        -tmp.transpose() * desired_contact_forces_,
+        0.5 * desired_contact_forces_.squaredNorm());
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Inequality constraints:
@@ -559,6 +574,14 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
   cost_ctr = eq_ctr = 0;
   for (const auto& pair : input.desired_body_motions()) {
     const DesiredBodyMotion& body_motion_d = pair.second;
+    const std::string& body_name = pair.first;
+
+    if (!body_motion_d.control_during_contact() &&
+        input.contact_information().find(body_name) !=
+        input.contact_information().end()) {
+      continue;
+    }
+
     body_J_[body_ctr] = rs.robot().CalcBodySpatialVelocityJacobianInWorldFrame(
         rs.cache(), body_motion_d.body());
     body_Jdv_[body_ctr] =
@@ -587,10 +610,10 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     }
     body_ctr++;
   }
-  DRAKE_ASSERT(body_ctr ==
-               static_cast<int>(input.desired_body_motions().size()));
-  DRAKE_ASSERT(cost_ctr == static_cast<int>(cost_body_motion_.size()));
-  DRAKE_ASSERT(eq_ctr == static_cast<int>(eq_body_motion_.size()));
+  //DRAKE_DEMAND(body_ctr ==
+  //             static_cast<int>(input.desired_body_motions().size()));
+  DRAKE_DEMAND(cost_ctr == static_cast<int>(cost_body_motion_.size()));
+  DRAKE_DEMAND(eq_ctr == static_cast<int>(eq_body_motion_.size()));
 
   // Joint motion
   row_idx_as_cost = input.desired_dof_motions().GetConstraintTypeIndices(
@@ -614,12 +637,15 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     tmp_vd_mat_.setZero();
     tmp_vd_vec_.setZero();
 
+    double c = 0;
     for (int d : row_idx_as_cost) {
       double weight = input.desired_dof_motions().weight(d);
       tmp_vd_mat_(d, d) = weight;
       tmp_vd_vec_[d] = -weight * input.desired_dof_motions().value(d);
+      c += 0.5 * weight * input.desired_dof_motions().value(d) *
+           input.desired_dof_motions().value(d);
     }
-    cost_dof_motion_->UpdateCoefficients(tmp_vd_mat_, tmp_vd_vec_);
+    cost_dof_motion_->UpdateCoefficients(tmp_vd_mat_, tmp_vd_vec_, c);
   }
 
   // Regularize basis to zero.
@@ -659,7 +685,7 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
   }
 
   for (auto& eq_b : eqs) {
-    DRAKE_ASSERT(
+    DRAKE_DEMAND(
         (prog_->EvalBindingAtSolution(eq_b) - eq_b.constraint()->lower_bound())
             .isZero(1e-6));
   }
@@ -668,7 +694,7 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
     solvers::LinearConstraint* ineq = ineq_b.constraint().get();
     tmp_vec = prog_->EvalBindingAtSolution(ineq_b);
     for (int i = 0; i < tmp_vec.size(); ++i) {
-      DRAKE_ASSERT(tmp_vec[i] >= ineq->lower_bound()[i] - 1e-6 &&
+      DRAKE_DEMAND(tmp_vec[i] >= ineq->lower_bound()[i] - 1e-6 &&
                    tmp_vec[i] <= ineq->upper_bound()[i] + 1e-6);
     }
   }
@@ -755,6 +781,10 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
 
   int body_motion_ctr = 0;
   for (const auto& pair : input.desired_body_motions()) {
+    const RigidBody<double>* body = rs.robot().FindBody(pair.first);
+    Isometry3<double> body_pose = rs.robot().CalcBodyPoseInWorldFrame(rs.cache(), *body);
+    std::cout << "body pose: " << pair.first << ", " << body_pose.translation().transpose() << std::endl;
+
     const DesiredBodyMotion& body_motion_d = pair.second;
     if (output->mutable_body_accelerations().find(body_motion_d.body_name()) ==
         output->mutable_body_accelerations().end()) {

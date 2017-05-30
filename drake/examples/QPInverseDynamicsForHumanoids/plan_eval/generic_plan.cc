@@ -103,6 +103,8 @@ void GenericPlan<T>::UpdateDofMotion(const HumanoidStatus& robot_status,
   dof_motions->mutable_values() =
       tracker.ComputeTargetAcceleration(robot_status.position(),
                                         robot_status.velocity());
+
+  dof_tracker_ = tracker;
 }
 
 template <typename T>
@@ -110,6 +112,8 @@ void GenericPlan<T>::UpdateBodyMotion(const HumanoidStatus& robot_status,
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       std::unordered_map<std::string, DesiredBodyMotion>* body_motions) const {
+  body_trackers_.clear();
+
   const T interp_time = robot_status.time();
   for (const auto& body_motion_pair : body_trajectories_) {
     const RigidBody<T>* body = body_motion_pair.first;
@@ -130,6 +134,8 @@ void GenericPlan<T>::UpdateBodyMotion(const HumanoidStatus& robot_status,
             robot_status.cache(), *body);
     body_motions->at(body->get_name())
         .mutable_values() = tracker.ComputeTargetAcceleration(pose, velocity);
+
+    body_trackers_.emplace(body, tracker);
   }
 }
 

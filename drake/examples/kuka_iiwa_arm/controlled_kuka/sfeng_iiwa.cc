@@ -15,6 +15,7 @@
 #include "drake/examples/QPInverseDynamicsForHumanoids/system/iiwa_controller.h"
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/lcmt_motion_plan.hpp"
+#include "drake/lcmt_plan_eval_debug_info.hpp"
 
 namespace drake {
 namespace examples {
@@ -24,7 +25,8 @@ namespace {
 int DoMain() {
   const std::string kModelPath =
     "/manipulation/models/iiwa_description/urdf/"
-    "iiwa14_polytope_collision.urdf";
+    "dual_iiwa14_polytope_collision.urdf";
+    //"iiwa14_polytope_collision.urdf";
 
   const std::string kAliasGroupsPath =
     drake::GetDrakePath() +
@@ -101,6 +103,13 @@ int DoMain() {
                            iiwa_state_pub->get_input_port(0));
 
   iiwa_state_pub->set_publish_period(1e-2);
+
+  auto plan_eval_pub = diagram_builder->AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<lcmt_plan_eval_debug_info>(
+          "PLAN_EVAL", &lcm));
+  diagram_builder->Connect(controller->get_output_port_debug_info(),
+                           plan_eval_pub->get_input_port(0));
+  plan_eval_pub->set_publish_period(1e-2);
 
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
 

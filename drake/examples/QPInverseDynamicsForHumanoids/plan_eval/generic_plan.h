@@ -7,11 +7,14 @@
 
 #include "drake/common/drake_copyable.h"
 #include "drake/common/eigen_types.h"
+#include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/humanoid_status.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/param_parser.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/param_parsers/rigid_body_tree_alias_groups.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller_common.h"
 #include "drake/manipulation/util/trajectory_utils.h"
+
+#include "drake/lcmt_plan_eval_debug_info.hpp"
 
 namespace drake {
 namespace examples {
@@ -113,7 +116,8 @@ class GenericPlan {
       const HumanoidStatus& robot_stauts,
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-      std::vector<uint8_t>* raw_bytes) const {}
+      const QpInput& qp_input,
+      lcmt_plan_eval_debug_info* message) const {}
 
   /**
    * Updates @p qp_input given the current state of the plan and measured robot
@@ -276,6 +280,9 @@ class GenericPlan {
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       std::unordered_map<std::string, DesiredBodyMotion>* body_motions) const;
 
+  const VectorSetpoint<T>& get_dof_tracker() const { return dof_tracker_; }
+  const std::unordered_map<const RigidBody<T>*, CartesianSetpoint<T>>& get_body_trackers() const { return body_trackers_; }
+
  private:
   // Planned set of bodies that are in contact.
   ContactState contact_state_;
@@ -285,6 +292,10 @@ class GenericPlan {
   std::unordered_map<const RigidBody<T>*,
                      manipulation::PiecewiseCartesianTrajectory<T>>
       body_trajectories_;
+
+  // TODO.
+  mutable VectorSetpoint<T> dof_tracker_;
+  mutable std::unordered_map<const RigidBody<T>*, CartesianSetpoint<T>> body_trackers_;
 };
 
 }  // namespace qp_inverse_dynamics

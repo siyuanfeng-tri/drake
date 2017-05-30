@@ -2,38 +2,3 @@ body_group {
   name: "flange"
   member: "iiwa_link_ee"
 }
-
-body_group {
-  name: "iiwa_link_7"
-  member: "iiwa_link_7"
-}
-
-body_group {
-  name: "iiwa_link_6"
-  member: "iiwa_link_6"
-}
-
-body_group {
-  name: "iiwa_link_5"
-  member: "iiwa_link_5"
-}
-
-body_group {
-  name: "iiwa_link_4"
-  member: "iiwa_link_4"
-}
-
-body_group {
-  name: "iiwa_link_3"
-  member: "iiwa_link_3"
-}
-
-body_group {
-  name: "iiwa_link_2"
-  member: "iiwa_link_2"
-}
-
-body_group {
-  name: "iiwa_link_1"
-  member: "iiwa_link_1"
-}

@@ -28,6 +28,7 @@ lcm_wrap_types(
   lcmt_body_wrench_data.lcm
   lcmt_bicycle_car_parameters_t.lcm
   lcmt_bicycle_car_state_t.lcm
+  lcmt_cartesian_keyframe.lcm
   lcmt_constrained_values.lcm
   lcmt_contact_information.lcm
   lcmt_contact_info_for_viz.lcm
@@ -35,6 +36,7 @@ lcm_wrap_types(
   lcmt_desired_body_motion.lcm
   lcmt_desired_centroidal_momentum_dot.lcm
   lcmt_desired_dof_motions.lcm
+  lcmt_dof_keyframe.lcm
   lcmt_drake_signal.lcm
   lcmt_driving_command_t.lcm
   lcmt_endless_road_car_config_t.lcm
@@ -49,6 +51,7 @@ lcm_wrap_types(
   lcmt_maliput_railcar_params_t.lcm
   lcmt_maliput_railcar_state_t.lcm
   lcmt_piecewise_polynomial.lcm
+  lcmt_plan_eval_debug_info.lcm
   lcmt_polynomial.lcm
   lcmt_polynomial_matrix.lcm
   lcmt_qp_controller_input.lcm
@@ -78,6 +81,7 @@ lcm_add_library(drake_lcmtypes C ${c_sources} ${c_install_headers})
 generate_export_header(drake_lcmtypes)
 target_include_directories(drake_lcmtypes INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+target_link_libraries(drake_lcmtypes PUBLIC lcmtypes_bot2-core)
 
 drake_install_pkg_config_file(drake-lcmtypes
   TARGET drake_lcmtypes
@@ -86,6 +90,7 @@ drake_install_pkg_config_file(drake-lcmtypes
 lcm_add_library(drakeLCMTypes CPP ${cpp_install_headers})
 target_include_directories(drakeLCMTypes INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
+target_link_libraries(drakeLCMTypes INTERFACE lcmtypes_bot2-core-cpp)
 
 drake_install_pkg_config_file(drake-lcmtypes-cpp)
 
@@ -115,7 +120,7 @@ if(JAVA_FOUND)
 
   add_jar(lcmtypes_drake-java
     OUTPUT_NAME lcmtypes_drake
-    INCLUDE_JARS lcm-java
+    INCLUDE_JARS lcmtypes_bot2-core-jar lcm-java
     SOURCES ${java_sources}
   )
 

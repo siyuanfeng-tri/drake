@@ -242,6 +242,7 @@
       </geometry>
       <material name="Grey"/>
     </visual>
+    <!--
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -249,6 +250,7 @@
       </geometry>
       <material name="Grey"/>
     </collision>
+    -->
   </link>
   <joint name="iiwa_joint_ee" type="fixed">
     <parent link="iiwa_link_7"/>
@@ -264,6 +266,54 @@
     <origin rpy="0 -1.57079632679 0" xyz="0 0 0.045"/>
   </joint>
   <link name="iiwa_link_ee">
+    <collision name='collision'>
+      <origin rpy="0 0 0" xyz="0.0 0.03 0"/>
+      <geometry>
+        <sphere radius="0.0"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0.0 0.03 0"/>
+      <geometry>
+        <sphere radius="0.01"/>
+      </geometry>
+    </visual>
+    <collision name='collision'>
+      <origin rpy="0 0 0" xyz="0.0 -0.03 0"/>
+      <geometry>
+        <sphere radius="0.0"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0.0 -0.03 0"/>
+      <geometry>
+        <sphere radius="0.01"/>
+      </geometry>
+    </visual>
+    <collision name='collision'>
+      <origin rpy="0 0 0" xyz="0 0 0.03"/>
+      <geometry>
+        <sphere radius="0.0"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.03"/>
+      <geometry>
+        <sphere radius="0.01"/>
+      </geometry>
+    </visual>
+    <collision name='collision'>
+      <origin rpy="0 0 0" xyz="0 0 -0.03"/>
+      <geometry>
+        <sphere radius="0.0"/>
+      </geometry>
+    </collision>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 -0.03"/>
+      <geometry>
+        <sphere radius="0.01"/>
+      </geometry>
+    </visual>
   </link>
   <frame link="iiwa_link_ee" name="iiwa_frame_ee" rpy="3.14159265359 0 1.57079632679" xyz="0.09 0 0"/>
   <!-- Load Gazebo lib and set the robot namespace -->

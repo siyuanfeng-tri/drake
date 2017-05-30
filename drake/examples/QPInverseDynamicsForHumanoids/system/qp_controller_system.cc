@@ -94,6 +94,8 @@ void QpControllerSystem::DoCalcUnrestrictedUpdate(
     debug.solved_vd[i] = qp_output.vd()[i];
     debug.solved_torque[i] = qp_output.dof_torques()[i];
   }
+
+  std::cout << "time: " << context.get_time() << qp_output << std::endl;
 }
 
 std::unique_ptr<systems::AbstractValue>

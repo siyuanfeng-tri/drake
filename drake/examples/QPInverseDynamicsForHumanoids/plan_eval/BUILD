@@ -30,6 +30,7 @@ drake_cc_library(
         "//drake/examples/QPInverseDynamicsForHumanoids:qp_controller_common",
         "//drake/examples/QPInverseDynamicsForHumanoids/param_parsers:param_parser",
         "//drake/examples/QPInverseDynamicsForHumanoids/param_parsers:rigid_body_tree_alias_groups",
+        "//drake/lcmtypes:plan_eval_debug_info",
         "//drake/manipulation/util:trajectory_utils",
     ],
 )

@@ -31,12 +31,10 @@ class ManipulatorPlan : public GenericPlan<T> {
       const void* message_bytes, int message_length) override;
 
   void UpdateQpInputGenericPlanDerived(
-      const HumanoidStatus&,
+      const HumanoidStatus& status,
       const param_parsers::ParamSet&,
       const param_parsers::RigidBodyTreeAliasGroups<T>&,
-      QpInput* qp_input) const override {
-    qp_input->mutable_contact_information() = override_contacts_;
-  }
+      QpInput* qp_input) const override;
 
   void ModifyPlanGenericPlanDerived(
       const HumanoidStatus& robot_status,
@@ -47,7 +45,8 @@ class ManipulatorPlan : public GenericPlan<T> {
       const HumanoidStatus& robot_stauts,
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-      std::vector<uint8_t>* raw_bytes) const override;
+      const QpInput& qp_input,
+      lcmt_plan_eval_debug_info* message) const override;
 
  private:
   GenericPlan<T>* CloneGenericPlanDerived() const override;

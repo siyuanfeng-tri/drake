@@ -4,12 +4,14 @@ package drake;
 struct lcmt_plan_eval_debug_info {
   int64_t timestamp;
 
-  int32_t num_dof;
+  lcmt_dof_keyframe dof_motion;
 
-  string dof_names[num_dof];
+  // Planned body pose, vel, acc.
+  int32_t num_body_motions;
+  string body_motion_names[num_body_motions];
+  lcmt_cartesian_keyframe body_motions[num_body_motions];
 
-  // Planned position, velocity and acceleration.
-  double nominal_q[num_dof];
-  double nominal_v[num_dof];
-  double nominal_vd[num_dof];
+  // Contact related stuff.
+  // TODO.
+  double nominal_wrench[6];
 }

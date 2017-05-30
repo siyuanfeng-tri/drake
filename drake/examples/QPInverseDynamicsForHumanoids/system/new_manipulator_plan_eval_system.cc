@@ -2,13 +2,15 @@
 
 #include <vector>
 
-//#include "drake/common/copyable_unique_ptr.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/control_utils.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/plan_eval/manipulator_plan.h"
 #include "drake/examples/QPInverseDynamicsForHumanoids/qp_controller_common.h"
 #include "drake/lcmt_plan_eval_debug_info.hpp"
 
 #include "drake/lcmt_motion_plan.hpp"
+
+#include "drake/manipulation/util/cartesian_trajectory_translator.h"
+#include "drake/manipulation/util/dof_trajectory_translator.h"
 
 namespace drake {
 namespace examples {
@@ -27,6 +29,12 @@ ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
 
   // Declare outputs.
   lcmt_plan_eval_debug_info debug_info;
+  manipulation::DofKeyframeTranslator::InitializeMessage(7,
+      &debug_info.dof_motion);
+  debug_info.num_body_motions = 1;
+  debug_info.body_motion_names.resize(debug_info.num_body_motions);
+  debug_info.body_motions.resize(debug_info.num_body_motions);
+
   systems::Value<lcmt_plan_eval_debug_info> debug_msg(debug_info);
   output_port_index_debug_info_ =
       DeclareAbstractOutputPort(debug_msg).get_index();
@@ -101,26 +109,12 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
   QpInput& qp_input = get_mutable_qp_input(state);
   plan.UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input);
 
-  /*
   // Generates debugging info.
   lcmt_plan_eval_debug_info& debug =
       get_mutable_abstract_value<lcmt_plan_eval_debug_info>(
           state, abs_state_index_debug_);
 
-  debug.timestamp = static_cast<int64_t>(context.get_time() * 1e6);
-  debug.num_dof = dim;
-  debug.dof_names.resize(dim);
-  debug.nominal_q.resize(dim);
-  debug.nominal_v.resize(dim);
-  debug.nominal_vd.resize(dim);
-
-  for (int i = 0; i < dim; i++) {
-    debug.dof_names[i] = get_robot().get_position_name(i);
-    debug.nominal_q[i] = plan.desired_position()[i];
-    debug.nominal_v[i] = plan.desired_velocity()[i];
-    debug.nominal_vd[i] = plan.desired_acceleration()[i];
-  }
-  */
+  plan.MakeDebugMessage(*robot_status, get_paramset(), get_alias_groups(), qp_input, &debug);
 }
 
 }  // namespace qp_inverse_dynamics

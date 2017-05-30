@@ -7,6 +7,10 @@
 #include "drake/common/unused.h"
 #include "drake/manipulation/util/motion_plan_translator.h"
 #include "drake/util/lcmUtil.h"
+#include "drake/util/drakeUtil.h"
+
+#include "drake/manipulation/util/cartesian_trajectory_translator.h"
+#include "drake/manipulation/util/dof_trajectory_translator.h"
 
 namespace drake {
 namespace examples {
@@ -74,6 +78,17 @@ void ManipulatorPlan<T>::HandlePlanMessageGenericPlanDerived(
 }
 
 template <typename T>
+void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
+      const HumanoidStatus& status,
+      const param_parsers::ParamSet&,
+      const param_parsers::RigidBodyTreeAliasGroups<T>&,
+      QpInput* qp_input) const {
+  qp_input->mutable_contact_information() = override_contacts_;
+  std::cout << "time: " << status.time() << std::endl;
+  std::cout << *qp_input << std::endl;
+}
+
+template <typename T>
 void ManipulatorPlan<T>::ModifyPlanGenericPlanDerived(
       const HumanoidStatus& robot_status,
       const param_parsers::ParamSet&,
@@ -86,11 +101,65 @@ void ManipulatorPlan<T>::ModifyPlanGenericPlanDerived(
 
 template <typename T>
 void ManipulatorPlan<T>::MakeDebugMessage(
-    const HumanoidStatus& robot_stauts,
+    const HumanoidStatus& robot_status,
     const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-    std::vector<uint8_t>* raw_bytes) const {
+    const QpInput& qp_input,
+    lcmt_plan_eval_debug_info* message) const {
 
+  lcmt_plan_eval_debug_info& msg = *message;
+  msg.timestamp = robot_status.time() * 1e6;
+
+  // Dof
+  manipulation::DofKeyframeTranslator::InitializeMessage(7,
+      &msg.dof_motion);
+  manipulation::DofKeyframeTranslator::EncodeMessage(robot_status.time(),
+      this->get_dof_tracker().desired_position(),
+      this->get_dof_tracker().desired_velocity(),
+      this->get_dof_tracker().desired_acceleration(),
+      &msg.dof_motion);
+
+  // Body.
+  const auto& body_trackers = this->get_body_trackers();
+  if (!body_trackers.empty()) {
+    msg.num_body_motions = body_trackers.size();
+    msg.body_motion_names.resize(msg.num_body_motions);
+    msg.body_motions.resize(msg.num_body_motions);
+    int ctr = 0;
+    for (const auto& tracker_pair : body_trackers) {
+      manipulation::CartesianKeyframeTranslator::InitializeMessage(
+          &msg.body_motions[ctr]);
+      manipulation::CartesianKeyframeTranslator::EncodeMessage(
+          tracker_pair.first->get_name(), robot_status.time(),
+          tracker_pair.second.desired_pose(),
+          tracker_pair.second.desired_velocity(),
+          tracker_pair.second.desired_acceleration(),
+          &msg.body_motions[ctr]);
+      ctr++;
+
+      std::cout << "desired body: " << tracker_pair.first->get_name() << ", " << tracker_pair.second.desired_pose().translation().transpose() << std::endl;
+    }
+  } else {
+    msg.num_body_motions = 1;
+    msg.body_motion_names.resize(msg.num_body_motions);
+    msg.body_motions.resize(msg.num_body_motions);
+    manipulation::CartesianKeyframeTranslator::InitializeMessage(
+        &msg.body_motions[0]);
+    msg.body_motions[0].body_name = "iiwa_link_ee";
+  }
+
+  // Contact.
+  msg.nominal_wrench[0] = 0;
+  msg.nominal_wrench[1] = 0;
+  msg.nominal_wrench[2] = 0;
+  msg.nominal_wrench[3] = 0;
+  msg.nominal_wrench[4] = 0;
+  msg.nominal_wrench[5] = 0;
+  if (!override_contacts_.empty()) {
+    for (int i = 0; i < 3; ++i) {
+      msg.nominal_wrench[3 + i] = override_contacts_.at("iiwa_link_ee").desired_force()[i];
+    }
+  }
 }
 
 template <typename T>

@@ -70,6 +70,8 @@ class IiwaController
       builder.ExportOutput(joint_level_controller->get_output_port_torque());
     this->set_output_port_index_control(index);
 
+    output_index_plan_eval_debug_ = builder.ExportOutput(plan_eval_->get_output_port_debug_info());
+
     // rs -> qp_input
     builder.Connect(rs_wrapper->get_output_port_humanoid_status(),
                     plan_eval_->get_input_port_humanoid_status());
@@ -123,10 +125,16 @@ class IiwaController
         input_index_plan_);
   }
 
+  const systems::OutputPortDescriptor<double>&
+  get_output_port_debug_info() const {
+    return get_output_port(output_index_plan_eval_debug_);
+  }
+
  private:
   ManipulatorPlanEvalSystem* plan_eval_{nullptr};
 
   int input_index_plan_;
+  int output_index_plan_eval_debug_;
 };
 
 }  // end namespace qp_inverse_dynamics
