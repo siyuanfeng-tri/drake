@@ -377,16 +377,25 @@ std::ostream& operator<<(std::ostream& out,
   return out;
 }
 
-ManipulationObjective::ManipulationObjective(const RigidBody<double>& object,
-    const std::vector<const RigidBody<double>*>& robot_bodies_in_contact,
-    const RigidBody<double>& world)
-    : desired_motion_(DesiredBodyMotion(object)),
-      world_contact_(ContactInformation(world)) {
-  for (const RigidBody<double>* body : robot_bodies_in_contact) {
-    robot_contacts_.emplace(body, ContactInformation(*body));
-  }
+/*
+ManipulationObjective::ManipulationObjective(double m,
+    const Matrix3<double>& I)
+    : mass_(m), inertia_(I),
+      X_WO_(Isometry3<double>::Identity()),
+      V_WO_(Vector6<double>::Zero()), desired_motion_(6) {}
+
+Matrix6<double> ManipulationObjective::ComputeMassMatrix() const {
+  Matrix6<double> ret = Matrix6<double>::Identity();
+  ret.block<3, 3>(0, 0) *= mass_;
+  ret.block<3, 3>(3, 3) = X_WO_.linear().transpose() * inertia_ * X_WO_.linear();
+  return ret;
 }
 
+Vector6<double> ManipulationObjective::ComputeDyanmicsBias() const {
+  Vector6<double> ret = Vector6<double>::Zero();
+  return ret;
+}
+*/
 
 bool QpInput::is_valid(int num_vd) const {
   if (num_vd != desired_dof_motions_.size()) {

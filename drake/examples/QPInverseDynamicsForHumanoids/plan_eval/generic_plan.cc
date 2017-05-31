@@ -58,7 +58,8 @@ template <typename T>
 void GenericPlan<T>::UpdateQpInput(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-    QpInput* qp_input) const {
+    QpInput* qp_input,
+    void* other_inputs) const {
   // Gets all bodies that are in contact.
   const ContactState& contact_state = get_planned_contact_state();
   const std::vector<const RigidBody<T>*> contact_bodies(contact_state.begin(),
@@ -84,7 +85,7 @@ void GenericPlan<T>::UpdateQpInput(
 
   // Calls custom update.
   UpdateQpInputGenericPlanDerived(robot_status, paramset, alias_groups,
-                                  qp_input);
+                                  qp_input, other_inputs);
 }
 
 template <typename T>

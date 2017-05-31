@@ -101,24 +101,6 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
       plan.ComputeTargetAcceleration(robot_status->position(),
                                      robot_status->velocity());
 
-  // Generates debugging info.
-  lcmt_plan_eval_debug_info& debug =
-      get_mutable_abstract_value<lcmt_plan_eval_debug_info>(
-          state, abs_state_index_debug_);
-
-  debug.timestamp = static_cast<int64_t>(context.get_time() * 1e6);
-  debug.num_dof = dim;
-  debug.dof_names.resize(dim);
-  debug.nominal_q.resize(dim);
-  debug.nominal_v.resize(dim);
-  debug.nominal_vd.resize(dim);
-
-  for (int i = 0; i < dim; i++) {
-    debug.dof_names[i] = get_robot().get_position_name(i);
-    debug.nominal_q[i] = plan.desired_position()[i];
-    debug.nominal_v[i] = plan.desired_velocity()[i];
-    debug.nominal_vd[i] = plan.desired_acceleration()[i];
-  }
 }
 
 }  // namespace qp_inverse_dynamics

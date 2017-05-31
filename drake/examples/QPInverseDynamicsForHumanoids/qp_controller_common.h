@@ -449,35 +449,66 @@ std::ostream& operator<<(std::ostream& out,
 
 class ManipulationObjective {
  public:
-  ManipulationObjective(const RigidBody<double>& object,
-      const std::vector<const RigidBody<double>*>& robot_bodies_in_contact,
-      const RigidBody<double>& world);
+  /*
+  ManipulationObjective()
+      : ManipulationObjective(0, Matrix3<double>::Zero()) {}
+
+  ManipulationObjective(double m,
+      const Matrix3<double>& I);
+  */
+  ManipulationObjective()
+      : X_WO_(Isometry3<double>::Identity()),
+        V_WO_(Vector6<double>::Zero()),
+        M_(Matrix6<double>::Zero()), h_(Vector6<double>::Zero()),
+        desired_motion_(6) {}
 
   bool is_static() const { return static_object_; }
 
-  const DesiredBodyMotion& get_desired_motion() const { return desired_motion_; }
+  // TODO
+  // Matrix6<double> ComputeMassMatrix() const;
+  // Vector6<double> ComputeDyanmicsBias() const;
+  Matrix6<double> ComputeMassMatrix() const { return M_; }
+  Vector6<double> ComputeDyanmicsBias() const { return h_; }
 
-  const DesiredCentroidalMomentumDot&
-  get_desired_centroidal_momentum_dot() const {
-    return desired_centroidal_momentum_dot_;
+  void set_M(const Matrix6<double>& M) {
+    M_ = M;
   }
 
-  const std::unordered_map<const RigidBody<double>*, ContactInformation>&
-  get_robot_contacts() const {
+  void set_h(const Vector6<double>& h) {
+    h_ = h;
+  }
+
+  const ConstrainedValues& get_desired_motion() const { return desired_motion_; }
+
+  const std::set<std::string>& get_robot_contacts() const {
     return robot_contacts_;
   }
 
-  const ContactInformation& get_world_contact() const {
-    return world_contact_;
+  const Isometry3<double>& get_X_WO() const { return X_WO_; }
+  const Vector6<double>& get_V_WO() const { return V_WO_; }
+  Isometry3<double>& get_mutable_X_WO() { return X_WO_; }
+  Vector6<double>& get_mutable_V_WO() { return V_WO_; }
+
+  ConstrainedValues& get_mutable_desired_motion() { return desired_motion_; }
+
+  std::set<std::string>& get_mutable_robot_contacts() {
+    return robot_contacts_;
   }
 
  private:
-  bool static_object_;
-  DesiredBodyMotion desired_motion_;
-  DesiredCentroidalMomentumDot desired_centroidal_momentum_dot_;
+  // double mass_;
+  // Matrix3<double> inertia_;
 
-  std::unordered_map<const RigidBody<double>*, ContactInformation> robot_contacts_;
-  ContactInformation world_contact_;
+  Isometry3<double> X_WO_;
+  Vector6<double> V_WO_;
+
+  Matrix6<double> M_;
+  Vector6<double> h_;
+
+  bool static_object_{false};
+
+  ConstrainedValues desired_motion_;
+  std::set<std::string> robot_contacts_;
 };
 
 
@@ -543,6 +574,14 @@ class QpInput {
   inline DesiredCentroidalMomentumDot&
   mutable_desired_centroidal_momentum_dot() {
     return desired_centroidal_momentum_dot_;
+  }
+
+  const std::unordered_map<std::string, ManipulationObjective>& get_manipulation_objectives() const {
+    return manipulation_objectives_;
+  }
+
+  std::unordered_map<std::string, ManipulationObjective>& get_mutable_manipulation_objectives() {
+    return manipulation_objectives_;
   }
   /// @}
 

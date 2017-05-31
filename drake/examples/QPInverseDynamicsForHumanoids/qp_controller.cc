@@ -43,7 +43,7 @@ void QPController::AddAsCosts(const Eigen::MatrixBase<DerivedA>& A,
   tmp_vd_vec_.setZero();
   double c = 0;
   for (int d : idx) {
-    double weight = weights[d];
+    double weight = weights[d] * weights[d];
     tmp_vd_mat_ += weight * A.row(d).transpose() * A.row(d);
     tmp_vd_vec_ += weight * A.row(d).transpose() * b.row(d);
     c += 0.5 * weight * b.row(d) * b.row(d);
@@ -141,6 +141,8 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
     }
   }
 
+  int num_manip_obj = static_cast<int>(input.get_manipulation_objectives().size());
+
   // Structure of the QP remains the same, no need to make a new
   // MathematicalProgram.
   if (num_contact_body == num_contact_body_ && num_vd == num_vd_ &&
@@ -153,7 +155,8 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
       num_dof_motion_as_eq == num_dof_motion_as_eq_ &&
       num_dof_motion_as_cost == num_dof_motion_as_cost_ &&
       num_contact_as_cost == num_contact_as_cost_ &&
-      num_contact_as_eq == num_contact_as_eq_) {
+      num_contact_as_eq == num_contact_as_eq_ &&
+      num_manip_obj == num_manip_obj_) {
     return;
   }
 
@@ -171,6 +174,7 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
   num_cen_mom_dot_as_eq_ = num_cen_mom_dot_as_eq;
   num_contact_as_cost_ = num_contact_as_cost;
   num_contact_as_eq_ = num_contact_as_eq;
+  num_manip_obj_ = num_manip_obj;
 
   // The order of insertion is important, the rest of the program assumes this
   // layout.
@@ -242,12 +246,22 @@ void QPController::ResizeQP(const RigidBodyTree<double>& robot,
   summed_contact_forces_ = MatrixX<double>::Zero(
       3 * num_contact_body_, 3 * num_point_force_);
   desired_contact_forces_ = VectorX<double>::Zero(3 * num_contact_body_);
+
   cost_contacts_forces_ =
       prog_->AddQuadraticCost(
           MatrixX<double>::Zero(num_basis_, num_basis_),
-          VectorX<double>::Zero(num_basis_),
-          basis_).constraint().get();
+          VectorX<double>::Zero(num_basis_), basis_).constraint().get();
   cost_contacts_forces_->set_description("all contact forces");
+
+  // Manip obj
+  // TODO: should really split the basis per contact point.
+  // So I only need to pick out the relavent ones.
+  cost_manip_obj_ext_force_.resize(num_manip_obj_);
+  for (size_t i = 0; i < input.get_manipulation_objectives().size(); ++i) {
+    cost_manip_obj_ext_force_[i] = prog_->AddQuadraticCost(
+        MatrixX<double>::Zero(num_basis_, num_basis_),
+        VectorX<double>::Zero(num_basis_), basis_).constraint().get();
+  }
 
   // Allocate inequality constraints.
   // Contact force scalar (Beta), which is constant and does not depend on the
@@ -505,12 +519,12 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
       const ContactInformation& contact = contact_pair.second;
       for (int i = 0; i < contact.num_contact_points(); ++i) {
         summed_contact_forces_.block<3,3>(row_idx, col_idx) =
-          contact.desired_force_weight().asDiagonal();
+            contact.desired_force_weight().asDiagonal();
         col_idx += 3;
       }
       desired_contact_forces_.segment<3>(row_idx) =
-        (contact.desired_force_weight().array() *
-         contact.desired_force().array()).matrix();
+          contact.desired_force_weight().asDiagonal() *
+          contact.desired_force();
       row_idx += 3;
     }
 
@@ -522,6 +536,55 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
         tmp.transpose() * tmp,
         -tmp.transpose() * desired_contact_forces_,
         0.5 * desired_contact_forces_.squaredNorm());
+  }
+
+  // manip objective:
+  // TODO: split basis
+  MatrixX<double> ext_force_matrix(6, 3 * num_point_force_);
+  Matrix3X<double> contact_points;
+  Vector3<double> throw_away_point;
+
+  int manip_obj_ctr = 0;
+  if (!input.get_manipulation_objectives().empty()) {
+    // Goes through all objects being manipulated.
+    for (const auto& pair : input.get_manipulation_objectives()) {
+      const auto& manip_obj = pair.second;
+
+      // Goes through all the contacts (including ones that are irrelevant to this obj)
+      int col_idx = 0;
+      ext_force_matrix.setZero();
+
+      for (const auto& contact_pair : input.contact_information()) {
+        // HACK!! This is really bad
+        const ContactInformation& contact = contact_pair.second;
+        const int col_stride = 3 * contact.num_contact_points();
+        // This contact is relavent.
+        if (manip_obj.get_robot_contacts().find(contact_pair.first) != manip_obj.get_robot_contacts().end()) {
+          contact.ComputeContactPointsAndWrenchReferencePoint(
+              rs.robot(), rs.cache(), Vector3<double>::Zero(),
+              &contact_points, &throw_away_point);
+
+          ext_force_matrix.block(0, col_idx, 6, col_stride) =
+            contact.ComputeWrenchMatrix(contact_points,
+                manip_obj.get_X_WO().translation());
+
+          col_idx += col_stride;
+        } else {
+          col_idx += col_stride;
+          continue;
+        }
+      }
+      DRAKE_DEMAND(col_idx == 3 * num_point_force_);
+
+      // min(-ext_force_matrix * basis_to_force_matrix_ * basis - M_obj * xdd_obj - b_obj)^2
+      MatrixX<double> A = manip_obj.get_desired_motion().weights().asDiagonal() * ext_force_matrix * basis_to_force_matrix_;
+      Vector6<double> b = manip_obj.get_desired_motion().weights().asDiagonal() *
+          (manip_obj.ComputeMassMatrix() * manip_obj.get_desired_motion().values() +
+           manip_obj.ComputeDyanmicsBias());
+
+      cost_manip_obj_ext_force_[manip_obj_ctr++]->UpdateCoefficients(
+          A.transpose() * A, A.transpose() * b, 0.5 * b.squaredNorm());
+    }
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -639,7 +702,8 @@ int QPController::Control(const HumanoidStatus& rs, const QpInput& input,
 
     double c = 0;
     for (int d : row_idx_as_cost) {
-      double weight = input.desired_dof_motions().weight(d);
+      double weight = input.desired_dof_motions().weight(d) *
+                      input.desired_dof_motions().weight(d);
       tmp_vd_mat_(d, d) = weight;
       tmp_vd_vec_[d] = -weight * input.desired_dof_motions().value(d);
       c += 0.5 * weight * input.desired_dof_motions().value(d) *

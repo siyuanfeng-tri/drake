@@ -112,6 +112,7 @@ class GenericPlan {
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
       const void* message_bytes, int message_length);
 
+  // HACKS
   virtual void MakeDebugMessage(
       const HumanoidStatus& robot_stauts,
       const param_parsers::ParamSet& paramset,
@@ -147,7 +148,8 @@ class GenericPlan {
       const HumanoidStatus& robot_status,
       const param_parsers::ParamSet& paramset,
       const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-      QpInput* qp_input) const;
+      QpInput* qp_input,
+      void* other_inputs = nullptr) const;
 
   /**
    * Returns the current planned contact state.
@@ -232,7 +234,8 @@ class GenericPlan {
       const HumanoidStatus&,
       const param_parsers::ParamSet&,
       const param_parsers::RigidBodyTreeAliasGroups<T>&,
-      QpInput*) const {}
+      QpInput*,
+      void* other_inputs = nullptr) const {}
 
   /**
    * Sets the planned contact state to @p contact_state.

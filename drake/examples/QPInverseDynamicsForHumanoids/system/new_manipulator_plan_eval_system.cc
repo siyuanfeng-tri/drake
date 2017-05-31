@@ -18,14 +18,23 @@ namespace qp_inverse_dynamics {
 
 ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
     const RigidBodyTree<double>& robot,
+    const RigidBodyTree<double>& object,
     const std::string& alias_groups_file_name,
     const std::string& param_file_name, double dt)
-    : PlanEvalBaseSystem(robot, alias_groups_file_name, param_file_name, dt) {
+    : PlanEvalBaseSystem(robot, alias_groups_file_name, param_file_name, dt),
+      object_(object) {
   DRAKE_DEMAND(get_robot().get_num_velocities() ==
                get_robot().get_num_positions());
 
   // Declare inputs.
   input_port_index_plan_ = DeclareAbstractInputPort().get_index();
+
+  VectorX<double> obj_state = VectorX<double>::Zero(
+      object_.get_num_positions() + object_.get_num_velocities());
+  obj_state.head(object_.get_num_positions()) = object_.getZeroConfiguration();
+
+  systems::BasicVector<double> obj_state0(obj_state);
+  input_port_index_object_ = DeclareVectorInputPort(obj_state0).get_index();
 
   // Declare outputs.
   lcmt_plan_eval_debug_info debug_info;
@@ -41,7 +50,7 @@ ManipulatorPlanEvalSystem::ManipulatorPlanEvalSystem(
 
   // Declare states.
   auto plan_as_value = systems::AbstractValue::Make<GenericPlan<double>>(
-      ManipulatorPlan<double>());
+      ManipulatorPlan<double>(object));
 
   abs_state_index_plan_ =
       DeclareAbstractState(std::move(plan_as_value));
@@ -57,8 +66,9 @@ void ManipulatorPlanEvalSystem::Initialize(const HumanoidStatus& current_status,
   plan.Initialize(current_status, get_paramset(), get_alias_groups());
 
   QpInput& qp_input = get_mutable_qp_input(state);
-  const std::vector<std::string> empty;
-  plan.UpdateQpInput(current_status, get_paramset(), get_alias_groups(), &qp_input);
+
+  VectorX<double> box_state = object_.getZeroConfiguration();
+  plan.UpdateQpInput(current_status, get_paramset(), get_alias_groups(), &qp_input, &box_state);
 }
 
 void ManipulatorPlanEvalSystem::DoExtendedCalcOutput(
@@ -78,6 +88,9 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
   // Gets the robot state from input.
   const HumanoidStatus* robot_status = EvalInputValue<HumanoidStatus>(
       context, get_input_port_humanoid_status().get_index());
+
+  VectorX<double> obj_state =
+      EvalEigenVectorInput(context, input_port_index_object_);
 
   // Gets the lcm message inputs.
   const lcmt_motion_plan* msg =
@@ -107,7 +120,9 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
 
   // Updates the QpInput in AbstractState.
   QpInput& qp_input = get_mutable_qp_input(state);
-  plan.UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input);
+
+  // TODO
+  plan.UpdateQpInput(*robot_status, get_paramset(), get_alias_groups(), &qp_input, &obj_state);
 
   // Generates debugging info.
   lcmt_plan_eval_debug_info& debug =

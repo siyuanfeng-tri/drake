@@ -16,7 +16,7 @@ class ManipulatorPlan : public GenericPlan<T> {
   DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(ManipulatorPlan)
 
  public:
-  ManipulatorPlan() {}
+  ManipulatorPlan(const RigidBodyTree<T>& object) : obj_(&object) {}
 
  protected:
   void InitializeGenericPlanDerived(
@@ -34,7 +34,8 @@ class ManipulatorPlan : public GenericPlan<T> {
       const HumanoidStatus& status,
       const param_parsers::ParamSet&,
       const param_parsers::RigidBodyTreeAliasGroups<T>&,
-      QpInput* qp_input) const override;
+      QpInput* qp_input,
+      void* other_inputs = nullptr) const override;
 
   void ModifyPlanGenericPlanDerived(
       const HumanoidStatus& robot_status,
@@ -50,6 +51,8 @@ class ManipulatorPlan : public GenericPlan<T> {
 
  private:
   GenericPlan<T>* CloneGenericPlanDerived() const override;
+
+  const RigidBodyTree<T>* obj_;
 
   std::unordered_map<std::string, ContactInformation> override_contacts_;
 };

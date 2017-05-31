@@ -37,6 +37,7 @@ drake_cc_binary(
         "//drake/manipulation/models/iiwa_description:models",
     ],
     deps = [
+        "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
         "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
         "//drake/lcmtypes:contact_info_for_viz",
         "//drake/lcmtypes:contact_results_for_viz",

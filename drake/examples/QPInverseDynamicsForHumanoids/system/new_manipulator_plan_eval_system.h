@@ -31,6 +31,7 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
    * @param dt Time step
    */
   ManipulatorPlanEvalSystem(const RigidBodyTree<double>& robot,
+                            const RigidBodyTree<double>& object,
                             const std::string& alias_groups_file_name,
                             const std::string& param_file_name, double dt);
 
@@ -50,6 +51,11 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
   const systems::InputPortDescriptor<double>&
   get_input_port_plan() const {
     return get_input_port(input_port_index_plan_);
+  }
+
+  const systems::InputPortDescriptor<double>&
+  get_input_port_object_state() const {
+    return get_input_port(input_port_index_object_);
   }
 
   /**
@@ -72,12 +78,15 @@ class ManipulatorPlanEvalSystem : public PlanEvalBaseSystem {
       systems::SystemOutput<double>* output) const override;
 
   int input_port_index_plan_{};
+  int input_port_index_object_{};
   int output_port_index_debug_info_{};
 
   int abs_state_index_plan_{};
   int abs_state_index_debug_{};
 
   mutable int64_t last_plan_timestamp_{0};
+
+  const RigidBodyTree<double>& object_;
 };
 
 }  // namespace qp_inverse_dynamics

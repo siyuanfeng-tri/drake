@@ -13,14 +13,19 @@ namespace kuka_iiwa_arm {
 
 using namespace qp_inverse_dynamics;
 
+constexpr int kDim = 14;
+
 void Approach(const RigidBodyTree<double>& robot, ::lcm::LCM *lcm) {
-  VectorX<double> q1(7);
-  q1 << 0, 45, 0, -45, 0, 0, 0;
-  for (int i = 0; i < 7; i++) {
+  VectorX<double> q1(kDim);
+  // left firt.
+  q1 << 0, 45, 0, -45, 0, 0, 0,
+        0, 45, 0, -45, 0, 0, 0;
+
+  for (int i = 0; i < 14; i++) {
     q1[i] = q1[i] / 180. * M_PI;
   }
 
-  VectorX<double> zero = VectorX<double>::Zero(7);
+  VectorX<double> zero = VectorX<double>::Zero(kDim);
   double duration = 2;
   std::vector<double> times = {0, duration};
   std::vector<VectorX<double>> qs(2, zero);
@@ -37,7 +42,7 @@ void Approach(const RigidBodyTree<double>& robot, ::lcm::LCM *lcm) {
       &msg.dof_motion);
 
   lcm->publish("IIWA_PLAN", &msg);
-  usleep(duration * 1e6);
+  usleep(6 * duration * 1e6);
 }
 
 void MoveStraight(
@@ -45,9 +50,10 @@ void MoveStraight(
     const param_parsers::ParamSet& params,
     const param_parsers::RigidBodyTreeAliasGroups<double>& alias_groups,
     ::lcm::LCM *lcm) {
-  VectorX<double> q1(7);
-  q1 << 0, 45, 0, -45, 0, 0, 0;
-  for (int i = 0; i < 7; i++) {
+  VectorX<double> q1(kDim);
+  q1 << 0, 45, 0, -45, 0, 0, 0,
+        0, 45, 0, -45, 0, 0, 0;
+  for (int i = 0; i < kDim; i++) {
     q1[i] = q1[i] / 180. * M_PI;
   }
 
@@ -56,7 +62,7 @@ void MoveStraight(
   msg.timestamp = static_cast<int64_t>(time(NULL));
 
   ///////////////////
-  VectorX<double> zero = VectorX<double>::Zero(7);
+  VectorX<double> zero = VectorX<double>::Zero(kDim);
   double duration = 1;
   std::vector<double> times = {0, duration};
   std::vector<VectorX<double>> qs(2, q1);
@@ -68,43 +74,68 @@ void MoveStraight(
       &msg.dof_motion);
 
   ///////////////////
-  msg.num_body_motions = 1;
+  msg.num_body_motions = 2;
   msg.body_motions.resize(msg.num_body_motions);
 
-  const RigidBody<double>* body = robot.FindBody("iiwa_link_ee");
-  KinematicsCache<double> cache = robot.CreateKinematicsCache();
-  cache.initialize(q1, zero);
-  robot.doKinematics(cache, true);
+  int body_idx = 0;
+  {
+    const RigidBody<double>* body = robot.FindBody("right_iiwa_link_ee");
+    KinematicsCache<double> cache = robot.CreateKinematicsCache();
+    cache.initialize(q1, zero);
+    robot.doKinematics(cache, true);
 
-  std::vector<Isometry3<double>> poses(2);
-  std::vector<Vector6<double>> velocities(2, Vector6<double>::Zero());
-  std::vector<Vector6<double>> accelerations(2, Vector6<double>::Zero());
+    std::vector<Isometry3<double>> poses(2);
+    std::vector<Vector6<double>> velocities(2, Vector6<double>::Zero());
+    std::vector<Vector6<double>> accelerations(2, Vector6<double>::Zero());
 
-  poses[0] = robot.CalcBodyPoseInWorldFrame(cache, *body);
-  std::cout << poses[0].translation()[0] << std::endl;
-  poses[1] = poses[0];
-  // Move in +x.
-  poses[1].translation()[0] = 0.84;
+    poses[0] = robot.CalcBodyPoseInWorldFrame(cache, *body);
+    std::cout << poses[0].translation()[0] << std::endl;
+    poses[1] = poses[0];
+    // Move in +x.
+    poses[1].translation()[0] = 0.84;
 
-  manipulation::CartesianTrajectoryTranslator::EncodeMessage(
-      body->get_name(),
-      times, poses, velocities, accelerations, &(msg.body_motions[0]));
+    manipulation::CartesianTrajectoryTranslator::EncodeMessage(
+        body->get_name(),
+        times, poses, velocities, accelerations, &(msg.body_motions[body_idx++]));
+  }
+
+  {
+    const RigidBody<double>* body = robot.FindBody("left_iiwa_link_ee");
+    KinematicsCache<double> cache = robot.CreateKinematicsCache();
+    cache.initialize(q1, zero);
+    robot.doKinematics(cache, true);
+
+    std::vector<Isometry3<double>> poses(2);
+    std::vector<Vector6<double>> velocities(2, Vector6<double>::Zero());
+    std::vector<Vector6<double>> accelerations(2, Vector6<double>::Zero());
+
+    poses[0] = robot.CalcBodyPoseInWorldFrame(cache, *body);
+    std::cout << poses[0].translation()[0] << std::endl;
+    poses[1] = poses[0];
+    // Move in +x.
+    poses[1].translation()[0] = 0.83 + 0.2 - 0.01;
+
+    manipulation::CartesianTrajectoryTranslator::EncodeMessage(
+        body->get_name(),
+        times, poses, velocities, accelerations, &(msg.body_motions[body_idx++]));
+  }
 
   lcm->publish("IIWA_PLAN", &msg);
-  usleep(duration * 1e6);
+  usleep(6 * duration * 1e6);
 }
 
 void MakeContact(const RigidBodyTree<double>& robot,
     const param_parsers::ParamSet& params,
     const param_parsers::RigidBodyTreeAliasGroups<double>& alias_groups,
     ::lcm::LCM *lcm) {
-  VectorX<double> q1(7);
-  q1 << 0, 45, 0, -45, 0, 0, 0;
-  for (int i = 0; i < 7; i++) {
+  VectorX<double> q1(kDim);
+  q1 << 0, 45, 0, -45, 0, 0, 0,
+        0, 45, 0, -45, 0, 0, 0;
+  for (int i = 0; i < kDim; i++) {
     q1[i] = q1[i] / 180. * M_PI;
   }
 
-  VectorX<double> zero = VectorX<double>::Zero(7);
+  VectorX<double> zero = VectorX<double>::Zero(kDim);
   double duration = 2;
   std::vector<double> times = {0, duration};
   std::vector<VectorX<double>> qs(2, q1);
@@ -119,20 +150,33 @@ void MakeContact(const RigidBodyTree<double>& robot,
       times, qs, vs, vds,
       &msg.dof_motion);
 
-  ContactInformation contact = params.MakeContactInformation(
-      *robot.FindBody("iiwa_link_ee"));
-  contact.mutable_desired_force() = Vector3<double>(-2, 0, 0);
-  contact.mutable_desired_force_weight() = Vector3<double>(10, 10, 10);
-
+  int body_idx = 0;
   msg.num_contact_states = 1;
   msg.contact_states.resize(msg.num_contact_states);
   msg.contact_states.front().timestamp = 0;
-  msg.contact_states.front().num_bodies_in_contact = 1;
-  msg.contact_states.front().bodies_in_contact.resize(1);
-  EncodeContactInformation(contact, &(msg.contact_states.front().bodies_in_contact.front()));
+  msg.contact_states.front().num_bodies_in_contact = 2;
+  msg.contact_states.front().bodies_in_contact.resize(msg.contact_states.front().num_bodies_in_contact);
+
+  {
+    ContactInformation contact = params.MakeContactInformation(
+        *robot.FindBody("left_iiwa_link_ee"));
+    contact.mutable_desired_force() = Vector3<double>(100, 0, 0);
+    contact.mutable_desired_force_weight() = Vector3<double>(1, 0, 0);
+
+    EncodeContactInformation(contact, &(msg.contact_states.front().bodies_in_contact[body_idx++]));
+  }
+
+  {
+    ContactInformation contact = params.MakeContactInformation(
+        *robot.FindBody("right_iiwa_link_ee"));
+    contact.mutable_desired_force() = Vector3<double>(-100, 0, 0);
+    contact.mutable_desired_force_weight() = Vector3<double>(1, 0, 0);
+
+    EncodeContactInformation(contact, &(msg.contact_states.front().bodies_in_contact[body_idx++]));
+  }
 
   lcm->publish("IIWA_PLAN", &msg);
-  usleep(duration * 1e6);
+  usleep(6 * duration * 1e6);
 }
 
 }  // namespace kuka_iiwa_arm
@@ -142,17 +186,17 @@ void MakeContact(const RigidBodyTree<double>& robot,
 int main(int argc, char* argv[]) {
   const std::string kModelPath =
     "/manipulation/models/iiwa_description/urdf/"
-    "iiwa14_polytope_collision.urdf";
+    "sfeng_dual_iiwa14_polytope_collision.urdf";
 
   const std::string kAliasGroupsPath =
     drake::GetDrakePath() +
     "/examples/QPInverseDynamicsForHumanoids/"
-    "config/iiwa.alias_groups";
+    "config/sfeng_iiwa.alias_groups";
 
   const std::string kControlConfigPath =
     drake::GetDrakePath() +
     "/examples/QPInverseDynamicsForHumanoids/"
-    "config/iiwa.id_controller_config";
+    "config/sfeng_iiwa.id_controller_config";
 
   auto tree = std::make_unique<RigidBodyTree<double>>();
   drake::examples::kuka_iiwa_arm::CreateTreedFromFixedModelAtPose(kModelPath, tree.get());

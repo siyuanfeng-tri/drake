@@ -106,6 +106,7 @@ class QPController {
   int num_cen_mom_dot_as_eq_{0};
   int num_contact_as_cost_{0};
   int num_contact_as_eq_{0};
+  int num_manip_obj_{0};
 
   // prog_ is only allocated in ResizeQP, Control only updates the appropriate
   // matrices / vectors.
@@ -133,6 +134,8 @@ class QPController {
   drake::solvers::QuadraticCost* cost_dof_motion_{nullptr};
 
   drake::solvers::QuadraticCost* cost_basis_reg_{nullptr};
+
+  std::vector<drake::solvers::QuadraticCost*> cost_manip_obj_ext_force_{nullptr};
 
   // Resize the QP. This resizes the temporary matrices. It also reinitializes
   // prog_ to the correct size, so that Control only updates the

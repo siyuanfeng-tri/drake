@@ -35,9 +35,16 @@ class IiwaController
   IiwaController(
       const std::string& model_path, const std::string& alias_group_path,
       const std::string& controller_config_path, double dt,
-      std::shared_ptr<RigidBodyFrame<double>> world_offset)
+      std::shared_ptr<RigidBodyFrame<double>> world_offset,
+      const std::string& obj_model_path,
+      std::shared_ptr<RigidBodyFrame<double>> obj_world_offset)
       : systems::ModelBasedController<double>(model_path, world_offset,
                                               multibody::joints::kFixed) {
+
+    obj_ = std::make_unique<RigidBodyTree<double>>();
+    parsers::urdf::AddModelInstanceFromUrdfFile(
+        obj_model_path, multibody::joints::kQuaternion, obj_world_offset, obj_.get());
+
     const RigidBodyTree<double>& robot = get_robot_for_control();
     systems::DiagramBuilder<double> builder;
 
@@ -53,7 +60,7 @@ class IiwaController
 
     // PlanEval + controller
     plan_eval_ = builder.AddSystem(std::make_unique<ManipulatorPlanEvalSystem>(
-        robot, alias_group_path, controller_config_path, dt));
+        robot, *obj_, alias_group_path, controller_config_path, dt));
     plan_eval_->set_name("plan_eval");
 
     QpControllerSystem* qp_con = builder.AddSystem(
@@ -65,6 +72,8 @@ class IiwaController
     this->set_input_port_index_estimated_state(index);
 
     input_index_plan_ = builder.ExportInput(plan_eval_->get_input_port_plan());
+    input_index_obj_state_ = builder.ExportInput(
+        plan_eval_->get_input_port_object_state());
 
     index =
       builder.ExportOutput(joint_level_controller->get_output_port_torque());
@@ -125,6 +134,12 @@ class IiwaController
         input_index_plan_);
   }
 
+  const systems::InputPortDescriptor<double>&
+  get_input_port_object_state() const {
+    return systems::Diagram<double>::get_input_port(
+        input_index_obj_state_);
+  }
+
   const systems::OutputPortDescriptor<double>&
   get_output_port_debug_info() const {
     return get_output_port(output_index_plan_eval_debug_);
@@ -133,7 +148,10 @@ class IiwaController
  private:
   ManipulatorPlanEvalSystem* plan_eval_{nullptr};
 
+  std::unique_ptr<RigidBodyTree<double>> obj_;
+
   int input_index_plan_;
+  int input_index_obj_state_;
   int output_index_plan_eval_debug_;
 };
 

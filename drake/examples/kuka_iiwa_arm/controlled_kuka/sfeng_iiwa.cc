@@ -17,37 +17,63 @@
 #include "drake/lcmt_motion_plan.hpp"
 #include "drake/lcmt_plan_eval_debug_info.hpp"
 
+#include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
+
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 namespace {
 
-int DoMain() {
+std::unique_ptr<RigidBodyTree<double>> make_rbt(
+    ModelInstanceInfo<double>* iiwa_instance,
+    ModelInstanceInfo<double>* box_instance) {
   const std::string kModelPath =
     "/manipulation/models/iiwa_description/urdf/"
-    "dual_iiwa14_polytope_collision.urdf";
-    //"iiwa14_polytope_collision.urdf";
+    "sfeng_dual_iiwa14_polytope_collision.urdf";
+  auto tree_builder = std::make_unique<WorldSimTreeBuilder<double>>();
 
+  tree_builder->StoreModel("iiwas", kModelPath);
+  tree_builder->StoreModel("box",
+      "/examples/kuka_iiwa_arm/models/objects/sfeng_box.urdf");
+
+  tree_builder->AddGround();
+
+  int id = tree_builder->AddFixedModelInstance("iiwas", Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+  tree_builder->get_model_info_for_instance(id);
+  *iiwa_instance = tree_builder->get_model_info_for_instance(id);;
+
+  id = tree_builder->AddFloatingModelInstance("box",
+                                              Vector3<double>(0.83 + 0.1, 0, 0.75),
+                                              Vector3<double>::Zero());
+  *box_instance = tree_builder->get_model_info_for_instance(id);
+
+  auto tree = tree_builder->Build();
+
+  Isometry3<double> X_WStand = Isometry3<double>::Identity();
+  X_WStand.translation() = Vector3<double>(0.83 + 0.1, 0, 0.4);
+  multibody::AddBoxToWorld(X_WStand, Vector3<double>(0.3, 0.3, 0.3), "stand", tree.get());
+
+  return tree;
+}
+
+int DoMain() {
   const std::string kAliasGroupsPath =
     drake::GetDrakePath() +
     "/examples/QPInverseDynamicsForHumanoids/"
-    "config/iiwa.alias_groups";
+    "config/sfeng_iiwa.alias_groups";
 
   const std::string kControlConfigPath =
     drake::GetDrakePath() +
     "/examples/QPInverseDynamicsForHumanoids/"
-    "config/iiwa.id_controller_config";
+    "config/sfeng_iiwa.id_controller_config";
   drake::lcm::DrakeLcm lcm;
   SimDiagramBuilder<double> builder;
   systems::RigidBodyPlant<double>* plant;
 
+  ModelInstanceInfo<double> iiwa_instance;
+  ModelInstanceInfo<double> box_instance;
   {
-    auto tree = std::make_unique<RigidBodyTree<double>>();
-    CreateTreedFromFixedModelAtPose(kModelPath, tree.get());
-
-    Isometry3<double> X_WBox = Isometry3<double>::Identity();
-    X_WBox.translation() = Vector3<double>(0.83 + 0.5, 0, 0.5);
-    multibody::AddBoxToWorld(X_WBox, Vector3<double>(1, 1, 1), "box", tree.get());
+    auto tree = make_rbt(&iiwa_instance, &box_instance);
 
     // Adds a plant
     plant = builder.AddPlant(std::move(tree));
@@ -59,8 +85,12 @@ int DoMain() {
   // Adds a iiwa controller
   auto controller =
       builder.AddController<qp_inverse_dynamics::IiwaController>(
-          RigidBodyTreeConstants::kFirstNonWorldModelInstanceId,
-           drake::GetDrakePath() + kModelPath, kAliasGroupsPath, kControlConfigPath, 2e-3, nullptr);
+          iiwa_instance.instance_id,
+          iiwa_instance.model_path,
+          kAliasGroupsPath, kControlConfigPath, 1e-3, nullptr,
+          box_instance.model_path,
+          box_instance.world_offset);
+  const RigidBodyTree<double>& robot = controller->get_robot_for_control();
 
   systems::DiagramBuilder<double>* diagram_builder =
       builder.get_mutable_builder();
@@ -90,10 +120,16 @@ int DoMain() {
   diagram_builder->Connect(plan_sub->get_output_port(0),
                            controller->get_input_port_plan());
 
+  std::cout << plant->model_instance_state_output_port(box_instance.instance_id).size() << ", " <<
+      controller->get_input_port_object_state().size() << std::endl;
+  diagram_builder->Connect(plant->model_instance_state_output_port(box_instance.instance_id),
+                           controller->get_input_port_object_state());
+
   auto estimator = diagram_builder->AddSystem<OracularStateEstimation<double>>(
-      controller->get_robot_for_control());
-  diagram_builder->Connect(plant->get_output_port(0),
-                           estimator->get_input_port_state());
+      robot);
+  diagram_builder->Connect(
+      plant->model_instance_state_output_port(iiwa_instance.instance_id),
+      estimator->get_input_port_state());
 
   // EST_ROBOT_STATE -> publisher.
   auto iiwa_state_pub = diagram_builder->AddSystem(
@@ -118,13 +154,14 @@ int DoMain() {
   // TODO set real init.
   systems::Context<double>* controller_context = diagram->GetMutableSubsystemContext(
       simulator.get_mutable_context(), controller);
-  VectorX<double> zero = VectorX<double>::Zero(7);
+  VectorX<double> zero = VectorX<double>::Zero(robot.get_num_positions());
   controller->Initialize(0, zero, zero, controller_context);
 
   lcm.StartReceiveThread();
 
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
+  simulator.get_mutable_integrator()->set_maximum_step_size(1e-4);
   simulator.set_publish_every_time_step(false);
 
   simulator.StepTo(INFINITY);
