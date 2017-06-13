@@ -31,15 +31,12 @@ class ManipulatorPlan : public GenericPlan<T> {
       const void* message_bytes, int message_length) override;
 
   void UpdateQpInputGenericPlanDerived(
-      const HumanoidStatus& status,
-      const param_parsers::ParamSet&,
-      const param_parsers::RigidBodyTreeAliasGroups<T>&,
-      QpInput* qp_input,
+      const HumanoidStatus& status, const param_parsers::ParamSet&,
+      const param_parsers::RigidBodyTreeAliasGroups<T>&, QpInput* qp_input,
       void* other_inputs = nullptr) const override;
 
   void ModifyPlanGenericPlanDerived(
-      const HumanoidStatus& robot_status,
-      const param_parsers::ParamSet&,
+      const HumanoidStatus& robot_status, const param_parsers::ParamSet&,
       const param_parsers::RigidBodyTreeAliasGroups<T>&) override;
 
   void MakeDebugMessage(

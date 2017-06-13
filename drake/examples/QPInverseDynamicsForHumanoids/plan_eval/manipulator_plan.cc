@@ -6,8 +6,8 @@
 
 #include "drake/common/unused.h"
 #include "drake/manipulation/util/motion_plan_translator.h"
-#include "drake/util/lcmUtil.h"
 #include "drake/util/drakeUtil.h"
+#include "drake/util/lcmUtil.h"
 
 #include "drake/manipulation/util/cartesian_trajectory_translator.h"
 #include "drake/manipulation/util/dof_trajectory_translator.h"
@@ -65,13 +65,14 @@ void ManipulatorPlan<T>::HandlePlanMessageGenericPlanDerived(
 
   // Contacts.
   override_contacts_.clear();
-  ContactInformation tmp(*robot_status.robot().FindBody("world")); // will get reset
+  ContactInformation tmp(
+      *robot_status.robot().FindBody("world"));  // will get reset
   if (msg.num_contact_states != 0) {
     // TODO: currently, we are only looking at the first thing.
     const lcmt_contact_state& contact_state = msg.contact_states.front();
     for (int i = 0; i < contact_state.num_bodies_in_contact; ++i) {
       DecodeContactInformation(robot_status.robot(),
-          contact_state.bodies_in_contact[i], &tmp);
+                               contact_state.bodies_in_contact[i], &tmp);
       override_contacts_.emplace(tmp.body_name(), tmp);
     }
   }
@@ -79,53 +80,56 @@ void ManipulatorPlan<T>::HandlePlanMessageGenericPlanDerived(
 
 template <typename T>
 void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
-      const HumanoidStatus& status,
-      const param_parsers::ParamSet&,
-      const param_parsers::RigidBodyTreeAliasGroups<T>&,
-      QpInput* qp_input,
-      void* other_inputs) const {
+    const HumanoidStatus& status, const param_parsers::ParamSet&,
+    const param_parsers::RigidBodyTreeAliasGroups<T>&, QpInput* qp_input,
+    void* other_inputs) const {
   qp_input->mutable_contact_information() = override_contacts_;
 
   // Picking stuff up
   if (!override_contacts_.empty()) {
     DRAKE_DEMAND(other_inputs != nullptr);
-    qp_input->get_mutable_manipulation_objectives().emplace("box", ManipulationObjective());
+    qp_input->get_mutable_manipulation_objectives().emplace(
+        "box", ManipulationObjective());
 
     // Don't hard code.
-    ManipulationObjective& manip_obj = qp_input->get_mutable_manipulation_objectives()["box"];
+    ManipulationObjective& manip_obj =
+        qp_input->get_mutable_manipulation_objectives()["box"];
     const VectorX<T>* obj_state = static_cast<const VectorX<T>*>(other_inputs);
     KinematicsCache<T> obj_cache =
-        obj_->doKinematics(
-            obj_state->head(obj_->get_num_positions()),
-            obj_state->tail(obj_->get_num_velocities()));
+        obj_->doKinematics(obj_state->head(obj_->get_num_positions()),
+                           obj_state->tail(obj_->get_num_velocities()));
 
     // Set pose.
-    manip_obj.get_mutable_X_WO() = obj_->CalcBodyPoseInWorldFrame(obj_cache,
-        obj_->get_body(1));
-    manip_obj.get_mutable_V_WO() = obj_->CalcBodySpatialVelocityInWorldFrame(obj_cache,
-        obj_->get_body(1));
+    manip_obj.get_mutable_X_WO() =
+        obj_->CalcBodyPoseInWorldFrame(obj_cache, obj_->get_body(1));
+    manip_obj.get_mutable_V_WO() =
+        obj_->CalcBodySpatialVelocityInWorldFrame(obj_cache, obj_->get_body(1));
 
     Isometry3<T> desired_obj_pose = Isometry3<T>::Identity();
     desired_obj_pose.translation() = Vector3<T>(0.93, 0, 0.7);
+    desired_obj_pose.translation()[0] += 0.05 * sin(status.time() * M_PI);
+    desired_obj_pose.translation()[1] += 0.05 * cos(status.time() * M_PI);
+
     Vector6<T> kp, kd;
     kp << 10, 10, 10, 10, 10, 10;
     kd << 3, 3, 3, 3, 3, 3;
-    CartesianSetpoint<T> obj_controller(
-        desired_obj_pose, Vector6<T>::Zero(), Vector6<T>::Zero(), kp, kd);
+    CartesianSetpoint<T> obj_controller(desired_obj_pose, Vector6<T>::Zero(),
+                                        Vector6<T>::Zero(), kp, kd);
 
     // Set obj mass.
     manip_obj.set_M(obj_->massMatrix(obj_cache));
-    drake::eigen_aligned_std_unordered_map<RigidBody<T> const*,
-                                           Vector6<T>> f_ext;
+    drake::eigen_aligned_std_unordered_map<RigidBody<T> const*, Vector6<T>>
+        f_ext;
     manip_obj.set_h(obj_->dynamicsBiasTerm(obj_cache, f_ext));
 
     // Set obj motion objective.
-    manip_obj.get_mutable_desired_motion().SetAllConstraintType(ConstraintType::Soft);
+    manip_obj.get_mutable_desired_motion().SetAllConstraintType(
+        ConstraintType::Soft);
     manip_obj.get_mutable_desired_motion().mutable_values() =
-        obj_controller.ComputeTargetAcceleration(
-            manip_obj.get_X_WO(), manip_obj.get_V_WO());
-    manip_obj.get_mutable_desired_motion().mutable_weights() <<
-        10, 10, 10, 10, 10, 10;
+        obj_controller.ComputeTargetAcceleration(manip_obj.get_X_WO(),
+                                                 manip_obj.get_V_WO());
+    manip_obj.get_mutable_desired_motion().mutable_weights() << 10, 10, 10, 10,
+        10, 10;
 
     // Set obj contacts.
     for (const auto& contact_pair : qp_input->contact_information()) {
@@ -146,8 +150,8 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
 
       body_motion.mutable_values() = manip_obj.get_desired_motion().values();
       // Now correct the linear acceleration.
-      Isometry3<T> X_WB = status.robot().CalcBodyPoseInWorldFrame(status.cache(),
-          *status.robot().FindBody(body_motion_pair.first));
+      Isometry3<T> X_WB = status.robot().CalcBodyPoseInWorldFrame(
+          status.cache(), *status.robot().FindBody(body_motion_pair.first));
       Vector3<T> r = X_WB.translation() - manip_obj.get_X_WO().translation();
       body_motion.mutable_values().template tail<3>() +=
           manip_obj.get_desired_motion().values().template head<3>().cross(r);
@@ -160,20 +164,14 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
 
 template <typename T>
 void ManipulatorPlan<T>::ModifyPlanGenericPlanDerived(
-      const HumanoidStatus& robot_status,
-      const param_parsers::ParamSet&,
-      const param_parsers::RigidBodyTreeAliasGroups<T>&) {
-
-}
+    const HumanoidStatus& robot_status, const param_parsers::ParamSet&,
+    const param_parsers::RigidBodyTreeAliasGroups<T>&) {}
 
 template <typename T>
 void ManipulatorPlan<T>::MakeDebugMessage(
-    const HumanoidStatus& robot_status,
-    const param_parsers::ParamSet& paramset,
+    const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
     const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
-    const QpInput& qp_input,
-    lcmt_plan_eval_debug_info* message) const {
-
+    const QpInput& qp_input, lcmt_plan_eval_debug_info* message) const {
   /*
   lcmt_plan_eval_debug_info& msg = *message;
   msg.timestamp = robot_status.time() * 1e6;
@@ -206,7 +204,8 @@ void ManipulatorPlan<T>::MakeDebugMessage(
           &msg.body_motions[ctr]);
       ctr++;
 
-      std::cout << "desired body: " << tracker_pair.first->get_name() << ", " << tracker_pair.second.desired_pose().translation().transpose() << std::endl;
+      std::cout << "desired body: " << tracker_pair.first->get_name() << ", " <<
+  tracker_pair.second.desired_pose().translation().transpose() << std::endl;
     }
   } else {
     msg.num_body_motions = 1;
@@ -226,15 +225,15 @@ void ManipulatorPlan<T>::MakeDebugMessage(
   msg.nominal_wrench[5] = 0;
   if (!override_contacts_.empty()) {
     for (int i = 0; i < 3; ++i) {
-      msg.nominal_wrench[3 + i] = override_contacts_.at("iiwa_link_ee").desired_force()[i];
+      msg.nominal_wrench[3 + i] =
+  override_contacts_.at("iiwa_link_ee").desired_force()[i];
     }
   }
   */
 }
 
 template <typename T>
-GenericPlan<T>* ManipulatorPlan<T>::CloneGenericPlanDerived()
-    const {
+GenericPlan<T>* ManipulatorPlan<T>::CloneGenericPlanDerived() const {
   return new ManipulatorPlan(*this);
 }
 
