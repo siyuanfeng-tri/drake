@@ -15,11 +15,13 @@ using namespace qp_inverse_dynamics;
 
 constexpr int kDim = 14;
 
+constexpr double box_x = 0.54;
+
 void Approach(const RigidBodyTree<double>& robot, ::lcm::LCM *lcm) {
   VectorX<double> q1(kDim);
   // left firt.
-  q1 << 0, 45, 0, -45, 0, 0, 0,
-        0, 45, 0, -45, 0, 0, 0;
+  q1 << 0, 5, 0, -60, 0, 25, 0,
+        0, 5, 0, -60, 0, 25, 0;
 
   for (int i = 0; i < 14; i++) {
     q1[i] = q1[i] / 180. * M_PI;
@@ -51,8 +53,9 @@ void MoveStraight(
     const param_parsers::RigidBodyTreeAliasGroups<double>& alias_groups,
     ::lcm::LCM *lcm) {
   VectorX<double> q1(kDim);
-  q1 << 0, 45, 0, -45, 0, 0, 0,
-        0, 45, 0, -45, 0, 0, 0;
+  q1 << 0, 5, 0, -60, 0, 25, 0,
+        0, 5, 0, -60, 0, 25, 0;
+
   for (int i = 0; i < kDim; i++) {
     q1[i] = q1[i] / 180. * M_PI;
   }
@@ -92,7 +95,7 @@ void MoveStraight(
     std::cout << poses[0].translation()[0] << std::endl;
     poses[1] = poses[0];
     // Move in +x.
-    poses[1].translation()[0] = 0.84;
+    poses[1].translation()[0] = box_x + 0.01;
 
     manipulation::CartesianTrajectoryTranslator::EncodeMessage(
         body->get_name(),
@@ -113,7 +116,7 @@ void MoveStraight(
     std::cout << poses[0].translation()[0] << std::endl;
     poses[1] = poses[0];
     // Move in +x.
-    poses[1].translation()[0] = 0.83 + 0.2 - 0.01;
+    poses[1].translation()[0] = box_x + 0.2 - 0.01;
 
     manipulation::CartesianTrajectoryTranslator::EncodeMessage(
         body->get_name(),
@@ -129,8 +132,8 @@ void MakeContact(const RigidBodyTree<double>& robot,
     const param_parsers::RigidBodyTreeAliasGroups<double>& alias_groups,
     ::lcm::LCM *lcm) {
   VectorX<double> q1(kDim);
-  q1 << 0, 45, 0, -45, 0, 0, 0,
-        0, 45, 0, -45, 0, 0, 0;
+  q1 << 0, 5, 0, -60, 0, 25, 0,
+        0, 5, 0, -60, 0, 25, 0;
   for (int i = 0; i < kDim; i++) {
     q1[i] = q1[i] / 180. * M_PI;
   }

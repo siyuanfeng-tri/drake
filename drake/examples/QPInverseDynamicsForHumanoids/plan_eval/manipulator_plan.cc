@@ -85,6 +85,12 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
     void* other_inputs) const {
   qp_input->mutable_contact_information() = override_contacts_;
 
+  /*
+  const RigidBody<double>* right_ee = status.robot().FindBody("right_iiwa_link_ee");
+  auto right_pose = status.robot().CalcBodyPoseInWorldFrame(status.cache(), *right_ee);
+  std::cout << "a " << right_pose.translation().transpose() << "\n";
+  */
+
   // Picking stuff up
   if (!override_contacts_.empty()) {
     DRAKE_DEMAND(other_inputs != nullptr);
@@ -106,7 +112,7 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
         obj_->CalcBodySpatialVelocityInWorldFrame(obj_cache, obj_->get_body(1));
 
     Isometry3<T> desired_obj_pose = Isometry3<T>::Identity();
-    desired_obj_pose.translation() = Vector3<T>(0.93, 0, 0.7);
+    desired_obj_pose.translation() = Vector3<T>(0.54 + 0.1, 0, 0.97);
     desired_obj_pose.translation()[0] += 0.05 * sin(status.time() * M_PI);
     desired_obj_pose.translation()[1] += 0.05 * cos(status.time() * M_PI);
 
@@ -158,8 +164,8 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
     }
   }
 
-  std::cout << "time: " << status.time() << std::endl;
-  std::cout << *qp_input << std::endl;
+  // std::cout << "time: " << status.time() << std::endl;
+  // std::cout << *qp_input << std::endl;
 }
 
 template <typename T>

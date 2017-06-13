@@ -43,14 +43,14 @@ std::unique_ptr<RigidBodyTree<double>> make_rbt(
   *iiwa_instance = tree_builder->get_model_info_for_instance(id);;
 
   id = tree_builder->AddFloatingModelInstance("box",
-                                              Vector3<double>(0.83 + 0.1, 0, 0.75),
+                                              Vector3<double>(0.54 + 0.1, 0, 0.95 + 0.1),
                                               Vector3<double>::Zero());
   *box_instance = tree_builder->get_model_info_for_instance(id);
 
   auto tree = tree_builder->Build();
 
   Isometry3<double> X_WStand = Isometry3<double>::Identity();
-  X_WStand.translation() = Vector3<double>(0.83 + 0.1, 0, 0.4);
+  X_WStand.translation() = Vector3<double>(0.54 + 0.1, 0, 0.95 - 0.1 - 0.15);
   multibody::AddBoxToWorld(X_WStand, Vector3<double>(0.3, 0.3, 0.3), "stand", tree.get());
 
   return tree;
