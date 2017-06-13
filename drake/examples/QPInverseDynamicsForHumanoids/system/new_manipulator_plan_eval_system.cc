@@ -116,7 +116,7 @@ void ManipulatorPlanEvalSystem::DoExtendedCalcUnrestrictedUpdate(
   }
 
   // Runs controller.
-  plan.ModifyPlan(*robot_status, get_paramset(), get_alias_groups());
+  plan.ModifyPlan(*robot_status, get_paramset(), get_alias_groups(), &obj_state);
 
   // Updates the QpInput in AbstractState.
   QpInput& qp_input = get_mutable_qp_input(state);

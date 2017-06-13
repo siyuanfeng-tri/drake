@@ -449,13 +449,6 @@ std::ostream& operator<<(std::ostream& out,
 
 class ManipulationObjective {
  public:
-  /*
-  ManipulationObjective()
-      : ManipulationObjective(0, Matrix3<double>::Zero()) {}
-
-  ManipulationObjective(double m,
-      const Matrix3<double>& I);
-  */
   ManipulationObjective()
       : X_WO_(Isometry3<double>::Identity()),
         V_WO_(Vector6<double>::Zero()),
@@ -465,8 +458,6 @@ class ManipulationObjective {
   bool is_static() const { return static_object_; }
 
   // TODO
-  // Matrix6<double> ComputeMassMatrix() const;
-  // Vector6<double> ComputeDyanmicsBias() const;
   Matrix6<double> ComputeMassMatrix() const { return M_; }
   Vector6<double> ComputeDyanmicsBias() const { return h_; }
 
@@ -496,9 +487,6 @@ class ManipulationObjective {
   }
 
  private:
-  // double mass_;
-  // Matrix3<double> inertia_;
-
   Isometry3<double> X_WO_;
   Vector6<double> V_WO_;
 
@@ -511,6 +499,8 @@ class ManipulationObjective {
   std::set<std::string> robot_contacts_;
 };
 
+std::ostream& operator<<(std::ostream& out,
+                         const ManipulationObjective& input);
 
 /**
  * Input to the QP inverse dynamics controller.

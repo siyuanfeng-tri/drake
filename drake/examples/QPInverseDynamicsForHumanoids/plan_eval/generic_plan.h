@@ -92,7 +92,8 @@ class GenericPlan {
   void ModifyPlan(
       const HumanoidStatus& robot_stauts,
       const param_parsers::ParamSet& paramset,
-      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups);
+      const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+      void* other_inputs = nullptr);
 
   /**
    * Handles a discrete command in the form of a Lcm message (e.g. footstep
@@ -216,7 +217,8 @@ class GenericPlan {
   virtual void ModifyPlanGenericPlanDerived(
       const HumanoidStatus&,
       const param_parsers::ParamSet&,
-      const param_parsers::RigidBodyTreeAliasGroups<T>&) {}
+      const param_parsers::RigidBodyTreeAliasGroups<T>&,
+      void* other_inputs = nullptr) {}
 
   /**
    * Custom message handling can be implemented here.

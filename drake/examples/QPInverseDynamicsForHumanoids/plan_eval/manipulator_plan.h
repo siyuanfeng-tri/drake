@@ -37,7 +37,8 @@ class ManipulatorPlan : public GenericPlan<T> {
 
   void ModifyPlanGenericPlanDerived(
       const HumanoidStatus& robot_status, const param_parsers::ParamSet&,
-      const param_parsers::RigidBodyTreeAliasGroups<T>&) override;
+      const param_parsers::RigidBodyTreeAliasGroups<T>&,
+      void* other_input = nullptr) override;
 
   void MakeDebugMessage(
       const HumanoidStatus& robot_stauts,
@@ -50,6 +51,8 @@ class ManipulatorPlan : public GenericPlan<T> {
   GenericPlan<T>* CloneGenericPlanDerived() const override;
 
   const RigidBodyTree<T>* obj_;
+  manipulation::PiecewiseCartesianTrajectory<T> obj_traj_;
+  int obj_state_id_{0}; // 0 is lift, 1 is circle
 
   std::unordered_map<std::string, ContactInformation> override_contacts_;
 };

@@ -163,8 +163,8 @@ void MakeContact(const RigidBodyTree<double>& robot,
   {
     ContactInformation contact = params.MakeContactInformation(
         *robot.FindBody("left_iiwa_link_ee"));
-    contact.mutable_desired_force() = Vector3<double>(100, 0, 0);
-    contact.mutable_desired_force_weight() = Vector3<double>(1, 0, 0);
+    contact.mutable_desired_force() = Vector3<double>(50, 0, 0);
+    contact.mutable_desired_force_weight() = Vector3<double>(0.001, 0, 0);
 
     EncodeContactInformation(contact, &(msg.contact_states.front().bodies_in_contact[body_idx++]));
   }
@@ -172,8 +172,8 @@ void MakeContact(const RigidBodyTree<double>& robot,
   {
     ContactInformation contact = params.MakeContactInformation(
         *robot.FindBody("right_iiwa_link_ee"));
-    contact.mutable_desired_force() = Vector3<double>(-100, 0, 0);
-    contact.mutable_desired_force_weight() = Vector3<double>(1, 0, 0);
+    contact.mutable_desired_force() = Vector3<double>(-50, 0, 0);
+    contact.mutable_desired_force_weight() = Vector3<double>(0.001, 0, 0);
 
     EncodeContactInformation(contact, &(msg.contact_states.front().bodies_in_contact[body_idx++]));
   }

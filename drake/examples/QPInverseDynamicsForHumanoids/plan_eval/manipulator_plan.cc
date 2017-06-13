@@ -53,11 +53,9 @@ void ManipulatorPlan<T>::HandlePlanMessageGenericPlanDerived(
 
   // Body traj.
   std::string name;
-  std::cout << "asdf: " << msg.body_motions.size() << std::endl;
   PiecewiseCartesianTrajectory<double> traj;
   for (const auto& body_motion : msg.body_motions) {
     CartesianTrajectoryTranslator::DecodeMessage(body_motion, &name, &traj);
-    std::cout << name << std::endl;
     const RigidBody<T>* body = robot_status.robot().FindBody(name);
     traj.shift_right(robot_status.time());
     this->set_body_trajectory(body, traj);
@@ -91,6 +89,9 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
   std::cout << "a " << right_pose.translation().transpose() << "\n";
   */
 
+  static int init = 0;
+  static double t0 = 0;
+
   // Picking stuff up
   if (!override_contacts_.empty()) {
     DRAKE_DEMAND(other_inputs != nullptr);
@@ -100,7 +101,10 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
     // Don't hard code.
     ManipulationObjective& manip_obj =
         qp_input->get_mutable_manipulation_objectives()["box"];
+    /////////////////////////////////////////////////////////
+    // really bad
     const VectorX<T>* obj_state = static_cast<const VectorX<T>*>(other_inputs);
+    /////////////////////////////////////////////////////////
     KinematicsCache<T> obj_cache =
         obj_->doKinematics(obj_state->head(obj_->get_num_positions()),
                            obj_state->tail(obj_->get_num_velocities()));
@@ -111,16 +115,17 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
     manip_obj.get_mutable_V_WO() =
         obj_->CalcBodySpatialVelocityInWorldFrame(obj_cache, obj_->get_body(1));
 
-    Isometry3<T> desired_obj_pose = Isometry3<T>::Identity();
-    desired_obj_pose.translation() = Vector3<T>(0.54 + 0.1, 0, 0.97);
-    desired_obj_pose.translation()[0] += 0.05 * sin(status.time() * M_PI);
-    desired_obj_pose.translation()[1] += 0.05 * cos(status.time() * M_PI);
-
     Vector6<T> kp, kd;
     kp << 10, 10, 10, 10, 10, 10;
     kd << 3, 3, 3, 3, 3, 3;
-    CartesianSetpoint<T> obj_controller(desired_obj_pose, Vector6<T>::Zero(),
-                                        Vector6<T>::Zero(), kp, kd);
+    CartesianSetpoint<T> obj_controller(
+        obj_traj_.get_pose(status.time()),
+        obj_traj_.get_velocity(status.time()),
+        obj_traj_.get_acceleration(status.time()), kp, kd);
+
+    if (t0 == 0) {
+      t0 = status.time();
+    }
 
     // Set obj mass.
     manip_obj.set_M(obj_->massMatrix(obj_cache));
@@ -134,6 +139,12 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
     manip_obj.get_mutable_desired_motion().mutable_values() =
         obj_controller.ComputeTargetAcceleration(manip_obj.get_X_WO(),
                                                  manip_obj.get_V_WO());
+    // HACK
+    double hack_acc = -9.81 + (status.time() - t0) * 9.81;
+    if (hack_acc >= 0)
+      hack_acc = 0;
+    //manip_obj.get_mutable_desired_motion().mutable_values()[5] += hack_acc;
+
     manip_obj.get_mutable_desired_motion().mutable_weights() << 10, 10, 10, 10,
         10, 10;
 
@@ -162,6 +173,10 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
       body_motion.mutable_values().template tail<3>() +=
           manip_obj.get_desired_motion().values().template head<3>().cross(r);
     }
+
+    std::cout << "-------------------------\niteration: " << init << "\n";
+    std::cout << *qp_input;
+    init++;
   }
 
   // std::cout << "time: " << status.time() << std::endl;
@@ -171,7 +186,41 @@ void ManipulatorPlan<T>::UpdateQpInputGenericPlanDerived(
 template <typename T>
 void ManipulatorPlan<T>::ModifyPlanGenericPlanDerived(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet&,
-    const param_parsers::RigidBodyTreeAliasGroups<T>&) {}
+    const param_parsers::RigidBodyTreeAliasGroups<T>&,
+    void* other_inputs) {
+  // picking up.
+  if (!override_contacts_.empty()) {
+    /////////////////////////////////////////////////////////
+    // really bad
+    const VectorX<T>* obj_state = static_cast<const VectorX<T>*>(other_inputs);
+    /////////////////////////////////////////////////////////
+    KinematicsCache<T> obj_cache =
+        obj_->doKinematics(obj_state->head(obj_->get_num_positions()),
+                           obj_state->tail(obj_->get_num_velocities()));
+    const Isometry3<T> obj_X_WO =
+        obj_->CalcBodyPoseInWorldFrame(obj_cache, obj_->get_body(1));
+
+    switch (obj_state_id_) {
+      case 0: {
+        std::vector<double> times = {0, 1, 2};
+        std::vector<Isometry3<double>> poses(times.size(), obj_X_WO);
+        // poses.back().translation()[2] += 0.03;
+
+        obj_traj_ = PiecewiseCartesianTrajectory<double>::MakeCubicLinearWithEndLinearVelocity(
+            times, poses, Vector3<double>::Zero(), Vector3<double>::Zero());
+        obj_traj_.shift_right(robot_status.time());
+
+        obj_state_id_ = 1;
+
+        break;
+      }
+
+      case 1: {
+        break;
+      }
+    }
+  }
+}
 
 template <typename T>
 void ManipulatorPlan<T>::MakeDebugMessage(

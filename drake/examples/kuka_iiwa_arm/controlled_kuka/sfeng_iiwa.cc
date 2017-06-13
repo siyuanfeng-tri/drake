@@ -16,6 +16,7 @@
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/lcmt_motion_plan.hpp"
 #include "drake/lcmt_plan_eval_debug_info.hpp"
+#include "drake/lcmt_inverse_dynamics_debug_info.hpp"
 
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
 
@@ -143,9 +144,16 @@ int DoMain() {
   auto plan_eval_pub = diagram_builder->AddSystem(
       systems::lcm::LcmPublisherSystem::Make<lcmt_plan_eval_debug_info>(
           "PLAN_EVAL", &lcm));
-  diagram_builder->Connect(controller->get_output_port_debug_info(),
+  diagram_builder->Connect(controller->get_output_port_plan_eval_debug_info(),
                            plan_eval_pub->get_input_port(0));
   plan_eval_pub->set_publish_period(1e-2);
+
+  auto qp_pub = diagram_builder->AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<lcmt_inverse_dynamics_debug_info>(
+          "QP", &lcm));
+  diagram_builder->Connect(controller->get_output_port_qp_debug_info(),
+                           qp_pub->get_input_port(0));
+  qp_pub->set_publish_period(1e-2);
 
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
 

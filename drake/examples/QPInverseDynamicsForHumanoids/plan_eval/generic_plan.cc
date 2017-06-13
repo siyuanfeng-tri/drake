@@ -49,9 +49,10 @@ void GenericPlan<T>::HandlePlanMessage(
 template <typename T>
 void GenericPlan<T>::ModifyPlan(
     const HumanoidStatus& robot_status, const param_parsers::ParamSet& paramset,
-    const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups) {
+    const param_parsers::RigidBodyTreeAliasGroups<T>& alias_groups,
+    void* other_input) {
   // Runs derived class' plan.
-  ModifyPlanGenericPlanDerived(robot_status, paramset, alias_groups);
+  ModifyPlanGenericPlanDerived(robot_status, paramset, alias_groups, other_input);
 }
 
 template <typename T>

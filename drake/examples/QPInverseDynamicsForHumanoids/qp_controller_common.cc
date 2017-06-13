@@ -377,25 +377,13 @@ std::ostream& operator<<(std::ostream& out,
   return out;
 }
 
-/*
-ManipulationObjective::ManipulationObjective(double m,
-    const Matrix3<double>& I)
-    : mass_(m), inertia_(I),
-      X_WO_(Isometry3<double>::Identity()),
-      V_WO_(Vector6<double>::Zero()), desired_motion_(6) {}
-
-Matrix6<double> ManipulationObjective::ComputeMassMatrix() const {
-  Matrix6<double> ret = Matrix6<double>::Identity();
-  ret.block<3, 3>(0, 0) *= mass_;
-  ret.block<3, 3>(3, 3) = X_WO_.linear().transpose() * inertia_ * X_WO_.linear();
-  return ret;
+std::ostream& operator<<(std::ostream& out,
+                         const ManipulationObjective& input) {
+  out << "desired acc: " << input.get_desired_motion().values().transpose() << "\n";
+  for (const auto& name : input.get_robot_contacts())
+    out << "contact: " << name << "\n";
+  return out;
 }
-
-Vector6<double> ManipulationObjective::ComputeDyanmicsBias() const {
-  Vector6<double> ret = Vector6<double>::Zero();
-  return ret;
-}
-*/
 
 bool QpInput::is_valid(int num_vd) const {
   if (num_vd != desired_dof_motions_.size()) {
@@ -475,7 +463,11 @@ std::ostream& operator<<(std::ostream& out, const QpInput& input) {
   out << "weight_basis_reg: " << input.w_basis_reg() << "\n";
 
   for (const auto& contact_pair : input.contact_information()) {
-    out << contact_pair.second << std::endl;
+    out << contact_pair.second << "\n";
+  }
+
+  for (const auto& manip_obj_pair : input.get_manipulation_objectives()) {
+    out << manip_obj_pair.second << "\n";
   }
 
   return out;

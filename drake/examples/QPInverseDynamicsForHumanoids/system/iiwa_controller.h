@@ -81,6 +81,8 @@ class IiwaController
 
     output_index_plan_eval_debug_ = builder.ExportOutput(plan_eval_->get_output_port_debug_info());
 
+    output_index_qp_debug_ = builder.ExportOutput(qp_con->get_output_port_debug_info());
+
     // rs -> qp_input
     builder.Connect(rs_wrapper->get_output_port_humanoid_status(),
                     plan_eval_->get_input_port_humanoid_status());
@@ -141,8 +143,13 @@ class IiwaController
   }
 
   const systems::OutputPortDescriptor<double>&
-  get_output_port_debug_info() const {
+  get_output_port_plan_eval_debug_info() const {
     return get_output_port(output_index_plan_eval_debug_);
+  }
+
+  const systems::OutputPortDescriptor<double>&
+  get_output_port_qp_debug_info() const {
+    return get_output_port(output_index_qp_debug_);
   }
 
  private:
@@ -153,6 +160,7 @@ class IiwaController
   int input_index_plan_;
   int input_index_obj_state_;
   int output_index_plan_eval_debug_;
+  int output_index_qp_debug_;
 };
 
 }  // end namespace qp_inverse_dynamics
