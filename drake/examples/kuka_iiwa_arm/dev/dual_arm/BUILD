@@ -18,6 +18,9 @@ drake_cc_binary(
     deps = [
         "//drake/examples/kuka_iiwa_arm:iiwa_common",
         "//drake/examples/kuka_iiwa_arm:sim_diagram_builder",
+        "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
+        "//drake/lcmtypes:contact_info_for_viz",
+        "//drake/lcmtypes:contact_results_for_viz",
         "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
         "//drake/lcm",
         "//drake/systems/analysis",
