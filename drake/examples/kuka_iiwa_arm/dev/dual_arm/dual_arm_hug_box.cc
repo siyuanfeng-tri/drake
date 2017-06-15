@@ -196,7 +196,7 @@ void main() {
   plant->set_friction_contact_parameters(kStaticFriction, kDynamicFriction,
                                          kVStictionTolerance);
 
-  simulator.get_mutable_integrator()->set_maximum_step_size(3e-4);
+  simulator.get_mutable_integrator()->set_maximum_step_size(1e-3);
 
   // simulator.reset_integrator<systems::RungeKutta2Integrator<double>>(*diagram, simulator.get_mutable_context());
   // simulator.get_mutable_integrator()->request_initial_step_size_target(3e-4);
