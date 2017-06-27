@@ -18,14 +18,13 @@
 /// 11: head_tilt_joint
 /// 12: shoulder_pan_joint
 /// 13: shoulder_lift_joint
-/// 14: shoulder_lift_joint
-/// 15: upperarm_roll_joint
-/// 16: elbow_flex_joint
-/// 17: forearm_roll_joint
-/// 18: wrist_flex_joint
-/// 19: wrist_roll_joint
-/// 20: r_gripper_finger_joint
-/// 21: l_gripper_finger_joint
+/// 14: upperarm_roll_joint
+/// 15: elbow_flex_joint
+/// 16: forearm_roll_joint
+/// 17: wrist_flex_joint
+/// 18: wrist_roll_joint
+/// 19: r_gripper_finger_joint
+/// 20: l_gripper_finger_joint
 ///
 /// Rotational position/velocity units are in rad and rad/s, respectively.
 /// Linear position units are in meters and m/s, respectively.
