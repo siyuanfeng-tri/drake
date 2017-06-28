@@ -14,12 +14,14 @@
         <color rgba="0.356 0.361 0.376 1" />
       </material>
     </visual>
+    <!--
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
         <mesh filename="../meshes/base_link_collision.obj" />
       </geometry>
     </collision>
+    -->
   </link>
   <link name="r_wheel_link">
     <inertial>
@@ -101,6 +103,7 @@
     </collision>
     -->
   </link>
+
   <joint name="torso_lift_joint" type="prismatic">
     <origin rpy="-6.123E-17 0 0" xyz="-0.086875 0 0.37743" />
     <parent link="base_link" />
@@ -570,6 +573,115 @@
     <parent link="head_camera_depth_frame" />
     <child link="head_camera_depth_optical_frame" />
   </joint>
+
+
+  <link name="front_left_caster">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0. 0. 0." />
+      <mass value="0.1" />
+      <inertia ixx="0.000016" ixy="0.0" ixz="0" iyy="0.000016" iyz="0" izz="0.000016" />
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="front_left_caster_ball_joint" type="ball">
+    <origin rpy="0 0 0" xyz="0.17 0.12 0.01" />
+    <parent link="base_link" />
+    <child link="front_left_caster" />
+  </joint>
+
+  <link name="front_right_caster">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0. 0. 0." />
+      <mass value="0.1" />
+      <inertia ixx="0.000016" ixy="0.0" ixz="0" iyy="0.000016" iyz="0" izz="0.000016" />
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="front_right_caster_ball_joint" type="ball">
+    <origin rpy="0 0 0" xyz="0.17 -0.12 0.01" />
+    <parent link="base_link" />
+    <child link="front_right_caster" />
+  </joint>
+
+  <link name="back_left_caster">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0. 0. 0." />
+      <mass value="0.1" />
+      <inertia ixx="0.000016" ixy="0.0" ixz="0" iyy="0.000016" iyz="0" izz="0.000016" />
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="back_left_caster_ball_joint" type="ball">
+    <origin rpy="0 0 0" xyz="-0.21 0.12 0.01" />
+    <parent link="base_link" />
+    <child link="back_left_caster" />
+  </joint>
+
+  <link name="back_right_caster">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0. 0. 0." />
+      <mass value="0.1" />
+      <inertia ixx="0.000016" ixy="0.0" ixz="0" iyy="0.000016" iyz="0" izz="0.000016" />
+    </inertial>
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <sphere radius="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="back_right_caster_ball_joint" type="ball">
+    <origin rpy="0 0 0" xyz="-0.21 -0.12 0.01" />
+    <parent link="base_link" />
+    <child link="back_right_caster" />
+  </joint>
+
+
+
+
 
   <transmission name="r_wheel_joint">
     <type>transmission_interface/SimpleTransmission</type>

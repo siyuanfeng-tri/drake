@@ -731,7 +731,9 @@ void ParseJoint(RigidBodyTree<double>* tree, XMLElement* node,
     joint = fjoint;
   } else if (type.compare("floating") == 0) {
     joint = new RollPitchYawFloatingJoint(name, transform_to_parent_body);
-  } else {
+  } else if (type.compare("ball") == 0) {
+    joint = new QuaternionBallJoint(name, transform_to_parent_body);
+  }else {
     throw runtime_error(string(__FILE__) + ": " + __func__ + ": ERROR: "
         "Unrecognized joint type: " + type);
   }

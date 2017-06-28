@@ -106,6 +106,7 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
           dmotion_subspace = nullptr) const {
     drake::unused(q);
     motion_subspace.setIdentity(drake::kTwistSize, get_num_velocities());
+    // motion_subspace.template block<3, 3>(3, 3).setZero();
     if (dmotion_subspace) {
       dmotion_subspace->setZero(motion_subspace.size(), get_num_positions());
     }

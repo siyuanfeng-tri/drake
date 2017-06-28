@@ -7,6 +7,9 @@ namespace Fetch {
 using systems::Context;
 using systems::BasicVector;
 
+//constexpr int kWheelQStart = 7;
+constexpr int kWheelVStart = 6;
+
 constexpr int kHeadQStart = 10;
 constexpr int kHeadVStart = 9;
 
@@ -36,9 +39,9 @@ FetchController<T>::FetchController(
   kp_torso_ = 10;
   kd_torso_ = 5;
 
-  lin_v_gain_ = 50;
+  lin_v_gain_ = 5;
   // The magic number is wheel to center.
-  omega_v_gain_ = 50 * 0.18738;
+  omega_v_gain_ = 5 * 0.18738;
 }
 
 template <typename T>
@@ -123,7 +126,7 @@ VectorX<T> FetchController<T>::CalcTorque(const VectorX<T>& acc,
 
   // Just the actuated parts.
   VectorX<T> torque = full_robot_->inverseDynamics(*cache, f_ext, acc)
-                          .tail(full_robot_->get_num_actuators());
+                          .segment(kWheelVStart, full_robot_->get_num_actuators());
   return torque;
 }
 
@@ -147,8 +150,10 @@ FetchControllerSystem<T>::FetchControllerSystem(
 template <typename T>
 void FetchControllerSystem<T>::CalcOutputTorque(const Context<T>& context,
                                                 BasicVector<T>* output) const {
+  /*
+  output->get_mutable_value().setZero();
+  */
   const auto& robot = controller_.get_full_robot();
-
   // Do kinematics.
   VectorX<T> x = this->EvalEigenVectorInput(
       context, input_port_index_full_estimated_state_);
@@ -176,10 +181,9 @@ void FetchControllerSystem<T>::CalcOutputTorque(const Context<T>& context,
   // Call ID.
   output->get_mutable_value() = controller_.CalcTorque(vd_d, &cache);
 
-
   // Wheels
   output->get_mutable_value().template head<2>() =
-      controller_.CalcWheelTorque(cache, 0.5, 0.5);
+      controller_.CalcWheelTorque(cache, 0.2, 0.2);
 
   // Hand
   output->get_mutable_value().template tail<2>() =

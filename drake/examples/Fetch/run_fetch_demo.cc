@@ -62,6 +62,9 @@ int DoMain() {
       std::cout << i << ": " << tree->actuators[i].name_ << "\n";
     }
 
+    for (int i = 0; i < tree->get_num_positions(); ++i) {
+      std::cout << i << ": " << tree->get_position_name(i) << "\n";
+    }
     auto control_tree = tree->Clone();
 
     plant = builder.AddSystem<RigidBodyPlant<double>>(std::move(tree));
@@ -74,7 +77,7 @@ int DoMain() {
 
   // Verifies the tree.
   const RigidBodyTree<double>& tree = plant->get_rigid_body_tree();
-  VerifyFetchTree(tree);
+  // VerifyFetchTree(tree);
 
   // Creates and adds LCM publisher for visualization.
   auto visualizer = builder.AddSystem<systems::DrakeVisualizer>(tree, &lcm);
