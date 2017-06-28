@@ -61,6 +61,8 @@ Vector2<T> FetchController<T>::CalcWheelTorque(const KinematicsCache<T>& cache,
   // yawdot in body frame.
   T w = V_WB_B[2];
 
+  std::cout << "(v, w)" << v << " " << w << "\n";
+
   T R = lin_v_gain_ * (v_d - v) + omega_v_gain_ * (w_d - w);
   T L = lin_v_gain_ * (v_d - v) - omega_v_gain_ * (w_d - w);
 

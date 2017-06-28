@@ -16,63 +16,47 @@
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 // TODO(sherm1,mitiguy) Verify that this is correct.
 /**
- * Defines a 6 dof tree joint (mobilizer) that uses a unit quaternion as the
+ * Defines a 3 dof tree joint (mobilizer) that uses a unit quaternion as the
  * generalized orientation coordinates.
  *
  * <h3>Generalized coordinates (configuration variables)</h3>
- * There are 7 generalized coordinates q,
- * organized as a position vector and quaternion. A tree joint connects an
- * inboard (parent) body P to an outboard (child) body B. In those terms this
- * joint's generalized coordinates are: <pre>
- *          --------- ------------- T
- *     q = | p_PB_P  |    q_PB     |
- *          --------- -------------  7×1
- *          px py pz   qw qx qy qz
+ * There are 4 generalized coordinates q, organized as a quaternion. A tree
+ * joint connects an inboard (parent) body P to an outboard (child) body B. In
+ * those terms this joint's generalized coordinates are: <pre>
+ *          ------------- T
+ *     q = |    q_PB     |
+ *          -------------  4×1
+ *           qw qx qy qz
  * </pre>
- * where `p_PB_P` is the position vector from P's origin Po to B's origin Bo,
- * expressed in the P basis, and `q_PB` is the quaternion that is equivalent
- * to the rotation matrix `R_PB`. The second line shows the 7 generalized
- * coordinate scalars in order. Note that `qw` is the scalar part of the
- * quaternion while `[qx qy qz]` is the vector part. See
- * @ref multibody_spatial_pose for more  information about this notation.
+ * where `q_PB` is the quaternion that is equivalent to the rotation matrix
+ * `R_PB`. The second line shows the 4 generalized coordinate scalars in order.
+ * Note that `qw` is the scalar part of the quaternion while `[qx qy qz]` is
+ * the vector part. See @ref multibody_spatial_pose for more information about
+ * this notation.
  *
  * The time derivatives qdot of the generalized coordinates, _not_ to be
  * confused with the generalized velocity variables v, are: <pre>
- *          --------- ------------- T
- *  qdot = | v_PB_P  |   qdot_PB   |
- *          --------- -------------  7×1
+ *          ------------- T
+ *  qdot = |   qdot_PB   |
+ *          -------------  4×1
  * </pre>
- * where `v_PB_P = d_P/dt p_PB_P` is the velocity of point Bo measured and
- * expressed in the P frame, where we have emphasized that the derivative is
- * taken in P, and `qdot_PB = d/dt q_PB` is the time derivative of the
- * quaternion.
+ * where `qdot_PB = d/dt q_PB` is the time derivative of the quaternion.
  *
  * <h3>Generalized velocity</h3>
- * There are 6 generalized velocity variables v, organized as follows: <pre>
- *          --------- -------- T
- *     v = | ω_PB_B  | v_PB_B |
- *          --------- --------  6×1
+ * There are 3 generalized velocity variables v, organized as follows: <pre>
+ *          --------- T
+ *     v = | ω_PB_B  |
+ *          --------- 3×1
  * </pre>
- * where `ω_PB_B` is B's angular velocity in P, expressed in B, and
- * `v_PB_B` is point Bo's translational velocity in P, expressed in B.
+ * where `ω_PB_B` is B's angular velocity in P, expressed in B.
  *
  * Note that
- * the rotational and translational quantities are in the reverse order from
- * those in the generalized coordinates, and that the velocities are expressed
- * in the _child_ frame B rather than in the parent. Clearly these are _not_
- * the derivatives of the generalized coordinates!
- *
  * The time derivatives of the generalized velocities are: <pre>
- *          --------- ----------- T
- *  vdot = | α_PB_B  | vdot_PB_B |
- *          --------- -----------  6×1
+ *          --------- T
+ *  vdot = | α_PB_B  |
+ *          --------- 3×1
  * </pre>
- * where `α_PB_B` is B's angular acceleration in P, expressed in B, and
- * `vdot_PB_B = d_B/dt v_PB_B` where we have emphasized that the derivative is
- * taken in the B frame, so this is *not* the acceleration of Bo in P. That
- * acceleration is given by `a_PB_B = vdot_PB_B + ω_PB_B × v_PB_B` (still in B).
- * Re-expressing `a_PB_B` in P provides the configuration second derivative
- * `a_PB_P = d²_P/dt² p_PB_P = R_PB*a_PB_B`.
+ * where `α_PB_B` is B's angular acceleration in P, expressed in B.
  */
 class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
  public:
@@ -96,7 +80,6 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
     return ret;
   }
 
-  // IDK
   template <typename DerivedQ, typename DerivedMS>
   void motionSubspace(
       const Eigen::MatrixBase<DerivedQ>& q,
@@ -106,7 +89,6 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
           dmotion_subspace = nullptr) const {
     drake::unused(q);
     motion_subspace.setIdentity(drake::kTwistSize, get_num_velocities());
-    // motion_subspace.template block<3, 3>(3, 3).setZero();
     if (dmotion_subspace) {
       dmotion_subspace->setZero(motion_subspace.size(), get_num_positions());
     }
@@ -137,39 +119,36 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
   }
 
   /**
-   * For the %QuaternionBallJoint, computes the matrix `N⁺(q)`∊ℝ⁶ˣ⁷ that
+   * For the %QuaternionBallJoint, computes the matrix `N⁺(q)`∊ℝ³ˣ⁴ that
    * maps generalized coordinate time derivatives qdot to generalized
-   * velocities v, with `v=N⁺ qdot`. The name signifies that `N⁺=pinv(N)` where
-   * `N(q)` is the matrix that maps v to qdot with `qdot=N v` and `pinv()`
-   * is the pseudoinverse (in this case the left pseudoinverse).
+   * velocities v, with `v=N⁺ qdot`. The name signifies that `N⁺=pinv(N)`
+   * where `N(q)` is the matrix that maps v to qdot with `qdot=N v` and
+   * `pinv()` is the pseudoinverse (in this case the left pseudoinverse).
    *
    * See the class description for precise definitions of the generalized
    * coordinates and velocities. Because the velocities are not the time
    * derivatives of the coordinates, rotations and translations are
    * reversed, and different expressed-in frames are employed, `N⁺` has the
    * following elaborate structure: <pre>
-   *        -------- -----------
-   *       |  0₃ₓ₃  | Nq⁺_PB_B  |
-   *  N⁺ = |--------|-----------|
-   *       |  R_BP  |   0₃ₓ₄    |
-   *        -------- ----------- 6×7
+   *        -----------
+   *  N⁺ = | Nq⁺_PB_B  |
+   *        ----------- 3×4
    * </pre>
    * where `Nq_PB_B` is the matrix that maps angular velocity `ω_PB_B` to
    * quaternion time derivative `qdot_PB` such that `qdot_PB=Nq_PB_B*ω_PB_B`,
    * and `Nq⁺_PB_B` is the left pseudoinverse of `Nq_PB_B`.
    *
-   * @param[in]  q The 7-element generalized configuration variable. See the
+   * @param[in]  q The 4-element generalized configuration variable. See the
    *   class documentation for details. See warning below regarding the effect
    *   if the contained quaternion is not normalized.
    * @param[out] qdot_to_v The matrix `N⁺`.
    * @param      dqdot_to_v Unused, must be `nullptr` on entry.
    *
    * @warning Let `s` be the norm of the quaternion in `q`. If `s ≠ 1`, then
-   * we will calculate `s*Nq⁺_PB_B` in the upper right block of `N⁺` so the
-   * resulting angular velocity vector will be scaled by `s` as well. This
-   * method neither performs a normalization check nor normalizes the quaternion
-   * orientation parameters. Implications for integration techniques must be
-   * carefully considered.
+   * we will calculate `s*Nq⁺_PB_B` so the resulting angular velocity vector
+   * will be scaled by `s` as well. This method neither performs a normalization
+   * check nor normalizes the quaternion orientation parameters. Implications
+   * for integration techniques must be carefully considered.
    */
   template <typename DerivedQ>
   void qdot2v(const Eigen::MatrixBase<DerivedQ>& q,
@@ -192,12 +171,11 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
     const auto& ez = q[3];
 
     // Assume that the quaternion orientation (e) gives a transformation matrix
-    // that re-expresses vectors from some frame B to some frame N. The upper
-    // right hand block of the transformation matrix represents
-    // the 2 L part of the relationship ω = 2 L de/dt, where
-    // e = [ ew ex ey ez ] are the quaternion values and ω is an angular
-    // velocity given in frame B. The relationship ω = 2 L de/dt and the
-    // matrix L was taken from:
+    // that re-expresses vectors from some frame B to some frame N. The
+    // transformation matrix represents the 2 L part of the relationship
+    // ω = 2 L de/dt, where e = [ ew ex ey ez ] are the quaternion values and ω
+    // is an angular velocity given in frame B. The relationship ω = 2 L de/dt
+    // and the matrix L was taken from:
     // - P. Nikravesh, Computer-Aided Analysis of Mechanical Systems. Prentice
     //     Hall, New Jersey, 1988. Equation 6.108.
     // NOTE: the torque-free, cylindrical solid unit test successfully detects
@@ -212,7 +190,7 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
 
 
   /**
-   * For the %QuaternionBallJoint, computes the matrix `N(q)`∊ℝ⁷ˣ⁶ that
+   * For the %QuaternionBallJoint, computes the matrix `N(q)`∊ℝ⁴ˣ³ that
    * maps generalized velocities v to generalized coordinate time derivatives
    * qdot, with `qdot=N v`.
    *
@@ -221,29 +199,24 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
    * derivatives of the coordinates, rotations and translations are
    * reversed, and different expressed-in frames are employed, `N` has the
    * following elaborate structure: <pre>
-   *        ------- ------
-   *       |  0₃ₓ₃ | R_PB |
-   *       |-------|------|
-   *   N = |       |      |
-   *       |Nq_PB_B| 0₄ₓ₃ |
-   *       |       |      |
-   *        -------------- 7×6
+   *        -------
+   *   N = |Nq_PB_B|
+   *        ------- 4×3
    * </pre>
    * where `Nq_PB_B` is the matrix that maps angular velocity `ω_PB_B` to
    * quaternion time derivative `qdot_PB` such that `qdot_PB=Nq_PB_B*ω_PB_B`.
    *
-   * @param[in]  q The 7-element generalized configuration variable. See the
+   * @param[in]  q The 4-element generalized configuration variable. See the
    *   class documentation for details. See warning below regarding the effect
    *   if the contained quaternion is not normalized.
    * @param[out] v_to_qdot The matrix `N`.
    * @param      dv_to_qdot Unused, must be `nullptr` on entry.
    *
    * @warning Let `s` be the norm of the quaternion in `q`. If `s ≠ 1`, then
-   * we will calculate `s*Nq_PB_B` in the lower left block of `N` so the
-   * resulting quaternion derivative will be scaled by `s` as well. This
-   * method neither performs a normalization check nor normalizes the quaternion
-   * orientation parameters. Implications for integration techniques must be
-   * carefully considered.
+   * we will calculate `s*Nq_PB_B` so the resulting quaternion derivative will
+   * be scaled by `s` as well. This method neither performs a normalization
+   * check nor normalizes the quaternion orientation parameters. Implications
+   * for integration techniques must be carefully considered.
    */
   template <typename DerivedQ>
   void v2qdot(const Eigen::MatrixBase<DerivedQ>& q,
@@ -266,13 +239,12 @@ class QuaternionBallJoint : public DrakeJointImpl<QuaternionBallJoint> {
     const auto& ez = q[3];
 
     // Assume that the quaternion orientation (e) gives a transformation matrix
-    // that re-expresses vectors from some frame B to some frame N. The upper
-    // right hand block of the tranfsormation matrix corresponds to the
-    // transpose of the "L" matrix used in qdot2v(). Specifically, this matrix
-    // represents the 1/2 Lᵀ part of the relationship de/dt = 1/2 Lᵀω, where
-    // e = [ ew ex ey ez ] are the quaternion values and ω is an angular
-    // velocity given in frame B. The relationship de/dt = 1/2 Lᵀω and the
-    // matrix L was taken from:
+    // that re-expresses vectors from some frame B to some frame N. The
+    // tranfsormation matrix corresponds to the transpose of the "L" matrix used
+    // in qdot2v(). Specifically, this matrix represents the 1/2 Lᵀ part of the
+    // relationship de/dt = 1/2 Lᵀω, where e = [ ew ex ey ez ] are the
+    // quaternion values and ω is an angular velocity given in frame B. The
+    // relationship de/dt = 1/2 Lᵀω and the matrix L was taken from:
     // - P. Nikravesh, Computer-Aided Analysis of Mechanical Systems. Prentice
     //     Hall, New Jersey, 1988. Equation 6.109.
     v_to_qdot << -ex, -ey, -ez,
