@@ -16,7 +16,7 @@ class FetchController {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(FetchController)
 
-  FetchController(std::unique_ptr<RigidBodyTree<T>> full_robot);
+  explicit FetchController(std::unique_ptr<RigidBodyTree<T>> full_robot);
 
   Vector2<T> CalcWheelTorque(const KinematicsCache<T>& cache, const T v_d,
                              const T w_d) const;
@@ -41,6 +41,8 @@ class FetchController {
  private:
   std::unique_ptr<RigidBodyTree<T>> full_robot_{nullptr};
   const RigidBody<T>* const base_link_{nullptr};
+  // The magic number is wheel to center.
+  static constexpr double kWheelYOffset = 0.18738;
 
   Vector<T, 7> kp_arm_;
   Vector<T, 7> kd_arm_;
@@ -63,8 +65,7 @@ class FetchControllerSystem : public systems::LeafSystem<T> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(FetchControllerSystem)
 
-  FetchControllerSystem(std::unique_ptr<RigidBodyTree<T>> full_robot);
-  // std::unique_ptr<RigidBodyTree<T>> fixed_robot);
+  explicit FetchControllerSystem(std::unique_ptr<RigidBodyTree<T>> full_robot);
 
   const systems::InputPortDescriptor<T>& get_input_port_full_estimated_state()
       const {
@@ -105,12 +106,6 @@ class FetchControllerSystem : public systems::LeafSystem<T> {
     return controller_.get_full_robot();
   }
 
-  /*
-  const RigidBodyTree<T>& get_fixed_robot() const {
-    return *fixed_robot_;
-  }
-  */
-
  private:
   void CalcOutputTorque(const systems::Context<T>& context,
                         systems::BasicVector<T>* output) const;
@@ -125,19 +120,6 @@ class FetchControllerSystem : public systems::LeafSystem<T> {
   int input_port_index_desired_hand_q_{-1};
 
   int output_port_index_control_{-1};
-
-  /*
-  Vector<T, kNumTorsoAct> kp_torso_;
-  Eigen::Matrix<double, kNumTorsoAct, 1> kp_torso_;
-  Eigen::Matrix<double, kNumHeadAct, 1> kp_head_;
-  Eigen::Matrix<double, kNumArmAct, 1> kp_arm_;
-  Eigen::Matrix<double, kNumHandAct, 1> kp_hand_;
-
-  Eigen::Matrix<double, kNumTorsoAct, 1> kd_torso_;
-  Eigen::Matrix<double, kNumHeadAct, 1> kd_head_;
-  Eigen::Matrix<double, kNumArmAct, 1> kd_arm_;
-  Eigen::Matrix<double, kNumHandAct, 1> kd_hand_;
-  */
 };
 
 }  // namespace Fetch

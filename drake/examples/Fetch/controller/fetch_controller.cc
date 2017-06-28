@@ -1,4 +1,5 @@
 #include "drake/examples/Fetch/controller/fetch_controller.h"
+#include <utility>
 
 namespace drake {
 namespace examples {
@@ -7,7 +8,7 @@ namespace Fetch {
 using systems::Context;
 using systems::BasicVector;
 
-//constexpr int kWheelQStart = 7;
+// constexpr int kWheelQStart = 7;
 constexpr int kWheelVStart = 6;
 
 constexpr int kHeadQStart = 10;
@@ -40,8 +41,7 @@ FetchController<T>::FetchController(
   kd_torso_ = 5;
 
   lin_v_gain_ = 5;
-  // The magic number is wheel to center.
-  omega_v_gain_ = 5 * 0.18738;
+  omega_v_gain_ = 5 * kWheelYOffset;
 }
 
 template <typename T>
@@ -49,24 +49,23 @@ Vector2<T> FetchController<T>::CalcWheelTorque(const KinematicsCache<T>& cache,
                                                const T v_d, const T w_d) const {
   Vector6<T> V_WB =
       full_robot_->CalcBodySpatialVelocityInWorldFrame(cache, *base_link_);
-  Isometry3<T> X_WB =
-      full_robot_->CalcBodyPoseInWorldFrame(cache, *base_link_);
+  Isometry3<T> X_WB = full_robot_->CalcBodyPoseInWorldFrame(cache, *base_link_);
 
   Vector6<T> V_WB_B;
-  V_WB_B.template head<3>() = X_WB.linear().transpose() * V_WB.template head<3>();
-  V_WB_B.template tail<3>() = X_WB.linear().transpose() * V_WB.template tail<3>();
+  V_WB_B.template head<3>() =
+      X_WB.linear().transpose() * V_WB.template head<3>();
+  V_WB_B.template tail<3>() =
+      X_WB.linear().transpose() * V_WB.template tail<3>();
 
   // xdot in body frame.
   T v = V_WB_B[3];
   // yawdot in body frame.
   T w = V_WB_B[2];
 
-  std::cout << "(v, w)" << v << " " << w << "\n";
+  T right_wheel_trq = lin_v_gain_ * (v_d - v) + omega_v_gain_ * (w_d - w);
+  T left_wheel_trq = lin_v_gain_ * (v_d - v) - omega_v_gain_ * (w_d - w);
 
-  T R = lin_v_gain_ * (v_d - v) + omega_v_gain_ * (w_d - w);
-  T L = lin_v_gain_ * (v_d - v) - omega_v_gain_ * (w_d - w);
-
-  return Vector2<T>(R, L);
+  return Vector2<T>(right_wheel_trq, left_wheel_trq);
 }
 
 template <typename T>
@@ -86,12 +85,13 @@ Vector2<T> FetchController<T>::CalcHeadAcc(const KinematicsCache<T>& cache,
 
 template <typename T>
 Vector2<T> FetchController<T>::CalcHandTorque(const KinematicsCache<T>& cache,
-                                           const Vector2<T>& q_d) const {
+                                              const Vector2<T>& q_d) const {
   auto q = cache.getQ().template segment<2>(kHandQStart);
   auto v = cache.getV().template segment<2>(kHandVStart);
 
-  Vector2<T> trq = (kp_hand_.array() * (q_d - q).array() -
-                    kd_hand_.array() * v.array()).matrix();
+  Vector2<T> trq =
+      (kp_hand_.array() * (q_d - q).array() - kd_hand_.array() * v.array())
+          .matrix();
   return trq;
 }
 
@@ -127,8 +127,9 @@ VectorX<T> FetchController<T>::CalcTorque(const VectorX<T>& acc,
   eigen_aligned_std_unordered_map<RigidBody<T> const*, Vector6<T>> f_ext;
 
   // Just the actuated parts.
-  VectorX<T> torque = full_robot_->inverseDynamics(*cache, f_ext, acc)
-                          .segment(kWheelVStart, full_robot_->get_num_actuators());
+  VectorX<T> torque =
+      full_robot_->inverseDynamics(*cache, f_ext, acc)
+          .segment(kWheelVStart, full_robot_->get_num_actuators());
   return torque;
 }
 
@@ -136,11 +137,12 @@ template <typename T>
 FetchControllerSystem<T>::FetchControllerSystem(
     std::unique_ptr<RigidBodyTree<T>> full_robot)
     : controller_(std::move(full_robot)) {
-
   const auto& robot = controller_.get_full_robot();
 
   input_port_index_full_estimated_state_ =
-      this->DeclareInputPort(systems::kVectorValued, robot.get_num_positions() + robot.get_num_velocities())
+      this->DeclareInputPort(
+              systems::kVectorValued,
+              robot.get_num_positions() + robot.get_num_velocities())
           .get_index();
 
   output_port_index_control_ =
@@ -169,9 +171,8 @@ void FetchControllerSystem<T>::CalcOutputTorque(const Context<T>& context,
   vd_d[kTorsoVStart] = controller_.CalcTorsoAcc(cache, 0.2, 0, 0);
 
   // Head acc
-  vd_d.template segment<2>(kHeadVStart) =
-      controller_.CalcHeadAcc(cache,
-          Vector2<T>::Zero(), Vector2<T>::Zero(), Vector2<T>::Zero());
+  vd_d.template segment<2>(kHeadVStart) = controller_.CalcHeadAcc(
+      cache, Vector2<T>::Zero(), Vector2<T>::Zero(), Vector2<T>::Zero());
 
   // Arms acc
   VectorX<T> arm_q = VectorX<T>::Zero(7);

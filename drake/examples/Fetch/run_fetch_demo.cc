@@ -72,7 +72,8 @@ int DoMain() {
     plant->set_normal_contact_parameters(FLAGS_contact_stiff,
                                          FLAGS_contact_diss);
 
-    controller = builder.AddSystem<FetchControllerSystem<double>>(std::move(control_tree));
+    controller = builder.AddSystem<FetchControllerSystem<double>>(
+        std::move(control_tree));
   }
 
   // Verifies the tree.
