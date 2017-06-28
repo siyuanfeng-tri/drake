@@ -1,0 +1,145 @@
+#pragma once
+
+#include <memory>
+#include <string>
+
+#include "drake/common/drake_copyable.h"
+#include "drake/multibody/rigid_body_tree.h"
+#include "drake/systems/framework/leaf_system.h"
+
+namespace drake {
+namespace examples {
+namespace Fetch {
+
+template <typename T>
+class FetchController {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(FetchController)
+
+  FetchController(std::unique_ptr<RigidBodyTree<T>> full_robot);
+
+  Vector2<T> CalcWheelTorque(const KinematicsCache<T>& cache, const T v_d,
+                             const T w_d) const;
+
+  Vector2<T> CalcHeadAcc(const KinematicsCache<T>& cache, const Vector2<T>& q_d,
+                         const Vector2<T>& v_d,
+                         const Vector2<T>& vd_d = Vector2<T>::Zero()) const;
+
+  Vector2<T> CalcHandTorque(const KinematicsCache<T>& cache,
+                            const Vector2<T>& q_d) const;
+
+  T CalcTorsoAcc(const KinematicsCache<T>& cache, const T q_d, const T v_d,
+                 const T vd_d = 0) const;
+
+  VectorX<T> CalcArmAcc(const KinematicsCache<T>& cache, const VectorX<T>& q_d,
+                        const VectorX<T>& v_d, const VectorX<T>& vd_d) const;
+
+  VectorX<T> CalcTorque(const VectorX<T>& acc, KinematicsCache<T>* cache) const;
+
+  const RigidBodyTree<T>& get_full_robot() const { return *full_robot_; }
+
+ private:
+  std::unique_ptr<RigidBodyTree<T>> full_robot_{nullptr};
+  const RigidBody<T>* const base_link_{nullptr};
+
+  Vector<T, 7> kp_arm_;
+  Vector<T, 7> kd_arm_;
+
+  T kp_torso_;
+  T kd_torso_;
+
+  T lin_v_gain_;
+  T omega_v_gain_;
+
+  Vector<T, 2> kp_hand_;
+  Vector<T, 2> kd_hand_;
+
+  Vector<T, 2> kp_head_;
+  Vector<T, 2> kd_head_;
+};
+
+template <typename T>
+class FetchControllerSystem : public systems::LeafSystem<T> {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(FetchControllerSystem)
+
+  FetchControllerSystem(std::unique_ptr<RigidBodyTree<T>> full_robot);
+  // std::unique_ptr<RigidBodyTree<T>> fixed_robot);
+
+  const systems::InputPortDescriptor<T>& get_input_port_full_estimated_state()
+      const {
+    return this->get_input_port(input_port_index_full_estimated_state_);
+  }
+
+  const systems::InputPortDescriptor<T>& get_input_port_desired_base_velocity()
+      const {
+    return this->get_input_port(input_port_index_desired_base_velocity_);
+  }
+
+  const systems::InputPortDescriptor<T>& get_input_port_desired_arm_state()
+      const {
+    return this->get_input_port(input_port_index_desired_arm_state_);
+  }
+
+  const systems::InputPortDescriptor<T>& get_input_port_desired_head_position()
+      const {
+    return this->get_input_port(input_port_index_desired_head_q_);
+  }
+
+  const systems::InputPortDescriptor<T>& get_input_port_desired_hand_position()
+      const {
+    return this->get_input_port(input_port_index_desired_hand_q_);
+  }
+
+  /**
+   * Returns the output port for computed control.
+   */
+  const systems::OutputPort<T>& get_output_port_control() const {
+    return this->get_output_port(output_port_index_control_);
+  }
+
+  /**
+   * Returns a constant reference to the RigidBodyTree used for control.
+   */
+  const RigidBodyTree<T>& get_full_robot() const {
+    return controller_.get_full_robot();
+  }
+
+  /*
+  const RigidBodyTree<T>& get_fixed_robot() const {
+    return *fixed_robot_;
+  }
+  */
+
+ private:
+  void CalcOutputTorque(const systems::Context<T>& context,
+                        systems::BasicVector<T>* output) const;
+
+  FetchController<T> controller_;
+
+  int input_port_index_full_estimated_state_{-1};
+  int input_port_index_desired_base_velocity_{-1};
+  int input_port_index_desired_torso_state_{-1};
+  int input_port_index_desired_arm_state_{-1};
+  int input_port_index_desired_head_q_{-1};
+  int input_port_index_desired_hand_q_{-1};
+
+  int output_port_index_control_{-1};
+
+  /*
+  Vector<T, kNumTorsoAct> kp_torso_;
+  Eigen::Matrix<double, kNumTorsoAct, 1> kp_torso_;
+  Eigen::Matrix<double, kNumHeadAct, 1> kp_head_;
+  Eigen::Matrix<double, kNumArmAct, 1> kp_arm_;
+  Eigen::Matrix<double, kNumHandAct, 1> kp_hand_;
+
+  Eigen::Matrix<double, kNumTorsoAct, 1> kd_torso_;
+  Eigen::Matrix<double, kNumHeadAct, 1> kd_head_;
+  Eigen::Matrix<double, kNumArmAct, 1> kd_arm_;
+  Eigen::Matrix<double, kNumHandAct, 1> kd_hand_;
+  */
+};
+
+}  // namespace Fetch
+}  // namespace examples
+}  // namespace drake

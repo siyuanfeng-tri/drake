@@ -15,6 +15,9 @@
 
 namespace drake {
 
+template <typename Scalar, int Dim>
+using Vector = Eigen::Matrix<Scalar, Dim, 1>;
+
 /// A column vector of size 1 (that is, a scalar), templated on scalar type.
 template <typename Scalar>
 using Vector1 = Eigen::Matrix<Scalar, 1, 1>;

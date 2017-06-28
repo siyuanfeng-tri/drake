@@ -60,4 +60,28 @@ drake_cc_binary(
     ],
 )
 
+drake_cc_binary(
+    name = "run_fetch_demo",
+    srcs = ["run_fetch_demo.cc"],
+    add_test_rule = 1,
+    data = [
+        "//drake/examples/Fetch:models",
+    ],
+    test_rule_args = ["--simulation_sec=10"],
+    deps = [
+        ":fetch_common",
+        "//drake/common:text_logging_gflags",
+        "//drake/examples/Fetch/controller:fetch_controller",
+        "//drake/lcm",
+        "//drake/lcmtypes:contact_results_for_viz",
+        "//drake/multibody:rigid_body_tree_construction",
+        "//drake/multibody/rigid_body_plant",
+        "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
+        "//drake/multibody/rigid_body_plant:drake_visualizer",
+        "//drake/systems/analysis:simulator",
+        "//drake/systems/primitives:constant_vector_source",
+        "@com_github_gflags_gflags//:gflags",
+    ],
+)
+
 cpplint()

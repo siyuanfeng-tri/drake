@@ -8,13 +8,18 @@
 #include "drake/common/drake_path.h"
 #include "drake/common/text_logging_gflags.h"
 #include "drake/examples/Fetch/fetch_common.h"
+#include "drake/examples/Fetch/controller/fetch_controller.h"
 #include "drake/lcm/drake_lcm.h"
+#include "drake/lcmt_contact_results_for_viz.hpp"
+#include "drake/multibody/parsers/urdf_parser.h"
+#include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/multibody/rigid_body_tree_construction.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/diagram_builder.h"
+#include "drake/systems/lcm/lcm_publisher_system.h"
 
 namespace drake {
 
@@ -41,6 +46,8 @@ int DoMain() {
 
   // Adds a plant.
   RigidBodyPlant<double>* plant = nullptr;
+  FetchControllerSystem<double>* controller = nullptr;
+
   const std::string kModelPath =
       drake::GetDrakePath() +
       "/examples/Fetch/fetch_description/robots/fetch.urdf";
@@ -55,10 +62,14 @@ int DoMain() {
       std::cout << i << ": " << tree->actuators[i].name_ << "\n";
     }
 
+    auto control_tree = tree->Clone();
+
     plant = builder.AddSystem<RigidBodyPlant<double>>(std::move(tree));
     plant->set_name("plant");
     plant->set_normal_contact_parameters(FLAGS_contact_stiff,
                                          FLAGS_contact_diss);
+
+    controller = builder.AddSystem<FetchControllerSystem<double>>(std::move(control_tree));
   }
 
   // Verifies the tree.
@@ -70,6 +81,29 @@ int DoMain() {
 
   // Connects the visualizer and builds the diagram.
   builder.Connect(plant->get_output_port(0), visualizer->get_input_port(0));
+
+  // Connects the controller and the plant.
+  builder.Connect(controller->get_output_port_control(),
+                  plant->actuator_command_input_port());
+  builder.Connect(plant->get_output_port(0),
+                  controller->get_input_port_full_estimated_state());
+
+  // Visualize contacts.
+  systems::ContactResultsToLcmSystem<double>& contact_viz =
+    *builder.template AddSystem<systems::ContactResultsToLcmSystem<double>>(
+        tree);
+  contact_viz.set_name("contact_viz");
+
+  auto& contact_results_publisher = *builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<lcmt_contact_results_for_viz>(
+          "CONTACT_RESULTS", &lcm));
+  contact_results_publisher.set_name("contact_results_publisher");
+
+  builder.Connect(plant->contact_results_output_port(),
+      contact_viz.get_input_port(0));
+  builder.Connect(contact_viz.get_output_port(0),
+      contact_results_publisher.get_input_port(0));
+
   std::unique_ptr<systems::Diagram<double>> diagram = builder.Build();
   systems::Simulator<double> simulator(*diagram);
 
@@ -79,13 +113,13 @@ int DoMain() {
   // Sets torso lift initial conditions.
   // See the @file docblock in fetch_common.h for joint index descriptions.
   VectorBase<double>* x0 = fetch_context->get_mutable_continuous_state_vector();
-  x0->SetAtIndex(9, 0.1);  // torso lift joint [m]
+  x0->SetAtIndex(2, 0.2);  // base z [m]
 
   simulator.Initialize();
 
   // Simulate for the desired duration.
-  simulator.set_target_realtime_rate(0.2);
-  simulator.StepTo(FLAGS_simulation_sec);
+  simulator.set_target_realtime_rate(1);
+  simulator.StepTo(10000);
 
   // Ensures the simulation was successful.
   const Context<double>& context = simulator.get_context();
