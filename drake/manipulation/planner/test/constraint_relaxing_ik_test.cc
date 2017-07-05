@@ -116,16 +116,12 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkTraj) {
   const VectorX<double> kQcurrent = iiwa->getZeroConfiguration();
 
   for (size_t i = 0; i < waypoints.size(); ++i) {
-    VectorX<double> q_fk = kQcurrent; // iiwa->getRandomConfiguration(rand_generator);
-    cache.initialize(q_fk);
-    iiwa->doKinematics(cache);
-    waypoints[i].pose = iiwa->CalcBodyPoseInWorldFrame(cache, *end_effector);
-    /*
     waypoints[i].pose = Isometry3<double>::Identity();
-    waypoints[i].pose.translation() = Vector3<double>(0, 0.5, 0.3);
+    // waypoints[i].pose.translation() = Vector3<double>(0, 0.5, 0.3);
     waypoints[i].pose.linear() = AngleAxis<double>(M_PI / 2., Vector3<double>::UnitX()).toRotationMatrix();
-    */
   }
+  waypoints[0].pose.translation() = Vector3<double>(0, 0.5, 0.3);
+  waypoints[0].pose.translation() = Vector3<double>(0.2, 0.2, 0.3);
 
   bool ret =
       ik_planner.PlanSequentialTrajectory1(waypoints, kQcurrent, &ik_res);
