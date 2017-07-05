@@ -17,8 +17,7 @@ constexpr int kDefaultRandomSeed = 1234;
 }  // namespace
 
 ConstraintRelaxingIk::ConstraintRelaxingIk(
-    const std::string& model_path,
-    const std::string& end_effector_link_name,
+    const std::string& model_path, const std::string& end_effector_link_name,
     const Isometry3<double>& base_to_world)
     : rand_generator_(kDefaultRandomSeed) {
   auto base_frame = std::allocate_shared<RigidBodyFrame<double>>(
@@ -30,6 +29,104 @@ ConstraintRelaxingIk::ConstraintRelaxingIk(
       model_path, multibody::joints::kFixed, base_frame, robot_.get());
 
   SetEndEffector(end_effector_link_name);
+}
+
+std::unique_ptr<WorldPositionConstraint> make_pos_constraint(
+    RigidBodyTree<double>* robot, const ConstraintRelaxingIk::IkCartesianWaypoint& waypoint,
+    int body_idx, const Vector3<double>& p_BE, const Vector2<double>& tspan) {
+  return std::make_unique<WorldPositionConstraint>(
+      robot, body_idx, p_BE, waypoint.pose.translation() - waypoint.pos_tol,
+      waypoint.pose.translation() + waypoint.pos_tol, tspan);
+}
+
+std::unique_ptr<WorldQuatConstraint> make_rot_constraint(
+    RigidBodyTree<double>* robot, const ConstraintRelaxingIk::IkCartesianWaypoint& waypoint,
+    int body_idx, const Vector2<double>& tspan) {
+  if (waypoint.constrain_orientation) {
+    return std::make_unique<WorldQuatConstraint>(
+        robot, body_idx, math::rotmat2quat(waypoint.pose.linear()),
+        waypoint.rot_tol, tspan);
+  } else {
+    return nullptr;
+  }
+}
+
+bool ConstraintRelaxingIk::PlanSequentialTrajectory1(
+    const std::vector<IkCartesianWaypoint>& waypoints,
+    const VectorX<double>& q_current, IKResults* ik_res) {
+  DRAKE_DEMAND(ik_res);
+  // idx 0 is q_current.
+  const int num_steps = static_cast<int>(waypoints.size()) + 1;
+
+  // Clear ik_res
+  ik_res->infeasible_constraints.clear();
+  ik_res->info.resize(num_steps);
+  ik_res->q_sol.resize(num_steps);
+  ik_res->info[0] = 1;
+  ik_res->q_sol[0] = q_current;
+
+  // Sets initial conditions.
+  MatrixX<double> q_initial = q_current.replicate(1, num_steps);
+  MatrixX<double> q_norm = q_initial;
+  VectorX<double> qd0 = VectorX<double>::Zero(robot_->get_num_velocities());
+
+  // Build constraints.
+  std::vector<RigidBodyConstraint*> constraint_array;
+  std::vector<std::unique_ptr<RigidBodyConstraint>> tmp_constraints;
+
+  // set a end time...
+  const double T = 2;
+  const double dt = T / (num_steps - 1);
+  std::vector<double> time(num_steps, 0);
+
+  int ctr = 1;
+  for (const auto& waypoint : waypoints) {
+    time[ctr] = ctr * dt;
+
+    // Position constarint.
+    Vector3<double> p_BH =
+        Vector3<double>::Zero();  // local offset in body frame.
+    Vector2<double> tspan(time[ctr], time[ctr]);
+
+    tmp_constraints.push_back(
+        make_pos_constraint(robot_.get(), waypoint, end_effector_body_idx_, p_BH, tspan));
+    constraint_array.push_back(tmp_constraints.back().get());
+
+    // Orientation constraint.
+    tmp_constraints.push_back(
+        make_rot_constraint(robot_.get(), waypoint, end_effector_body_idx_, tspan));
+    if (tmp_constraints.back() != nullptr)
+      constraint_array.push_back(tmp_constraints.back().get());
+  }
+
+  IKoptions ikoptions(robot_.get());
+  ikoptions.setDebug(true);
+  ikoptions.setFixInitialState(false);
+  ikoptions.setMajorIterationsLimit(500);
+
+  std::cout << num_steps << "\n" << constraint_array.size() << "\n";
+
+  MatrixX<double> q_sol(robot_->get_num_positions(), num_steps);
+  MatrixX<double> qdot_sol(robot_->get_num_positions(), num_steps);
+  MatrixX<double> qddot_sol(robot_->get_num_positions(), num_steps);
+  int info = 0;
+  std::vector<std::string> infeasible_constraint;
+  inverseKinTraj(robot_.get(), num_steps, time.data(), qd0, q_initial, q_norm,
+                 constraint_array.size(), constraint_array.data(), ikoptions,
+                 &q_sol, &qdot_sol, &qddot_sol, &info, &infeasible_constraint);
+
+  if (info != 1) {
+    std::cout << "can't solve\n";
+    for (const auto& err : infeasible_constraint) {
+      std::cout << err << "\n";
+    }
+  }
+
+  for (int i = 0; i < num_steps; ++i) {
+    ik_res->q_sol[i] = q_sol.col(i);
+  }
+
+  return info == 1;
 }
 
 bool ConstraintRelaxingIk::PlanSequentialTrajectory(
@@ -150,11 +247,9 @@ bool ConstraintRelaxingIk::PlanSequentialTrajectory(
 }
 
 bool ConstraintRelaxingIk::SolveIk(
-    const IkCartesianWaypoint& waypoint,
-    const VectorX<double>& q0,
-    const VectorX<double>& q_nom,
-    const Vector3<double>& pos_tol, double rot_tol,
-    VectorX<double>* q_res, std::vector<int>* info,
+    const IkCartesianWaypoint& waypoint, const VectorX<double>& q0,
+    const VectorX<double>& q_nom, const Vector3<double>& pos_tol,
+    double rot_tol, VectorX<double>* q_res, std::vector<int>* info,
     std::vector<std::string>* infeasible_constraints) {
   DRAKE_DEMAND(q_res);
   DRAKE_DEMAND(info);
