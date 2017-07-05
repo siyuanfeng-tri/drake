@@ -97,6 +97,7 @@ bool ConstraintRelaxingIk::PlanSequentialTrajectory1(
         make_rot_constraint(robot_.get(), waypoint, end_effector_body_idx_, tspan));
     if (tmp_constraints.back() != nullptr)
       constraint_array.push_back(tmp_constraints.back().get());
+    ctr++;
   }
 
   IKoptions ikoptions(robot_.get());
