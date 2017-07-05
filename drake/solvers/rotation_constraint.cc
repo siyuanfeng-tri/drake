@@ -1,4 +1,5 @@
 /* clang-format off */
+#include "drake/solvers/gurobi_solver.h"
 #include "drake/solvers/rotation_constraint.h"
 #include "drake/solvers/rotation_constraint_internal.h"
 /* clang-format on */
@@ -487,7 +488,8 @@ void ComputeHalfSpaceRelaxationForBoxSphereIntersection(
   Vector4<symbolic::Expression> lorentz_cone_vars;
   lorentz_cone_vars << 1, n_var;
   prog_normal.AddLorentzConeConstraint(lorentz_cone_vars);
-  prog_normal.Solve();
+  GurobiSolver gurobi_solver;
+  gurobi_solver.Solve(prog_normal);
   *n = prog_normal.GetSolution(n_var);
   *d = prog_normal.GetSolution(d_var(0));
 

@@ -88,11 +88,14 @@ class ConstraintRelaxingIk {
       const std::vector<IkCartesianWaypoint>& waypoints,
       const VectorX<double>& q_current, IKResults* ik_res);
 
+  bool PlanSequentialTrajectory1(
+      const std::vector<IkCartesianWaypoint>& waypoints,
+      const VectorX<double>& q_current, IKResults* ik_res);
+
  private:
   bool SolveIk(const IkCartesianWaypoint& waypoint, const VectorX<double>& q0,
-               const VectorX<double>& q_nom,
-               const Vector3<double>& pos_tol, double rot_tol,
-               VectorX<double>* q_res, std::vector<int>* info,
+               const VectorX<double>& q_nom, const Vector3<double>& pos_tol,
+               double rot_tol, VectorX<double>* q_res, std::vector<int>* info,
                std::vector<std::string>* infeasible_constraints);
 
   std::default_random_engine rand_generator_;

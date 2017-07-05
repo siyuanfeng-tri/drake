@@ -8,8 +8,9 @@
 namespace drake {
 namespace manipulation {
 namespace planner {
-namespace {
 
+/*
+namespace {
 inline double get_orientation_difference(const Matrix3<double>& rot0,
                                          const Matrix3<double>& rot1) {
   AngleAxis<double> err(rot0.transpose() * rot1);
@@ -82,6 +83,85 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkFromFk) {
 
     // cos(ang_diff) >= cos(tol) is the actual constraint in the IK.
     EXPECT_TRUE(std::cos(rot_diff) + kEpsilon >= std::cos(wp.rot_tol));
+  }
+}
+*/
+
+GTEST_TEST(ConstraintRelaxingIkTest, SolveIkTraj) {
+  const std::string kModelPath = FindResourceOrThrow(
+      "drake/manipulation/models/iiwa_description/urdf/"
+      "iiwa14_polytope_collision.urdf");
+  std::unique_ptr<RigidBodyTree<double>> iiwa =
+      std::make_unique<RigidBodyTree<double>>();
+  drake::parsers::urdf::AddModelInstanceFromUrdfFile(
+      kModelPath, multibody::joints::kFixed, nullptr, iiwa.get());
+
+  KinematicsCache<double> cache = iiwa->CreateKinematicsCache();
+
+  const std::string kEndEffectorLinkName = "iiwa_link_ee";
+  const RigidBody<double>* end_effector = iiwa->FindBody(kEndEffectorLinkName);
+
+  IKResults ik_res;
+  ConstraintRelaxingIk ik_planner(kModelPath, kEndEffectorLinkName,
+                                  Isometry3<double>::Identity());
+  ConstraintRelaxingIk::IkCartesianWaypoint wp;
+  wp.pos_tol = Vector3<double>(0.001, 0.001, 0.001);
+  wp.rot_tol = 0.005;
+  wp.constrain_orientation = true;
+
+  //
+  std::vector<ConstraintRelaxingIk::IkCartesianWaypoint> waypoints(2, wp);
+
+  std::default_random_engine rand_generator(1234);
+  const VectorX<double> kQcurrent = iiwa->getZeroConfiguration();
+
+  for (size_t i = 0; i < waypoints.size(); ++i) {
+    VectorX<double> q_fk = kQcurrent; // iiwa->getRandomConfiguration(rand_generator);
+    cache.initialize(q_fk);
+    iiwa->doKinematics(cache);
+    waypoints[i].pose = iiwa->CalcBodyPoseInWorldFrame(cache, *end_effector);
+    /*
+    waypoints[i].pose = Isometry3<double>::Identity();
+    waypoints[i].pose.translation() = Vector3<double>(0, 0.5, 0.3);
+    waypoints[i].pose.linear() = AngleAxis<double>(M_PI / 2., Vector3<double>::UnitX()).toRotationMatrix();
+    */
+  }
+
+  bool ret =
+      ik_planner.PlanSequentialTrajectory1(waypoints, kQcurrent, &ik_res);
+  EXPECT_TRUE(ret);
+
+  /*
+  const double kEpsilon = 1e-6;
+  const Vector3<double> kUpperBound =
+      wp.pos_tol + kEpsilon * Vector3<double>::Ones();
+  const Vector3<double> kLowerBound =
+      -wp.pos_tol - kEpsilon * Vector3<double>::Ones();
+  */
+
+  for (size_t i = 0; i < waypoints.size(); ++i) {
+    cache.initialize(ik_res.q_sol[i + 1]);
+    iiwa->doKinematics(cache);
+    Isometry3<double> ik_pose = iiwa->CalcBodyPoseInWorldFrame(cache, *end_effector);
+
+    std::cout << "pos: " << ik_pose.translation().transpose() << "\n";
+    std::cout << "rot: " << ik_pose.linear() << "\n";
+
+    /*
+    const Isometry3<double>& fk_pose = waypoints[i].pose;
+
+    Vector3<double> pos_diff = ik_pose.translation() - fk_pose.translation();
+    double rot_diff =
+        get_orientation_difference(ik_pose.linear(), fk_pose.linear());
+
+    std::cout << pos_diff.transpose() << "\n" << kUpperBound.transpose() << "\n";
+
+    EXPECT_TRUE((pos_diff.array() <= kUpperBound.array()).all());
+    EXPECT_TRUE((pos_diff.array() >= kLowerBound.array()).all());
+
+    // cos(ang_diff) >= cos(tol) is the actual constraint in the IK.
+    EXPECT_TRUE(std::cos(rot_diff) + kEpsilon >= std::cos(wp.rot_tol));
+    */
   }
 }
 
