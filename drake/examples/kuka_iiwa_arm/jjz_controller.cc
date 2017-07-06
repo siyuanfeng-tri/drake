@@ -119,6 +119,10 @@ class RobotPlanRunner {
 
     bool first_tick = true;
     Isometry3<double> X_WE0;
+    double t0;
+
+    std::vector<VectorX<double>> q_sol;
+    size_t q_ctr = 0;
 
     while (true) {
       // Call lcm handle until at least one status message is
@@ -132,16 +136,42 @@ class RobotPlanRunner {
 
       if (first_tick) {
         X_WE0 = X_WE;
+        t0 = state_.get_time();
         first_tick = false;
+
+        const int N = 1000;
+        std::vector<double> T(N);
+        std::vector<Isometry3<double>> pose_d(N);
+        for (int i = 0; i < N; ++i) {
+          T[i] = (i + 1) * 5e-3;
+          pose_d[i] = X_WE0;
+          pose_d[i].translation()[0] += 0.1 * std::sin(T[i]);
+          pose_d[i].translation()[1] += 0.1 * std::cos(T[i]);
+        }
+        VectorX<double> q_nominal = robot_.getZeroConfiguration();
+        jaco_planner_.Plan(state_.get_q(), T, pose_d, q_nominal, &q_sol);
       }
 
+      /*
+      Isometry3<double> X_WE_d = X_WE0;
+      X_WE_d.translation()[0] += 0.1 * std::sin((state_.get_time() - t0));
+      X_WE_d.translation()[1] += 0.1 * (std::cos((state_.get_time() - t0)));
+      */
+
+      // std::cout << X_WE_d.translation().transpose() << "\n";
+
+      /*
       const double dt = 5e-3;
       Vector6<double> V_WE_d =
-          manipulation::planner::JacobianIk::ComputePoseDiffInWorldFrame(X_WE, X_WE0) / dt;
+          manipulation::planner::JacobianIk::ComputePoseDiffInWorldFrame(X_WE, X_WE_d) / dt;
       VectorX<double> v = jaco_planner_.ComputeDofVelocity(
           state_.get_cache(), V_WE_d, robot_.getZeroConfiguration(), dt);
 
       VectorX<double> q_d = state_.get_q() + v * dt;
+      */
+      VectorX<double> q_d = q_sol[q_ctr++];
+      if (q_ctr >= q_sol.size() - 1)
+        q_ctr = q_sol.size() - 1;
 
       // Make msg.
       iiwa_command.utime = static_cast<int64_t>(state_.get_time() * 1e6);
