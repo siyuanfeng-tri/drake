@@ -16,7 +16,7 @@ namespace manipulation {
 namespace planner {
 
 Vector6<double> JacobianIk::ComputePoseDiffInWorldFrame(
-      const Isometry3<double>& pose0, const Isometry3<double>& pose1) {
+    const Isometry3<double>& pose0, const Isometry3<double>& pose1) {
   Vector6<double> diff = Vector6<double>::Zero();
 
   // Linear.
@@ -45,16 +45,16 @@ JacobianIk::JacobianIk(const std::string& model_path,
 
   q_lower_ = robot_->joint_limit_min;
   q_upper_ = robot_->joint_limit_max;
-  v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -2);
-  v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 2.);
+  v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -0.5);
+  v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 0.5);
 
   identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
                                         robot_->get_num_positions());
 }
 
-VectorX<double> JacobianIk::ComputeDofVelocity(const KinematicsCache<double>& cache0,
-    const Vector6<double>& V_WE, const VectorX<double>& q_nominal,
-    double dt) const {
+VectorX<double> JacobianIk::ComputeDofVelocity(
+    const KinematicsCache<double>& cache0, const Vector6<double>& V_WE,
+    const VectorX<double>& q_nominal, double dt) const {
   DRAKE_DEMAND(q_nominal.size() == robot_->get_num_positions());
 
   VectorX<double> ret;
@@ -63,7 +63,7 @@ VectorX<double> JacobianIk::ComputeDofVelocity(const KinematicsCache<double>& ca
 
   solvers::MathematicalProgram prog;
   solvers::VectorXDecisionVariable v =
-    prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
+      prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
 
   // Add ee vel constraint
   solvers::QuadraticCost* cost =
@@ -73,8 +73,8 @@ VectorX<double> JacobianIk::ComputeDofVelocity(const KinematicsCache<double>& ca
   prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
 
   // Add q upper and lower joint limit.
-  prog.AddLinearConstraint(identity_ * dt,
-      q_lower_ - cache0.getQ(), q_upper_ - cache0.getQ(), v);
+  prog.AddLinearConstraint(identity_ * dt, q_lower_ - cache0.getQ(),
+                           q_upper_ - cache0.getQ(), v);
 
   solvers::SolutionResult result = solver_.Solve(prog);
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
@@ -119,7 +119,8 @@ bool JacobianIk::Plan(const VectorX<double>& q0,
 
     pose_now = robot_->CalcBodyPoseInWorldFrame(cache, *end_effector_);
     double dt = times[t] - time_now;
-    Vector6<double> V_WE_d = ComputePoseDiffInWorldFrame(pose_now, pose_traj[t]) / dt;
+    Vector6<double> V_WE_d =
+        ComputePoseDiffInWorldFrame(pose_now, pose_traj[t]) / dt;
 
     v = ComputeDofVelocity(cache, V_WE_d, q_nominal, dt);
 

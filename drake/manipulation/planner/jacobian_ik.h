@@ -51,8 +51,9 @@ class JacobianIk {
    * @return Resulting generalized velocity.
    */
   VectorX<double> ComputeDofVelocity(const KinematicsCache<double>& cache0,
-      const Vector6<double>& V_WE, const VectorX<double>& q_nominal,
-      double dt) const;
+                                     const Vector6<double>& V_WE,
+                                     const VectorX<double>& q_nominal,
+                                     double dt) const;
 
   /**
    * Sets end effector to @p end_effector_body.
@@ -69,6 +70,8 @@ class JacobianIk {
     end_effector_ = robot_->FindBody(link_name);
     end_effector_body_idx_ = end_effector_->get_body_index();
   }
+
+  const RigidBody<double>& get_end_effector() const { return *end_effector_; }
 
   /**
    * Returns constant reference to the robot model.
