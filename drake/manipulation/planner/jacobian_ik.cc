@@ -55,40 +55,51 @@ VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
   std::cout << xd.transpose() << "\n";
 
   solvers::MathematicalProgram prog;
-  solvers::VectorXDecisionVariable vd =
+  solvers::VectorXDecisionVariable v =
       prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
 
   // Add ee vel constraint
+  /*
   prog.AddLinearEqualityConstraint(
       robot_->CalcBodySpatialVelocityJacobianInWorldFrame(cache0,
                                                           *end_effector_),
-      xd, vd);
+      xd, v);
+  */
+  prog.AddL2NormCost(
+      robot_->CalcBodySpatialVelocityJacobianInWorldFrame(cache0,
+                                                          *end_effector_),
+      xd, v);
 
   std::cout << q_lower_.transpose() << "\n";
   std::cout << q_upper_.transpose() << "\n";
 
-  // Add q upper and lower joint limit.
+  prog.AddBoundingBoxConstraint(
+      -2 * VectorX<double>::Ones(robot_->get_num_velocities()),
+       2 * VectorX<double>::Ones(robot_->get_num_velocities()),
+       v);
+
   /*
+  // Add q upper and lower joint limit.
   prog.AddLinearConstraint(
       MatrixX<double>::Identity(robot_->get_num_positions(),
                                 robot_->get_num_positions()) * dt,
-      q_lower_ - cache0.getQ(), q_upper_ - cache0.getQ(), vd);
-  */
+      q_lower_ - cache0.getQ(), q_upper_ - cache0.getQ(), v);
 
   // Add a normalization term
-  prog.AddQuadraticErrorCost(
+  prog.AddL2NormCost(
       MatrixX<double>::Identity(robot_->get_num_positions(),
                                 robot_->get_num_positions()) * dt,
-      -cache0.getQ(), vd);
+      -cache0.getQ(), v);
+  */
 
   solvers::SolutionResult result = prog.Solve();
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
-  VectorX<double> v = prog.GetSolutionVectorValues();
+  VectorX<double> ret = prog.GetSolutionVectorValues();
 
-  std::cout << "lb:" << (v * dt + cache0.getQ() - q_lower_).transpose() << "\n";
-  std::cout << "ub:" << (v * dt + cache0.getQ() - q_upper_).transpose() << "\n";
+  //std::cout << "lb:" << (ret * dt + cache0.getQ() - q_lower_).transpose() << "\n";
+  //std::cout << "ub:" << (ret * dt + cache0.getQ() - q_upper_).transpose() << "\n";
 
-  return v;
+  return ret;
 }
 
 bool JacobianIk::Plan(const VectorX<double>& q0,
