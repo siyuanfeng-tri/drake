@@ -131,8 +131,13 @@ int DoMain() {
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
 
-  std::default_random_engine rand(30);
-  VectorX<double> q0 = tree.getRandomConfiguration(rand);
+  //std::default_random_engine rand(30);
+  //VectorX<double> q0 = tree.getRandomConfiguration(rand);
+  VectorX<double> q0 = tree.getZeroConfiguration();
+  q0[1] -= 45. * M_PI / 180.;
+  q0[3] += M_PI / 2.;
+  q0[5] -= 45. * M_PI / 180.;
+
   Context<double>& plant_context = sys->GetMutableSubsystemContext(*plant, simulator.get_mutable_context());
   systems::VectorBase<double>* plant_q0 = plant_context.get_mutable_continuous_state()->get_mutable_generalized_position();
   plant_q0->SetFromVector(q0);
