@@ -15,18 +15,18 @@ namespace drake {
 namespace manipulation {
 namespace planner {
 
-Vector6<double> compute_velocity(const Isometry3<double>& pose0,
-                                 const Isometry3<double>& pose1, double dt) {
-  Vector6<double> vel = Vector6<double>::Zero();
+Vector6<double> JacobianIk::ComputePoseDiffInWorldFrame(
+      const Isometry3<double>& pose0, const Isometry3<double>& pose1) {
+  Vector6<double> diff = Vector6<double>::Zero();
 
   // Linear.
-  vel.tail<3>() = (pose1.translation() - pose0.translation()) / dt;
+  diff.tail<3>() = (pose1.translation() - pose0.translation());
 
   // Angular.
   AngleAxis<double> rot_err(pose1.linear() * pose0.linear().transpose());
-  vel.head<3>() = rot_err.axis() * rot_err.angle() / dt;
+  diff.head<3>() = rot_err.axis() * rot_err.angle();
 
-  return vel;
+  return diff;
 }
 
 JacobianIk::JacobianIk(const std::string& model_path,
@@ -52,8 +52,11 @@ JacobianIk::JacobianIk(const std::string& model_path,
                                         robot_->get_num_positions());
 }
 
-VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
-                                    const Vector6<double>& xd, double dt) const {
+VectorX<double> JacobianIk::ComputeDofVelocity(const KinematicsCache<double>& cache0,
+    const Vector6<double>& V_WE, const VectorX<double>& q_nominal,
+    double dt) const {
+  DRAKE_DEMAND(q_nominal.size() == robot_->get_num_positions());
+
   VectorX<double> ret;
   MatrixX<double> J = robot_->CalcBodySpatialVelocityJacobianInWorldFrame(
       cache0, *end_effector_);
@@ -64,7 +67,7 @@ VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
 
   // Add ee vel constraint
   solvers::QuadraticCost* cost =
-      prog.AddL2NormCost(J, xd, v).constraint().get();
+      prog.AddL2NormCost(J, V_WE, v).constraint().get();
 
   // Add v constraint
   prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
@@ -84,8 +87,8 @@ VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
 
   // Changed the cost to go towards the zero configuration.
   cost->UpdateCoefficients(identity_ * dt * dt,
-                           cache0.getQ() * dt,
-                           cache0.getQ().dot(cache0.getQ()));
+                           (cache0.getQ() - q_nominal) * dt,
+                           (cache0.getQ() - q_nominal).squaredNorm());
 
   result = solver_.Solve(prog);
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
@@ -97,6 +100,7 @@ VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
 bool JacobianIk::Plan(const VectorX<double>& q0,
                       const std::vector<double>& times,
                       const std::vector<Isometry3<double>>& pose_traj,
+                      const VectorX<double>& q_nominal,
                       std::vector<VectorX<double>>* q_sol) const {
   DRAKE_DEMAND(times.size() == pose_traj.size());
 
@@ -115,9 +119,9 @@ bool JacobianIk::Plan(const VectorX<double>& q0,
 
     pose_now = robot_->CalcBodyPoseInWorldFrame(cache, *end_effector_);
     double dt = times[t] - time_now;
-    Vector6<double> xd_d = compute_velocity(pose_now, pose_traj[t], dt);
+    Vector6<double> V_WE_d = ComputePoseDiffInWorldFrame(pose_now, pose_traj[t]) / dt;
 
-    v = solve_v(cache, xd_d, dt);
+    v = ComputeDofVelocity(cache, V_WE_d, q_nominal, dt);
 
     q_now += v * dt;
     time_now = times[t];
