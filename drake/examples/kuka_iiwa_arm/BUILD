@@ -189,6 +189,23 @@ drake_cc_binary(
     ],
 )
 
+drake_cc_binary(
+    name = "jjz_controller",
+    srcs = ["jjz_controller.cc"],
+    data = [
+        ":models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":iiwa_common",
+        ":iiwa_lcm",
+        "//drake/manipulation/planner:jacobian_ik",
+        "//drake/common:find_resource",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
 # === test/ ===
 
 drake_cc_googletest(

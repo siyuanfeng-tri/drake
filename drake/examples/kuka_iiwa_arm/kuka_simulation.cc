@@ -129,12 +129,18 @@ int DoMain() {
   lcm.StartReceiveThread();
   simulator.set_publish_every_time_step(false);
   simulator.Initialize();
+  simulator.set_target_realtime_rate(1.0);
+
+  std::default_random_engine rand(30);
+  VectorX<double> q0 = tree.getRandomConfiguration(rand);
+  Context<double>& plant_context = sys->GetMutableSubsystemContext(*plant, simulator.get_mutable_context());
+  systems::VectorBase<double>* plant_q0 = plant_context.get_mutable_continuous_state()->get_mutable_generalized_position();
+  plant_q0->SetFromVector(q0);
 
   command_receiver->set_initial_position(
       &sys->GetMutableSubsystemContext(*command_receiver,
                                        simulator.get_mutable_context()),
-      VectorX<double>::Zero(tree.get_num_positions()));
-
+      q0);
 
   // Simulate for a very long time.
   simulator.StepTo(FLAGS_simulation_sec);
