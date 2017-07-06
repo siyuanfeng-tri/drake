@@ -13,7 +13,8 @@ drake_cc_library(
     name = "simple_tree_visualizer",
     srcs = ["simple_tree_visualizer.cc"],
     hdrs = ["simple_tree_visualizer.h"],
-    visibility = ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
+    visibility = ["//visibility:public"],
+    #visibility = ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
     deps = [
         "//drake/common",
         "//drake/lcm",

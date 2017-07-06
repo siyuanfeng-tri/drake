@@ -9,7 +9,6 @@
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_ik.h"
 
-#include "drake/solvers/gurobi_solver.h"
 #include "drake/solvers/mathematical_program.h"
 
 namespace drake {
@@ -46,58 +45,51 @@ JacobianIk::JacobianIk(const std::string& model_path,
 
   q_lower_ = robot_->joint_limit_min;
   q_upper_ = robot_->joint_limit_max;
+  v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -2);
+  v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 2.);
+
+  identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
+                                        robot_->get_num_positions());
 }
 
 VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
-                                    const Vector6<double>& xd, double dt) {
-  std::cout << "q: " << cache0.getQ().transpose() << "\n";
-
-  std::cout << xd.transpose() << "\n";
+                                    const Vector6<double>& xd, double dt) const {
+  VectorX<double> ret;
+  MatrixX<double> J = robot_->CalcBodySpatialVelocityJacobianInWorldFrame(
+      cache0, *end_effector_);
 
   solvers::MathematicalProgram prog;
   solvers::VectorXDecisionVariable v =
-      prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
+    prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
 
   // Add ee vel constraint
-  /*
-  prog.AddLinearEqualityConstraint(
-      robot_->CalcBodySpatialVelocityJacobianInWorldFrame(cache0,
-                                                          *end_effector_),
-      xd, v);
-  */
-  prog.AddL2NormCost(
-      robot_->CalcBodySpatialVelocityJacobianInWorldFrame(cache0,
-                                                          *end_effector_),
-      xd, v);
+  solvers::QuadraticCost* cost =
+      prog.AddL2NormCost(J, xd, v).constraint().get();
 
-  std::cout << q_lower_.transpose() << "\n";
-  std::cout << q_upper_.transpose() << "\n";
+  // Add v constraint
+  prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
 
-  prog.AddBoundingBoxConstraint(
-      -2 * VectorX<double>::Ones(robot_->get_num_velocities()),
-       2 * VectorX<double>::Ones(robot_->get_num_velocities()),
-       v);
-
-  /*
   // Add q upper and lower joint limit.
-  prog.AddLinearConstraint(
-      MatrixX<double>::Identity(robot_->get_num_positions(),
-                                robot_->get_num_positions()) * dt,
+  prog.AddLinearConstraint(identity_ * dt,
       q_lower_ - cache0.getQ(), q_upper_ - cache0.getQ(), v);
 
-  // Add a normalization term
-  prog.AddL2NormCost(
-      MatrixX<double>::Identity(robot_->get_num_positions(),
-                                robot_->get_num_positions()) * dt,
-      -cache0.getQ(), v);
-  */
-
-  solvers::SolutionResult result = prog.Solve();
+  solvers::SolutionResult result = solver_.Solve(prog);
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
-  VectorX<double> ret = prog.GetSolutionVectorValues();
+  ret = prog.GetSolutionVectorValues();
 
-  //std::cout << "lb:" << (ret * dt + cache0.getQ() - q_lower_).transpose() << "\n";
-  //std::cout << "ub:" << (ret * dt + cache0.getQ() - q_upper_).transpose() << "\n";
+  ////////////////
+
+  // Constrain end effector speed to be J * ret.
+  prog.AddLinearEqualityConstraint(J, J * ret, v);
+
+  // Changed the cost to go towards the zero configuration.
+  cost->UpdateCoefficients(identity_ * dt * dt,
+                           cache0.getQ() * dt,
+                           cache0.getQ().dot(cache0.getQ()));
+
+  result = solver_.Solve(prog);
+  DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
+  ret = prog.GetSolutionVectorValues();
 
   return ret;
 }
@@ -105,7 +97,7 @@ VectorX<double> JacobianIk::solve_v(const KinematicsCache<double>& cache0,
 bool JacobianIk::Plan(const VectorX<double>& q0,
                       const std::vector<double>& times,
                       const std::vector<Isometry3<double>>& pose_traj,
-                      std::vector<VectorX<double>>* q_sol) {
+                      std::vector<VectorX<double>>* q_sol) const {
   DRAKE_DEMAND(times.size() == pose_traj.size());
 
   KinematicsCache<double> cache = robot_->CreateKinematicsCache();
