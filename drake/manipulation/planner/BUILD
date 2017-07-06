@@ -69,6 +69,7 @@ drake_cc_googletest(
         ":constraint_relaxing_ik",
         ":jacobian_ik",
         "//drake/common:find_resource",
+        "//drake/examples/kuka_iiwa_arm/dev/tools:simple_tree_visualizer",
     ],
 )
 

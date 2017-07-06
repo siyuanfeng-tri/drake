@@ -9,6 +9,7 @@
 #include "drake/common/eigen_types.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/multibody/rigid_body_ik.h"
+#include "drake/solvers/gurobi_solver.h"
 
 namespace drake {
 namespace manipulation {
@@ -24,7 +25,7 @@ class JacobianIk {
 
   bool Plan(const VectorX<double>& q0, const std::vector<double>& times,
             const std::vector<Isometry3<double>>& pose_traj,
-            std::vector<VectorX<double>>* q_sol);
+            std::vector<VectorX<double>>* q_sol) const;
 
   /**
    * Sets end effector to @p end_effector_body.
@@ -53,7 +54,7 @@ class JacobianIk {
 
  private:
   VectorX<double> solve_v(const KinematicsCache<double>& cache0,
-                          const Vector6<double>& xd, double dt);
+                          const Vector6<double>& xd, double dt) const;
 
   std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
   const RigidBody<double>* end_effector_{nullptr};
@@ -62,6 +63,11 @@ class JacobianIk {
 
   VectorX<double> q_lower_;
   VectorX<double> q_upper_;
+  VectorX<double> v_lower_;
+  VectorX<double> v_upper_;
+  MatrixX<double> identity_;
+
+  mutable drake::solvers::GurobiSolver solver_;
 };
 
 }  // namespace planner
