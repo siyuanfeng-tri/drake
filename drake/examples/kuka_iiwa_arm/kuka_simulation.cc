@@ -53,10 +53,11 @@ int DoMain() {
 
   // Adds a plant.
   RigidBodyPlant<double>* plant = nullptr;
-  const char* kModelPath = "drake/manipulation/models/iiwa_description/"
+  const char* kModelPath =
+      "drake/manipulation/models/iiwa_description/"
       "urdf/iiwa14_polytope_collision.urdf";
-  const std::string urdf = (!FLAGS_urdf.empty() ? FLAGS_urdf :
-                            FindResourceOrThrow(kModelPath));
+  const std::string urdf =
+      (!FLAGS_urdf.empty() ? FLAGS_urdf : FindResourceOrThrow(kModelPath));
   {
     auto tree = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
@@ -91,37 +92,37 @@ int DoMain() {
 
   auto controller =
       builder.AddController<systems::InverseDynamicsController<double>>(
-          RigidBodyTreeConstants::kFirstNonWorldModelInstanceId,
-          tree.Clone(), iiwa_kp, iiwa_ki, iiwa_kd,
+          RigidBodyTreeConstants::kFirstNonWorldModelInstanceId, tree.Clone(),
+          iiwa_kp, iiwa_ki, iiwa_kd,
           false /* without feedforward acceleration */);
 
   // Create the command subscriber and status publisher.
   systems::DiagramBuilder<double>* base_builder = builder.get_mutable_builder();
   auto command_sub = base_builder->AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>(
-          "IIWA_COMMAND", &lcm));
+      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IIWA_COMMAND",
+                                                                 &lcm));
   command_sub->set_name("command_subscriber");
   auto command_receiver =
       base_builder->AddSystem<IiwaCommandReceiver>(num_joints);
   command_receiver->set_name("command_receiver");
   auto status_pub = base_builder->AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>(
-          "IIWA_STATUS", &lcm));
+      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>("IIWA_STATUS",
+                                                               &lcm));
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(kIiwaLcmStatusPeriod);
   auto status_sender = base_builder->AddSystem<IiwaStatusSender>(num_joints);
   status_sender->set_name("status_sender");
 
   base_builder->Connect(command_sub->get_output_port(0),
-                  command_receiver->get_input_port(0));
+                        command_receiver->get_input_port(0));
   base_builder->Connect(command_receiver->get_output_port(0),
-                  controller->get_input_port_desired_state());
+                        controller->get_input_port_desired_state());
   base_builder->Connect(plant->get_output_port(0),
-                  status_sender->get_state_input_port());
+                        status_sender->get_state_input_port());
   base_builder->Connect(command_receiver->get_output_port(0),
-                  status_sender->get_command_input_port());
+                        status_sender->get_command_input_port());
   base_builder->Connect(status_sender->get_output_port(0),
-                  status_pub->get_input_port(0));
+                        status_pub->get_input_port(0));
   auto sys = builder.Build();
 
   Simulator<double> simulator(*sys);
@@ -131,15 +132,13 @@ int DoMain() {
   simulator.Initialize();
   simulator.set_target_realtime_rate(1.0);
 
-  //std::default_random_engine rand(30);
-  //VectorX<double> q0 = tree.getRandomConfiguration(rand);
   VectorX<double> q0 = tree.getZeroConfiguration();
-  q0[1] -= 45. * M_PI / 180.;
-  q0[3] += M_PI / 2.;
-  q0[5] -= 45. * M_PI / 180.;
 
-  Context<double>& plant_context = sys->GetMutableSubsystemContext(*plant, simulator.get_mutable_context());
-  systems::VectorBase<double>* plant_q0 = plant_context.get_mutable_continuous_state()->get_mutable_generalized_position();
+  Context<double>& plant_context =
+      sys->GetMutableSubsystemContext(*plant, simulator.get_mutable_context());
+  systems::VectorBase<double>* plant_q0 =
+      plant_context.get_mutable_continuous_state()
+          ->get_mutable_generalized_position();
   plant_q0->SetFromVector(q0);
 
   command_receiver->set_initial_position(
