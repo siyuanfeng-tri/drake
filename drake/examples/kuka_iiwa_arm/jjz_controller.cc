@@ -108,6 +108,14 @@ class RobotPlanRunner {
     //                &RobotPlanRunner::HandlePlan, this);
   }
 
+  PiecewisePolynomial<double> SplineToDesiredConfiguration(
+      const VectorX<double>& q_d, double duration) const {
+    std::vector<double> times = {state_.get_time(), state_.get_time() + duration};
+    std::vector<MatrixX<double>> knots = {state_.get_q(), q_d};
+    MatrixX<double> zero = MatrixX<double>::Zero(robot_.get_num_velocities(), 1);
+    return PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  }
+
   void Run() {
     lcmt_iiwa_command iiwa_command;
     iiwa_command.num_joints = robot_.get_num_positions();
@@ -117,10 +125,20 @@ class RobotPlanRunner {
 
     double cmd_time = kUninitTime;
 
-    bool first_tick = true;
-    Isometry3<double> X_WE0;
-    double t0;
+    constexpr int GOTO = 0;
+    constexpr int CIRCLE = 1;
+    constexpr int NOOP = 2;
+//    constexpr int WAIT = 3;
 
+    int STATE = GOTO;
+    bool state_init = true;
+    double state_t0;
+
+    // traj for GOTO state.
+    PiecewisePolynomial<double> traj;
+
+    // traj for circle state.
+    Isometry3<double> X_WE0;
     std::vector<VectorX<double>> q_sol;
     size_t q_ctr = 0;
 
@@ -134,49 +152,69 @@ class RobotPlanRunner {
           robot_.CalcBodyPoseInWorldFrame(state_.get_cache(),
               jaco_planner_.get_end_effector());
 
-      if (first_tick) {
-        X_WE0 = X_WE;
-        t0 = state_.get_time();
-        first_tick = false;
+      switch (STATE) {
+        // go home.
+        case GOTO: {
+          // make a spline to reset to home.
+          if (state_init) {
+            VectorX<double> q1 = robot_.getZeroConfiguration();
+            q1[1] += 45. * M_PI / 180.;
+            q1[3] -= M_PI / 2.;
+            q1[5] += 45. * M_PI / 180.;
+            traj = SplineToDesiredConfiguration(q1, 2);
+            state_init = false;
+            state_t0 = state_.get_time();
+          }
 
-        const int N = 1000;
-        std::vector<double> T(N);
-        std::vector<Isometry3<double>> pose_d(N);
-        for (int i = 0; i < N; ++i) {
-          T[i] = (i + 1) * 5e-3;
-          pose_d[i] = X_WE0;
-          pose_d[i].translation()[0] += 0.1 * std::sin(T[i]);
-          pose_d[i].translation()[1] += 0.1 * std::cos(T[i]);
+          q_d_ = traj.value(state_.get_time());
+
+          if (state_.get_time() - state_t0 > 2.1) {
+            STATE = NOOP;
+            state_init = true;
+          }
+
+          break;
         }
-        VectorX<double> q_nominal = robot_.getZeroConfiguration();
-        jaco_planner_.Plan(state_.get_q(), T, pose_d, q_nominal, &q_sol);
+
+        case CIRCLE: {
+          if (state_init) {
+            X_WE0 = X_WE;
+            const int N = std::ceil(2 * M_PI / 5e-3);
+            std::vector<double> T(N);
+            std::vector<Isometry3<double>> pose_d(N);
+            for (int i = 0; i < N; ++i) {
+              T[i] = (i + 1) * 5e-3 + state_.get_time();
+              pose_d[i] = X_WE0;
+              pose_d[i].translation()[0] += 0.1 * (std::cos(T[i] - state_.get_time()) - 1);
+              pose_d[i].translation()[1] += 0.1 * std::sin(T[i] - state_.get_time());
+            }
+            VectorX<double> q_nominal = robot_.getZeroConfiguration();
+            jaco_planner_.Plan(state_.get_q(), T, pose_d, q_nominal, &q_sol);
+            q_ctr = 0;
+
+            state_init = false;
+            state_t0 = state_.get_time();
+          }
+
+          q_d_ = q_sol[q_ctr++];
+
+          if (q_ctr >= q_sol.size()) {
+            STATE = NOOP;
+            state_init = true;
+          }
+
+          break;
+        }
+
+        case NOOP: {
+          break;
+        }
       }
-
-      /*
-      Isometry3<double> X_WE_d = X_WE0;
-      X_WE_d.translation()[0] += 0.1 * std::sin((state_.get_time() - t0));
-      X_WE_d.translation()[1] += 0.1 * (std::cos((state_.get_time() - t0)));
-      */
-
-      // std::cout << X_WE_d.translation().transpose() << "\n";
-
-      /*
-      const double dt = 5e-3;
-      Vector6<double> V_WE_d =
-          manipulation::planner::JacobianIk::ComputePoseDiffInWorldFrame(X_WE, X_WE_d) / dt;
-      VectorX<double> v = jaco_planner_.ComputeDofVelocity(
-          state_.get_cache(), V_WE_d, robot_.getZeroConfiguration(), dt);
-
-      VectorX<double> q_d = state_.get_q() + v * dt;
-      */
-      VectorX<double> q_d = q_sol[q_ctr++];
-      if (q_ctr >= q_sol.size() - 1)
-        q_ctr = q_sol.size() - 1;
 
       // Make msg.
       iiwa_command.utime = static_cast<int64_t>(state_.get_time() * 1e6);
       for (int i = 0; i < robot_.get_num_positions(); i++) {
-        iiwa_command.joint_position[i] = q_d[i];
+        iiwa_command.joint_position[i] = q_d_[i];
       }
 
       // Send command
@@ -198,6 +236,7 @@ class RobotPlanRunner {
   const RigidBodyTree<double>& robot_;
   // lcmt_iiwa_status iiwa_status_;
   IiwaState state_;
+  VectorX<double> q_d_;
 };
 
 int do_main() {
