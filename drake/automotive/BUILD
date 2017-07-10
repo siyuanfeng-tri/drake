@@ -233,7 +233,7 @@ drake_cc_library(
     data = ["//drake/automotive:models"],
     deps = [
         ":car_vis",
-        "//drake/common:drake_path",
+        "//drake/common:find_resource",
         "//drake/lcmtypes:viewer",
         "//drake/multibody/joints",
         "//drake/multibody/parsers",
@@ -404,6 +404,7 @@ drake_cc_binary(
     test_rule_args = [" --simulation_sec=0.01"],
     deps = [
         ":automotive_simulator",
+        "//drake/common:find_resource",
         "//drake/common:text_logging_gflags",
         "//drake/multibody:rigid_body_tree_construction",
         "//drake/multibody/rigid_body_plant",
@@ -415,7 +416,7 @@ py_binary(
     name = "steering_command_driver",
     srcs = ["steering_command_driver.py"],
     deps = [
-        "//drake/lcmtypes:lcmtypes-py",
+        "//drake/lcmtypes:lcmtypes_py",
         "@lcm//:lcm-python",
     ],
 )
@@ -424,8 +425,7 @@ java_binary(
     name = "lcm-spy",
     main_class = "lcm.spy.Spy",
     runtime_deps = [
-        "//drake/lcmtypes:automotive_java",
-        "//drake/lcmtypes:viewer_java",
+        "//drake/lcmtypes:lcmtypes_drake_java",
     ],
 )
 
@@ -518,7 +518,6 @@ drake_cc_googletest(
         "//drake/automotive/maliput/api",
         "//drake/automotive/maliput/dragway",
         "//drake/automotive/maliput/monolane",
-        "//drake/common:drake_path",
         "//drake/common:eigen_matrix_compare",
         "//drake/math:geometric_transform",
     ],
@@ -645,8 +644,8 @@ drake_cc_googletest(
     tags = ["snopt"],
     deps = [
         ":simple_car",
-        "//drake/common:call_matlab",
         "//drake/common:eigen_matrix_compare",
+        "//drake/common/proto:call_matlab",
         "//drake/systems/trajectory_optimization:direct_collocation",
     ],
 )
