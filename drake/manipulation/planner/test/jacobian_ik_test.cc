@@ -6,7 +6,7 @@
 #include "drake/common/find_resource.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 
-#include "drake/examples/kuka_iiwa_arm/dev/tools/simple_tree_visualizer.h"
+#include "drake/manipulation/util/simple_tree_visualizer.h"
 #include "drake/lcm/drake_lcm.h"
 
 namespace drake {
@@ -56,7 +56,7 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkFromFk) {
 
   // viz
   drake::lcm::DrakeLcm lcm;
-  examples::kuka_iiwa_arm::tools::SimpleTreeVisualizer viz(*iiwa, &lcm);
+  manipulation::SimpleTreeVisualizer viz(*iiwa, &lcm);
 
   for (int i = 0; i < N; ++i) {
     cache.initialize(q_sol[i]);
