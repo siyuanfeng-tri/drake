@@ -29,9 +29,9 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkFromFk) {
   //std::default_random_engine rand(30);
   //VectorX<double> q0 = iiwa->getRandomConfiguration(rand);
   VectorX<double> q0 = iiwa->getZeroConfiguration();
-  q0[1] -= 45. * M_PI / 180.;
-  q0[3] += M_PI / 2.;
-  q0[5] -= 45. * M_PI / 180.;
+  q0[1] += 45. * M_PI / 180.;
+  q0[3] -= M_PI / 2.;
+  q0[5] += 45. * M_PI / 180.;
 
   cache.initialize(q0);
   iiwa->doKinematics(cache);
@@ -40,13 +40,14 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkFromFk) {
       iiwa->CalcBodyPoseInWorldFrame(cache, *end_effector);
 
   const int N = 1000;
+  const double dt = 1e-3;
   std::vector<double> T(N);
   std::vector<Isometry3<double>> pose_d(N);
   for (int i = 0; i < N; ++i) {
-    T[i] = (i + 1) * 5e-3;
+    T[i] = (i + 1) * dt;
     pose_d[i] = pose0;
-    pose_d[i].translation()[0] += 0.1 * std::sin(T[i] * 2 * M_PI);
-    pose_d[i].translation()[1] += 0.1 * std::cos(T[i] * 2 * M_PI);
+    pose_d[i].translation()[0] -= 0.1 * (std::cos(T[i] * 2 * M_PI) - 1);
+    pose_d[i].translation()[1] += 0.1 * std::sin(T[i] * 2 * M_PI);
   }
 
   JacobianIk ik(kModelPath, kEndEffectorLinkName, Isometry3<double>::Identity());
@@ -54,6 +55,7 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkFromFk) {
   VectorX<double> q_nominal = iiwa->getZeroConfiguration();
   ik.Plan(q0, T, pose_d, q_nominal, &q_sol);
 
+  /*
   // viz
   drake::lcm::DrakeLcm lcm;
   manipulation::SimpleTreeVisualizer viz(*iiwa, &lcm);
@@ -62,10 +64,10 @@ GTEST_TEST(ConstraintRelaxingIkTest, SolveIkFromFk) {
     cache.initialize(q_sol[i]);
     iiwa->doKinematics(cache);
     pose0 = iiwa->CalcBodyPoseInWorldFrame(cache, *end_effector);
-    std::cout << "t: " << T[i] << ", " << pose0.translation().transpose() << "\n";
     viz.visualize(q_sol[i]);
-    getchar();
+    usleep(dt * 1e6);
   }
+  */
 }
 
 }  // namespace planner

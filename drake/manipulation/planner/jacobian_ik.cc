@@ -45,8 +45,8 @@ JacobianIk::JacobianIk(const std::string& model_path,
 
   q_lower_ = robot_->joint_limit_min;
   q_upper_ = robot_->joint_limit_max;
-  v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -0.5);
-  v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 0.5);
+  v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -2);
+  v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 2);
 
   identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
                                         robot_->get_num_positions());

@@ -127,14 +127,6 @@ int DoMain() {
 
   Simulator<double> simulator(*sys);
 
-
-  auto cache = tree.CreateKinematicsCache();
-  cache.initialize(VectorX<double>::Zero(7));
-  tree.doKinematics(cache);
-  const auto& ee = *tree.FindBody("iiwa_link_ee");
-  auto pose = tree.CalcBodyPoseInWorldFrame(cache, ee);
-  std::cout << pose.linear() << "\n\n";
-
   lcm.StartReceiveThread();
   simulator.set_publish_every_time_step(false);
   simulator.Initialize();

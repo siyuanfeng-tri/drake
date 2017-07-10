@@ -116,6 +116,26 @@ class RobotPlanRunner {
     return PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
   }
 
+  void GenerateEETraj(const VectorX<double>& q, double r, double period, std::vector<double>* times, std::vector<Isometry3<double>>* poses) const {
+    double dt = 1e-3;
+    const int N = std::ceil(period / dt);
+    times->resize(N);
+    poses->resize(N);
+
+    KinematicsCache<double> cache = robot_.CreateKinematicsCache();
+    cache.initialize(q);
+    robot_.doKinematics(cache);
+    Isometry3<double> X_WE0 = robot_.CalcBodyPoseInWorldFrame(cache,
+        jaco_planner_.get_end_effector());
+
+    for (int i = 0; i < N; ++i) {
+      (*times)[i] = (i + 1) * dt;
+      (*poses)[i] = X_WE0;
+      (*poses)[i].translation()[0] -= r * (std::cos(2 * M_PI * times->at(i) / period) - 1);
+      (*poses)[i].translation()[1] += r * std::sin(2 * M_PI * times->at(i) / period);
+    }
+  }
+
   void Run() {
     lcmt_iiwa_command iiwa_command;
     iiwa_command.num_joints = robot_.get_num_positions();
@@ -128,6 +148,7 @@ class RobotPlanRunner {
     constexpr int GOTO = 0;
     constexpr int CIRCLE = 1;
     constexpr int NOOP = 2;
+    constexpr int FB = 3;
 //    constexpr int WAIT = 3;
 
     int STATE = GOTO;
@@ -139,18 +160,20 @@ class RobotPlanRunner {
 
     // traj for circle state.
     Isometry3<double> X_WE0;
+    std::vector<double> times;
+    std::vector<Isometry3<double>> poses;
     std::vector<VectorX<double>> q_sol;
     size_t q_ctr = 0;
+
+    VectorX<double> q_nominal = robot_.getZeroConfiguration();
+
+    KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
     while (true) {
       // Call lcm handle until at least one status message is
       // processed.
       while (0 == lcm_.handleTimeout(10) || state_.get_time() == cmd_time) {
       }
-
-      Isometry3<double> X_WE =
-          robot_.CalcBodyPoseInWorldFrame(state_.get_cache(),
-              jaco_planner_.get_end_effector());
 
       switch (STATE) {
         // go home.
@@ -169,7 +192,7 @@ class RobotPlanRunner {
           q_d_ = traj.value(state_.get_time());
 
           if (state_.get_time() - state_t0 > 2.1) {
-            STATE = NOOP;
+            STATE = FB;
             state_init = true;
           }
 
@@ -178,18 +201,13 @@ class RobotPlanRunner {
 
         case CIRCLE: {
           if (state_init) {
-            X_WE0 = X_WE;
-            const int N = std::ceil(2 * M_PI / 5e-3);
-            std::vector<double> T(N);
-            std::vector<Isometry3<double>> pose_d(N);
-            for (int i = 0; i < N; ++i) {
-              T[i] = (i + 1) * 5e-3 + state_.get_time();
-              pose_d[i] = X_WE0;
-              pose_d[i].translation()[0] += 0.1 * (std::cos(T[i] - state_.get_time()) - 1);
-              pose_d[i].translation()[1] += 0.1 * std::sin(T[i] - state_.get_time());
-            }
-            VectorX<double> q_nominal = robot_.getZeroConfiguration();
-            jaco_planner_.Plan(state_.get_q(), T, pose_d, q_nominal, &q_sol);
+            VectorX<double> q1 = robot_.getZeroConfiguration();
+            q1[1] += 45. * M_PI / 180.;
+            q1[3] -= M_PI / 2.;
+            q1[5] += 45. * M_PI / 180.;
+
+            GenerateEETraj(q1, 0.1, 1.0, &times, &poses);
+            jaco_planner_.Plan(q1, times, poses, q_nominal, &q_sol);
             q_ctr = 0;
 
             state_init = false;
@@ -204,6 +222,43 @@ class RobotPlanRunner {
           }
 
           break;
+        }
+
+        case FB: {
+          if (state_init) {
+            VectorX<double> q1 = robot_.getZeroConfiguration();
+            q1[1] += 45. * M_PI / 180.;
+            q1[3] -= M_PI / 2.;
+            q1[5] += 45. * M_PI / 180.;
+
+            GenerateEETraj(q1, 0.1, 1.0, &times, &poses);
+            q_ctr = 0;
+            cc.initialize(state_.get_q());
+            robot_.doKinematics(cc);
+
+            state_init = false;
+            state_t0 = state_.get_time();
+          }
+
+          const auto& pose_d = poses[q_ctr++];
+          double dt = 1e-3;
+
+          Isometry3<double> X_WE =
+              robot_.CalcBodyPoseInWorldFrame(cc,
+                  jaco_planner_.get_end_effector());
+
+          Vector6<double> V_WE_d =
+              jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, pose_d) / dt;
+          VectorX<double> v = jaco_planner_.ComputeDofVelocity(cc, V_WE_d, q_nominal, dt);
+          q_d_ = cc.getQ() + v * dt;
+          cc.initialize(q_d_);
+          robot_.doKinematics(cc);
+
+          if (q_ctr >= poses.size()) {
+            q_ctr = 0;
+            //STATE = NOOP;
+            //state_init = true;
+          }
         }
 
         case NOOP: {
