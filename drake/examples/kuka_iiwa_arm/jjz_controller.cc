@@ -16,6 +16,7 @@
 #include "drake/multibody/rigid_body_tree.h"
 
 #include "drake/manipulation/planner/jacobian_ik.h"
+#include "drake/manipulation/util/trajectory_utils.h"
 
 namespace drake {
 namespace examples {
@@ -36,28 +37,34 @@ class IiwaState {
  public:
   IiwaState(const RigidBodyTree<double>& iiwa)
       : iiwa_(iiwa),
+        end_effector_(*iiwa_.FindBody(kEEName)),
         cache_(iiwa.CreateKinematicsCache()),
         q_(VectorX<double>::Zero(iiwa.get_num_positions())),
         v_(VectorX<double>::Zero(iiwa.get_num_velocities())),
+        trq_(VectorX<double>::Zero(iiwa.get_num_actuators())),
         ext_trq_(VectorX<double>::Zero(iiwa.get_num_actuators())) {
     DRAKE_DEMAND(iiwa.get_num_positions() == iiwa.get_num_velocities());
     DRAKE_DEMAND(iiwa.get_num_actuators() == iiwa.get_num_velocities());
   }
 
-  void UpdateState(const lcmt_iiwa_status& msg) {
+  bool UpdateState(const lcmt_iiwa_status& msg) {
     // Check msg.
     DRAKE_DEMAND(msg.num_joints == iiwa_.get_num_positions());
 
     const double cur_time = msg.utime / 1e6;
+    // Same time stamp, should just return.
+    if (init_ && cur_time == time_)
+      return false;
 
     // Do velocity update first.
     if (init_) {
       // TODO need to filter.
-      const double dt = cur_time - time_;
+      delta_time_ = cur_time - time_;
       for (int i = 0; i < msg.num_joints; ++i) {
-        v_[i] = (msg.joint_position_measured[i] - q_[i]) / dt;
+        v_[i] = (msg.joint_position_measured[i] - q_[i]) / delta_time_;
       }
     } else {
+      delta_time_ = 0;
       v_.setZero();
     }
 
@@ -65,6 +72,7 @@ class IiwaState {
     time_ = cur_time;
     for (int i = 0; i < msg.num_joints; ++i) {
       q_[i] = msg.joint_position_measured[i];
+      trq_[i] = msg.joint_torque_measured[i];
       ext_trq_[i] = msg.joint_torque_external[i];
     }
 
@@ -72,23 +80,39 @@ class IiwaState {
     cache_.initialize(q_, v_);
     iiwa_.doKinematics(cache_);
 
+    J_ = iiwa_.CalcBodySpatialVelocityJacobianInWorldFrame(
+        cache_, end_effector_);
+    ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
+
     init_ = true;
+
+    return true;
   }
 
   const KinematicsCache<double>& get_cache() const { return cache_; }
   const VectorX<double>& get_q() const { return q_; }
   const VectorX<double>& get_v() const { return v_; }
   const VectorX<double>& get_ext_trq() const { return ext_trq_; }
+  const VectorX<double>& get_trq() const { return trq_; }
+  const Vector6<double>& get_ext_wrench() const { return ext_wrench_; }
   double get_time() const { return time_; }
+  double get_dt() const { return delta_time_; }
 
  private:
   const RigidBodyTree<double>& iiwa_;
+  const RigidBody<double>& end_effector_;
   KinematicsCache<double> cache_;
   double time_{kUninitTime};
+  double delta_time_{0};
 
   VectorX<double> q_;
   VectorX<double> v_;
+  VectorX<double> trq_;
   VectorX<double> ext_trq_;
+  MatrixX<double> J_;
+
+  // J^T * F = ext_trq_
+  Vector6<double> ext_wrench_;
 
   bool init_{false};
 };
@@ -115,13 +139,9 @@ class RobotPlanRunner {
     return PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
   }
 
-  void GenerateEETraj(const VectorX<double>& q, double r, double period,
-                      std::vector<double>* times,
-                      std::vector<Isometry3<double>>* poses) const {
-    double dt = 1e-3;
+  manipulation::PiecewiseCartesianTrajectory<double> GenerateEETraj(
+      const VectorX<double>& q, double r, double period, double dt) const {
     const int N = std::ceil(period / dt);
-    times->resize(N);
-    poses->resize(N);
 
     KinematicsCache<double> cache = robot_.CreateKinematicsCache();
     cache.initialize(q);
@@ -129,14 +149,24 @@ class RobotPlanRunner {
     Isometry3<double> X_WE0 = robot_.CalcBodyPoseInWorldFrame(
         cache, jaco_planner_.get_end_effector());
 
+    std::vector<double> times(N);
+    std::vector<MatrixX<double>> pos(N);
+    eigen_aligned_std_vector<Quaternion<double>> rot(N);
+
     for (int i = 0; i < N; ++i) {
-      (*times)[i] = (i + 1) * dt;
-      (*poses)[i] = X_WE0;
-      (*poses)[i].translation()[0] -=
-          r * (std::cos(2 * M_PI * times->at(i) / period) - 1);
-      (*poses)[i].translation()[1] +=
-          r * std::sin(2 * M_PI * times->at(i) / period);
+      times[i] = (i + 1) * dt;
+      pos[i] = X_WE0.translation();
+      pos[i](0, 0) -=
+          r * (std::cos(2 * M_PI * times[i] / period) - 1);
+      pos[i](1, 0) +=
+          r * std::sin(2 * M_PI * times[i]/ period);
+
+      rot[i] = Quaternion<double>(X_WE0.linear());
     }
+    PiecewiseQuaternionSlerp<double> rot_traj(times, rot);
+    PiecewisePolynomial<double> pos_traj =
+        PiecewisePolynomial<double>::FirstOrderHold(times, pos);
+    return manipulation::PiecewiseCartesianTrajectory<double>(pos_traj, rot_traj);
   }
 
   void ControlThread() {
@@ -144,10 +174,11 @@ class RobotPlanRunner {
     lcmt_iiwa_status msg;
 
     constexpr int GOTO = 0;
-    constexpr int CIRCLE = 1;
+    constexpr int GOTO1 = 1;
+    // constexpr int CIRCLE = 1;
     constexpr int NOOP = 2;
-    constexpr int FB = 3;
-    //    constexpr int WAIT = 3;
+    constexpr int JACOBI = 3;
+    // constexpr int WAIT = 3;
 
     int STATE = GOTO;
     bool state_init = true;
@@ -158,10 +189,8 @@ class RobotPlanRunner {
 
     // traj for circle state.
     Isometry3<double> X_WE0;
-    std::vector<double> times;
-    std::vector<Isometry3<double>> poses;
-    std::vector<VectorX<double>> q_sol;
-    size_t q_ctr = 0;
+
+    manipulation::PiecewiseCartesianTrajectory<double> ee_traj;
 
     VectorX<double> q_nominal = robot_.getZeroConfiguration();
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
@@ -175,10 +204,12 @@ class RobotPlanRunner {
         msg = iiwa_status_;
       }
 
+      // No status yet.
       if (msg.utime == -1)
         continue;
 
-      state.UpdateState(msg);
+      if (!state.UpdateState(msg))
+        continue;
 
       switch (STATE) {
         // go home.
@@ -197,47 +228,43 @@ class RobotPlanRunner {
           q_cmd = traj.value(state.get_time());
 
           if (state.get_time() - state_t0 > 2.1) {
-            STATE = FB;
+            STATE = JACOBI;
             state_init = true;
           }
 
           break;
         }
 
-        case CIRCLE: {
+        case GOTO1: {
+          // make a spline to reset to home.
           if (state_init) {
             VectorX<double> q1 = robot_.getZeroConfiguration();
-            q1[1] += 45. * M_PI / 180.;
-            q1[3] -= M_PI / 2.;
-            q1[5] += 45. * M_PI / 180.;
-
-            GenerateEETraj(q1, 0.1, 1.0, &times, &poses);
-            jaco_planner_.Plan(q1, times, poses, q_nominal, &q_sol);
-            q_ctr = 0;
-
+            traj = SplineToDesiredConfiguration(state.get_q(), q1, state.get_time(), 2);
             state_init = false;
             state_t0 = state.get_time();
           }
 
-          q_cmd = q_sol[q_ctr++];
+          q_cmd = traj.value(state.get_time());
 
-          if (q_ctr >= q_sol.size()) {
-            STATE = NOOP;
+          if (state.get_time() - state_t0 > 2.1) {
+            STATE = GOTO;
             state_init = true;
           }
 
           break;
         }
 
-        case FB: {
+        case JACOBI: {
+          const double period = 2;
+          const double radius = 0.1;
           if (state_init) {
             VectorX<double> q1 = robot_.getZeroConfiguration();
             q1[1] += 45. * M_PI / 180.;
             q1[3] -= M_PI / 2.;
             q1[5] += 45. * M_PI / 180.;
 
-            GenerateEETraj(q1, 0.1, 1.0, &times, &poses);
-            q_ctr = 0;
+            double dt = 3e-3;
+            ee_traj = GenerateEETraj(q1, radius, period, dt);
             cc.initialize(state.get_q());
             robot_.doKinematics(cc);
 
@@ -245,24 +272,21 @@ class RobotPlanRunner {
             state_t0 = state.get_time();
           }
 
-          const auto& pose_d = poses[q_ctr++];
-          double dt = 3e-3;
+          double interp_t = std::fmod((state.get_time() - state_t0), period);
+          const Isometry3<double> pose_d = ee_traj.get_pose(interp_t);
 
           Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
               cc, jaco_planner_.get_end_effector());
 
+          const double control_dt = state.get_dt();
           Vector6<double> V_WE_d =
-              jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, pose_d) / dt;
+              jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, pose_d) / control_dt;
           VectorX<double> v =
-              jaco_planner_.ComputeDofVelocity(cc, V_WE_d, q_nominal, dt);
-          cc.initialize(cc.getQ() + v * dt);
+              jaco_planner_.ComputeDofVelocity(cc, V_WE_d, q_nominal, control_dt);
+          cc.initialize(cc.getQ() + v * control_dt);
           robot_.doKinematics(cc);
 
           q_cmd = cc.getQ();
-
-          if (q_ctr >= poses.size())
-            q_ctr = 0;
-
           break;
         }
 

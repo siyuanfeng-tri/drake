@@ -217,6 +217,7 @@ drake_cc_binary(
         ":iiwa_common",
         ":iiwa_lcm",
         "//drake/manipulation/planner:jacobian_ik",
+        "//drake/manipulation/util:trajectory_utils",
         "//drake/common:find_resource",
         "@lcmtypes_bot2_core",
         "@lcmtypes_robotlocomotion",

@@ -56,6 +56,7 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
     const KinematicsCache<double>& cache0, const Vector6<double>& V_WE,
     const VectorX<double>& q_nominal, double dt) const {
   DRAKE_DEMAND(q_nominal.size() == robot_->get_num_positions());
+  DRAKE_DEMAND(dt > 0);
 
   VectorX<double> ret;
   MatrixX<double> J = robot_->CalcBodySpatialVelocityJacobianInWorldFrame(
@@ -77,6 +78,16 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
                            q_upper_ - cache0.getQ(), v);
 
   solvers::SolutionResult result = solver_.Solve(prog);
+  if (result != solvers::SolutionResult::kSolutionFound) {
+    solver_.Solve(prog);
+    for (int i = 0; i < 7; i++) {
+      std::cout << q_lower_[i] << "\t" << cache0.getQ()[i] << "\t" << q_upper_[i] << "\n";
+    }
+
+    std::cout << "v " << V_WE.transpose() << "\n";
+    std::cout << "J " << J << "\n";
+    std::cout << "result: " << result << "\n";
+  }
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
   ret = prog.GetSolutionVectorValues();
 
