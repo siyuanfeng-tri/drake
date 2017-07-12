@@ -11,12 +11,15 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
+#include "drake/lcmt_jjz_controller.hpp"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_tree.h"
 
 #include "drake/manipulation/planner/jacobian_ik.h"
 #include "drake/manipulation/util/trajectory_utils.h"
+#include "drake/util/drakeUtil.h"
+#include "drake/util/lcmUtil.h"
 
 namespace drake {
 namespace examples {
@@ -25,6 +28,7 @@ namespace {
 
 const char* const kLcmStatusChannel = "IIWA_STATUS";
 const char* const kLcmCommandChannel = "IIWA_COMMAND";
+const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
 
 constexpr double kUninitTime = -1.0;
 const std::string kPath =
@@ -169,12 +173,24 @@ class RobotPlanRunner {
     return manipulation::PiecewiseCartesianTrajectory<double>(pos_traj, rot_traj);
   }
 
+  Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose) const {
+    Eigen::Matrix<double, 7, 1> ret;
+    ret.head<3>() = pose.translation();
+    Quaternion<double> quat(pose.linear());
+    ret[3] = quat.w();
+    ret[4] = quat.x();
+    ret[5] = quat.y();
+    ret[6] = quat.z();
+
+    return ret;
+  }
+
   void ControlThread() {
     IiwaState state(robot_);
     lcmt_iiwa_status msg;
 
     constexpr int GOTO = 0;
-    constexpr int GOTO1 = 1;
+    constexpr int HOME = 1;
     // constexpr int CIRCLE = 1;
     constexpr int NOOP = 2;
     constexpr int JACOBI = 3;
@@ -183,19 +199,20 @@ class RobotPlanRunner {
     int STATE = GOTO;
     bool state_init = true;
     double state_t0;
+    double control_dt;
 
     // traj for GOTO state.
     PiecewisePolynomial<double> traj;
 
-    // traj for circle state.
-    Isometry3<double> X_WE0;
-
+    // traj for cartesian mode.
     manipulation::PiecewiseCartesianTrajectory<double> ee_traj;
 
     VectorX<double> q_nominal = robot_.getZeroConfiguration();
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
     VectorX<double> q_cmd;
+
+    lcmt_jjz_controller ctrl_debug{};
 
     while (true) {
       // TODO lock this
@@ -210,6 +227,8 @@ class RobotPlanRunner {
 
       if (!state.UpdateState(msg))
         continue;
+
+      control_dt = state.get_dt();
 
       switch (STATE) {
         // go home.
@@ -235,7 +254,7 @@ class RobotPlanRunner {
           break;
         }
 
-        case GOTO1: {
+        case HOME: {
           // make a spline to reset to home.
           if (state_init) {
             VectorX<double> q1 = robot_.getZeroConfiguration();
@@ -278,7 +297,6 @@ class RobotPlanRunner {
           Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
               cc, jaco_planner_.get_end_effector());
 
-          const double control_dt = state.get_dt();
           Vector6<double> V_WE_d =
               jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, pose_d) / control_dt;
           VectorX<double> v =
@@ -287,6 +305,11 @@ class RobotPlanRunner {
           robot_.doKinematics(cc);
 
           q_cmd = cc.getQ();
+
+          auto tmp = pose_to_vec(pose_d);
+          eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
+          eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
+
           break;
         }
 
@@ -294,6 +317,13 @@ class RobotPlanRunner {
           break;
         }
       }
+
+      // make msg.
+      ctrl_debug.utime = static_cast<int64_t>(state.get_time() * 1e6);
+      ctrl_debug.dt = control_dt;
+      eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
+      eigenVectorToCArray(q_cmd, ctrl_debug.q1);
+      lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
 
       // TODO lock this:
       {

@@ -216,9 +216,12 @@ drake_cc_binary(
     deps = [
         ":iiwa_common",
         ":iiwa_lcm",
+        "//drake/lcmtypes:jjz_controller",
         "//drake/manipulation/planner:jacobian_ik",
         "//drake/manipulation/util:trajectory_utils",
         "//drake/common:find_resource",
+        "//drake/util:util",
+        "//drake/util:lcm_util",
         "@lcmtypes_bot2_core",
         "@lcmtypes_robotlocomotion",
     ],

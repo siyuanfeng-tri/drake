@@ -1,0 +1,22 @@
+package drake;
+
+struct lcmt_jjz_controller {
+  // state's time
+  int64_t utime;
+
+  double dt;
+
+  // xyz wxyz
+  double X_WE_d[7];
+  double X_WE[7];
+
+  // wx wy wz, xd yd zd
+  double V_WE_d[6];
+  double V_WE[6];
+
+  double q0[7];
+  double q1[7];
+
+  // tau, f.
+  double ext_wrench[6];
+}

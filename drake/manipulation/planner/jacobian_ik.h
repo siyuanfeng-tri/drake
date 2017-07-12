@@ -93,6 +93,7 @@ class JacobianIk {
   VectorX<double> v_lower_;
   VectorX<double> v_upper_;
   MatrixX<double> identity_;
+  VectorX<double> zero_;
 
   mutable drake::solvers::GurobiSolver solver_;
 };

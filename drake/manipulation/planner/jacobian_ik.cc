@@ -50,6 +50,7 @@ JacobianIk::JacobianIk(const std::string& model_path,
 
   identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
                                         robot_->get_num_positions());
+  zero_ = VectorX<double>::Zero(robot_->get_num_velocities());
 }
 
 VectorX<double> JacobianIk::ComputeDofVelocity(
@@ -70,6 +71,9 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   solvers::QuadraticCost* cost =
       prog.AddL2NormCost(J, V_WE, v).constraint().get();
 
+  // Add a small regularization
+  prog.AddQuadraticCost(identity_ * 1e-5, zero_, v);
+
   // Add v constraint
   prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
 
@@ -78,16 +82,6 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
                            q_upper_ - cache0.getQ(), v);
 
   solvers::SolutionResult result = solver_.Solve(prog);
-  if (result != solvers::SolutionResult::kSolutionFound) {
-    solver_.Solve(prog);
-    for (int i = 0; i < 7; i++) {
-      std::cout << q_lower_[i] << "\t" << cache0.getQ()[i] << "\t" << q_upper_[i] << "\n";
-    }
-
-    std::cout << "v " << V_WE.transpose() << "\n";
-    std::cout << "J " << J << "\n";
-    std::cout << "result: " << result << "\n";
-  }
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
   ret = prog.GetSolutionVectorValues();
 
