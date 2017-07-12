@@ -127,8 +127,7 @@ class RobotPlanRunner {
                   const std::string& end_effector_name,
                   const Isometry3<double>& X_WB)
       : jaco_planner_(model_path, end_effector_name, X_WB),
-        robot_(jaco_planner_.get_robot()),
-        q_d_(VectorX<double>::Zero(robot_.get_num_positions())) {
+        robot_(jaco_planner_.get_robot()) {
     VerifyIiwaTree(robot_);
     lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
   }
@@ -215,16 +214,13 @@ class RobotPlanRunner {
     lcmt_jjz_controller ctrl_debug{};
 
     while (true) {
-      // TODO lock this
-      {
-        std::lock_guard<std::mutex> guard(state_lock_);
-        msg = iiwa_status_;
-      }
+      msg = CopyStateMsg();
 
       // No status yet.
       if (msg.utime == -1)
         continue;
 
+      // No new states.
       if (!state.UpdateState(msg))
         continue;
 
@@ -247,7 +243,7 @@ class RobotPlanRunner {
           q_cmd = traj.value(state.get_time());
 
           if (state.get_time() - state_t0 > 2.1) {
-            STATE = JACOBI;
+            STATE = HOME;
             state_init = true;
           }
 
@@ -318,18 +314,15 @@ class RobotPlanRunner {
         }
       }
 
-      // make msg.
+      // Send shared position command
+      SetPosCmd(q_cmd);
+
+      // Make debug msg.
       ctrl_debug.utime = static_cast<int64_t>(state.get_time() * 1e6);
       ctrl_debug.dt = control_dt;
       eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
       eigenVectorToCArray(q_cmd, ctrl_debug.q1);
       lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
-
-      // TODO lock this:
-      {
-        std::lock_guard<std::mutex> guard(cmd_lock_);
-        q_d_ = q_cmd;
-      }
     }
   }
 
@@ -341,57 +334,82 @@ class RobotPlanRunner {
     iiwa_command.joint_torque.resize(robot_.get_num_positions(), 0.);
 
     iiwa_status_.utime = -1;
-    int64_t cmd_time = -1;
+    bool first_tick = true;
 
     std::thread control_thread =
         std::thread(&RobotPlanRunner::ControlThread, this);
 
+    lcmt_iiwa_status status;
+
     while (true) {
       // Call lcm handle until at least one status message is
       // processed.
-      while (0 == lcm_.handleTimeout(10) || iiwa_status_.utime == cmd_time) {
+      while (0 == lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
       }
 
-      // Initialize q_d_ to measured q.
-      if (cmd_time == -1) {
+      status = CopyStateMsg();
+
+      // Make cmd msg.
+      iiwa_command.utime = status.utime;
+
+      // Initialize command to measured q.
+      if (first_tick) {
         for (int i = 0; i < robot_.get_num_positions(); i++) {
-          q_d_[i] = iiwa_status_.joint_position_measured[i];
+          iiwa_command.joint_position[i] = status.joint_position_measured[i];
         }
+        first_tick = false;
       }
 
-      // Make msg.
-      iiwa_command.utime = iiwa_status_.utime;
-      {
-        std::lock_guard<std::mutex> guard(cmd_lock_);
+      // Write new desired position to msg.
+      VectorX<double> cmd = CopyPosCmd();
+      if (cmd.size() == robot_.get_num_positions()) {
         for (int i = 0; i < robot_.get_num_positions(); i++) {
-          // TODO lock this.
-          iiwa_command.joint_position[i] = q_d_[i];
+          iiwa_command.joint_position[i] = cmd[i];
         }
+      } else {
+        std::cout << "warning: doesn't have a valid command yet\n";
       }
 
       // Send command
       lcm_.publish(kLcmCommandChannel, &iiwa_command);
-      // Log time of command.
-      cmd_time = iiwa_status_.utime;
     }
   }
 
  private:
   void HandleStatus(const lcm::ReceiveBuffer*, const std::string&,
                     const lcmt_iiwa_status* status) {
+    SetStateMsg(*status);
+  }
+
+  lcmt_iiwa_status CopyStateMsg() const {
     std::lock_guard<std::mutex> guard(state_lock_);
-    iiwa_status_ = *status;
+    return iiwa_status_;
+  }
+
+  void SetStateMsg(const lcmt_iiwa_status& msg) {
+    std::lock_guard<std::mutex> guard(state_lock_);
+    iiwa_status_ = msg;
+  }
+
+  void SetPosCmd(const VectorX<double>& cmd) {
+    std::lock_guard<std::mutex> guard(cmd_lock_);
+    q_d_ = cmd;
+  }
+
+  VectorX<double> CopyPosCmd() const {
+    std::lock_guard<std::mutex> guard(cmd_lock_);
+    return q_d_;
   }
 
   lcm::LCM lcm_;
   manipulation::planner::JacobianIk jaco_planner_;
   const RigidBodyTree<double>& robot_;
-  lcmt_iiwa_status iiwa_status_{};
-  // IiwaState state_;
-  VectorX<double> q_d_;
 
-  std::mutex state_lock_;
-  std::mutex cmd_lock_;
+  mutable std::mutex state_lock_;
+  lcmt_iiwa_status iiwa_status_{};
+
+  mutable std::mutex cmd_lock_;
+  VectorX<double> q_d_;
 };
 
 int do_main() {
