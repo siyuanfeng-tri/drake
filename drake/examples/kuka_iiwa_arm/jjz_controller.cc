@@ -22,6 +22,7 @@
 #include "drake/util/drakeUtil.h"
 #include "drake/util/lcmUtil.h"
 
+#include "drake/math/rotation_matrix.h"
 #include "drake/multibody/constraint/rigid_body_constraint.h"
 #include "drake/multibody/ik_options.h"
 #include "drake/multibody/rigid_body_ik.h"
@@ -214,6 +215,24 @@ class RobotPlanRunner {
                                                               rot_traj);
   }
 
+  Vector3<double> world_to_zzj(const Vector3<double>& xyyaw) const {
+    double ang = 0; //M_PI / 2.;
+    Eigen::Rotation2D<double> R_JW(ang);
+    Vector3<double> ret;
+    ret.head<2>() = R_JW * xyyaw.head<2>();
+    ret(2) = xyyaw(2) + ang;
+    return ret;
+  }
+
+  Vector3<double> jjz_to_world(const Vector3<double>& xyyaw) const {
+    double ang = 0; //M_PI / 2.;
+    Eigen::Rotation2D<double> R_WJ(ang);
+    Vector3<double> ret;
+    ret.head<2>() = R_WJ * xyyaw.head<2>();
+    ret(2) = xyyaw(2) + ang;
+    return ret;
+  }
+
   manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTraj(
       const Isometry3<double>& pose0, double duration) const {
     // Limit surface A_11.
@@ -221,13 +240,19 @@ class RobotPlanRunner {
     // Limit surface A_33 / rho^2
     double ls_b = 4500;
     // Coefficient of contact friction
-    double mu = 0.5;
-    Vector2<double> pt(0, -0.02);
-    Vector2<double> normal(0, 1);
+    double mu = 0.25;
+
+    // local frame.
+    Vector2<double> pt(-0.02, 0);
+    Vector2<double> normal(1, 0);
+
     DubinsPushPlanner planner(pt, normal, mu, ls_a, ls_b);
 
-    Vector3<double> start_pose(0, 0, 0);
-    Vector3<double> goal_pose(0, 0, M_PI / 2.0);
+    Vector3<double> start_W(0, 0, 0);
+    Vector3<double> goal_W(0.1, 0, 0);
+
+    Vector3<double> start_pose = world_to_zzj(start_W);
+    Vector3<double> goal_pose = world_to_zzj(goal_W);
 
     // Are these sampled uniformly?
     int num_way_points = 100;
@@ -244,11 +269,14 @@ class RobotPlanRunner {
     for (int i = 0; i < num_way_points; ++i) {
       times[i] = (i + 1) * dt;
 
-      pos[i] = pose0.translation();
-      pos[i](0, 0) += pusher_poses(i, 0);
-      pos[i](1, 0) += pusher_poses(i, 1);
+      Vector3<double> pt_W = jjz_to_world(pusher_poses.row(i));
 
-      auto X_WT = AngleAxis<double>(pusher_poses(i, 2), Vector3<double>::UnitZ());
+      pos[i] = pose0.translation();
+      pos[i](0, 0) += pt_W[0];
+      pos[i](1, 0) += pt_W[1];
+      std::cout << pusher_poses.row(i) << "\n";
+
+      auto X_WT = AngleAxis<double>(pt_W[2] + M_PI / 2., Vector3<double>::UnitZ());
       auto X_WE = X_WT * X_TE;
       rot[i] = Quaternion<double>(X_WE);
     }
@@ -264,11 +292,14 @@ class RobotPlanRunner {
   Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose) const {
     Eigen::Matrix<double, 7, 1> ret;
     ret.head<3>() = pose.translation();
+    ret.segment<3>(3) = math::rotmat2rpy(pose.linear());
+    /*
     Quaternion<double> quat(pose.linear());
     ret[3] = quat.w();
     ret[4] = quat.x();
     ret[5] = quat.y();
     ret[6] = quat.z();
+    */
 
     return ret;
   }
@@ -307,7 +338,7 @@ class RobotPlanRunner {
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
     Isometry3<double> X_WE0 = Isometry3<double>::Identity();
-    X_WE0.translation() << 0.579828, 0, 0.293142;
+    X_WE0.translation() << 0.479828, 0, 0.393142;
     X_WE0.linear() = X_TE.toRotationMatrix();
 
     VectorX<double> q1 = PointIk(X_WE0);
@@ -391,10 +422,6 @@ class RobotPlanRunner {
             Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
                 cc, jaco_planner_.get_end_effector());
 
-            std::cout << X_WE.translation().transpose() << "\n";
-            std::cout << X_WE.linear() << "\n";
-            std::cout << X_WE.linear() * X_TE.toRotationMatrix().transpose() << "\n";
-
             ee_traj = PlanPlanarPushingTraj(X_WE, 5);
 
             /*
@@ -459,6 +486,7 @@ class RobotPlanRunner {
           state.get_cache(), jaco_planner_.get_end_effector());
       auto tmp = pose_to_vec(X_WE);
       eigenVectorToCArray(tmp, ctrl_debug.X_WE);
+
       eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
       eigenVectorToCArray(q_cmd, ctrl_debug.q1);
       lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
