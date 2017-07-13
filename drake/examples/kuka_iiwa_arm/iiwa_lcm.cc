@@ -20,7 +20,7 @@ using systems::DiscreteUpdateEvent;
 // This value is chosen to match the value in getSendPeriodMilliSec()
 // when initializing the FRI configuration on the iiwa's control
 // cabinet.
-const double kIiwaLcmStatusPeriod = 0.001;
+const double kIiwaLcmStatusPeriod = 0.005;
 
 IiwaCommandReceiver::IiwaCommandReceiver(int num_joints)
     : num_joints_(num_joints) {
