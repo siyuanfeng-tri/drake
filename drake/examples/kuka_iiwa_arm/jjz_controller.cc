@@ -184,47 +184,53 @@ class RobotPlanRunner {
     return ret;
   }
 
-  void ControlThread() {
-    IiwaState state(robot_);
-    lcmt_iiwa_status msg;
+  void Run() {
+    lcmt_iiwa_command iiwa_command;
+    iiwa_command.num_joints = robot_.get_num_positions();
+    iiwa_command.joint_position.resize(robot_.get_num_positions(), 0.);
+    iiwa_command.num_torques = 0;
+    iiwa_command.joint_torque.resize(robot_.get_num_positions(), 0.);
 
+    iiwa_status_.utime = -1;
+
+    IiwaState state(robot_);
     constexpr int GOTO = 0;
     constexpr int HOME = 1;
-    // constexpr int CIRCLE = 1;
-    constexpr int NOOP = 2;
-    constexpr int JACOBI = 3;
-    // constexpr int WAIT = 3;
+    constexpr int JACOBI = 2;
 
     int STATE = GOTO;
     bool state_init = true;
+    bool first_tick = true;
     double state_t0;
     double control_dt;
+    VectorX<double> q_cmd(7);
+    lcmt_jjz_controller ctrl_debug{};
+    ctrl_debug.wall_time = -1;
+
+    lcmt_iiwa_status msg{};
 
     // traj for GOTO state.
     PiecewisePolynomial<double> traj;
 
     // traj for cartesian mode.
     manipulation::PiecewiseCartesianTrajectory<double> ee_traj;
-
     VectorX<double> q_nominal = robot_.getZeroConfiguration();
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
-    VectorX<double> q_cmd;
-
-    lcmt_jjz_controller ctrl_debug{};
-
     while (true) {
+      // Call lcm handle until at least one status message is
+      // processed.
+      while (0 == lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
+      }
+
       msg = CopyStateMsg();
-
-      // No status yet.
-      if (msg.utime == -1)
-        continue;
-
-      // No new states.
-      if (!state.UpdateState(msg))
-        continue;
-
+      DRAKE_DEMAND(state.UpdateState(msg));
       control_dt = state.get_dt();
+
+      if (first_tick) {
+        q_cmd = state.get_q();
+        first_tick = false;
+      }
 
       switch (STATE) {
         // go home.
@@ -243,7 +249,7 @@ class RobotPlanRunner {
           q_cmd = traj.value(state.get_time());
 
           if (state.get_time() - state_t0 > 2.1) {
-            STATE = HOME;
+            STATE = JACOBI;
             state_init = true;
           }
 
@@ -304,73 +310,39 @@ class RobotPlanRunner {
 
           auto tmp = pose_to_vec(pose_d);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
+          tmp = pose_to_vec(X_WE);
+          eigenVectorToCArray(tmp, ctrl_debug.X_WE_ik);
           eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
 
           break;
         }
-
-        case NOOP: {
-          break;
-        }
       }
 
-      // Send shared position command
-      SetPosCmd(q_cmd);
-
-      // Make debug msg.
       ctrl_debug.utime = static_cast<int64_t>(state.get_time() * 1e6);
+      double wall_clock = get_time();
+      if (ctrl_debug.wall_time == -1) {
+        ctrl_debug.wall_dt = 0;
+      } else {
+        ctrl_debug.wall_dt = wall_clock - (ctrl_debug.wall_time / 1e6);
+      }
+      ctrl_debug.wall_time = static_cast<int64_t>(wall_clock * 1e6);
+
+      Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
+          state.get_cache(), jaco_planner_.get_end_effector());
+      auto tmp = pose_to_vec(X_WE);
+      eigenVectorToCArray(tmp, ctrl_debug.X_WE);
+
       ctrl_debug.dt = control_dt;
       eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
       eigenVectorToCArray(q_cmd, ctrl_debug.q1);
       lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
-    }
-  }
-
-  void Run() {
-    lcmt_iiwa_command iiwa_command;
-    iiwa_command.num_joints = robot_.get_num_positions();
-    iiwa_command.joint_position.resize(robot_.get_num_positions(), 0.);
-    iiwa_command.num_torques = 0;
-    iiwa_command.joint_torque.resize(robot_.get_num_positions(), 0.);
-
-    iiwa_status_.utime = -1;
-    bool first_tick = true;
-
-    std::thread control_thread =
-        std::thread(&RobotPlanRunner::ControlThread, this);
-
-    lcmt_iiwa_status status;
-
-    while (true) {
-      // Call lcm handle until at least one status message is
-      // processed.
-      while (0 == lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
-      }
-
-      status = CopyStateMsg();
 
       // Make cmd msg.
-      iiwa_command.utime = status.utime;
-
-      // Initialize command to measured q.
-      if (first_tick) {
-        for (int i = 0; i < robot_.get_num_positions(); i++) {
-          iiwa_command.joint_position[i] = status.joint_position_measured[i];
-        }
-        first_tick = false;
+      iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
+      iiwa_command.wall_time = static_cast<int64_t>(wall_clock * 1e6);
+      for (int i = 0; i < robot_.get_num_positions(); i++) {
+        iiwa_command.joint_position[i] = q_cmd[i];
       }
-
-      // Write new desired position to msg.
-      VectorX<double> cmd = CopyPosCmd();
-      if (cmd.size() == robot_.get_num_positions()) {
-        for (int i = 0; i < robot_.get_num_positions(); i++) {
-          iiwa_command.joint_position[i] = cmd[i];
-        }
-      } else {
-        std::cout << "warning: doesn't have a valid command yet\n";
-      }
-
-      // Send command
       lcm_.publish(kLcmCommandChannel, &iiwa_command);
     }
   }

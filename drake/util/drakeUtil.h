@@ -18,8 +18,13 @@
 #include "drake/common/drake_deprecated.h"
 #include "drake/common/eigen_stl_types.h"
 
-// TODO(siyuan.feng): Cleanup the naming according to the style guide.
+inline double get_time() {
+  struct timespec the_tp;
+  clock_gettime( CLOCK_MONOTONIC, &the_tp );
+  return ((double) (the_tp.tv_sec)) + 1.0e-9*the_tp.tv_nsec;
+}
 
+// TODO(siyuan.feng): Cleanup the naming according to the style guide.
 template <typename Key, typename T>
 using eigen_aligned_unordered_map
 DRAKE_DEPRECATED("Use drake::eigen_aligned_std_unordered_map")
