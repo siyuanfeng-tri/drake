@@ -68,11 +68,15 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
       prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
 
   // Add ee vel constraint
-  solvers::QuadraticCost* cost =
-      prog.AddL2NormCost(J, V_WE, v).constraint().get();
+  //solvers::QuadraticCost* cost =
+  prog.AddL2NormCost(J, V_WE, v).constraint().get();
+
+  prog.AddQuadraticCost(1e-3 * identity_ * dt * dt,
+                        1e-3 * (cache0.getQ() - q_nominal) * dt,
+                        1e-3 * (cache0.getQ() - q_nominal).squaredNorm(), v);
 
   // Add a small regularization
-  prog.AddQuadraticCost(identity_ * 1e-5, zero_, v);
+  // prog.AddQuadraticCost(identity_ * 1e-5, zero_, v);
 
   // Add v constraint
   prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
@@ -86,7 +90,7 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   ret = prog.GetSolutionVectorValues();
 
   ////////////////
-
+  /*
   // Constrain end effector speed to be J * ret.
   prog.AddLinearEqualityConstraint(J, J * ret, v);
 
@@ -98,6 +102,7 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   result = solver_.Solve(prog);
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
   ret = prog.GetSolutionVectorValues();
+  */
 
   return ret;
 }

@@ -216,7 +216,9 @@ drake_cc_binary(
     deps = [
         ":iiwa_common",
         ":iiwa_lcm",
+        "//drake/examples/PlanarPushing:planar_pushing",
         "//drake/lcmtypes:jjz_controller",
+        "//drake/multibody:inverse_kinematics",
         "//drake/manipulation/planner:jacobian_ik",
         "//drake/manipulation/util:trajectory_utils",
         "//drake/common:find_resource",
