@@ -43,7 +43,7 @@ const std::string kPath =
 const std::string kEEName = "iiwa_link_7";
 const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
 
-const auto X_TE = AngleAxis<double>(M_PI, Vector3<double>::UnitX());
+const Matrix3<double>X_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
 
 class IiwaState {
  public:
@@ -215,24 +215,6 @@ class RobotPlanRunner {
                                                               rot_traj);
   }
 
-  Vector3<double> world_to_zzj(const Vector3<double>& xyyaw) const {
-    double ang = 0; //M_PI / 2.;
-    Eigen::Rotation2D<double> R_JW(ang);
-    Vector3<double> ret;
-    ret.head<2>() = R_JW * xyyaw.head<2>();
-    ret(2) = xyyaw(2) + ang;
-    return ret;
-  }
-
-  Vector3<double> jjz_to_world(const Vector3<double>& xyyaw) const {
-    double ang = 0; //M_PI / 2.;
-    Eigen::Rotation2D<double> R_WJ(ang);
-    Vector3<double> ret;
-    ret.head<2>() = R_WJ * xyyaw.head<2>();
-    ret(2) = xyyaw(2) + ang;
-    return ret;
-  }
-
   manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTraj(
       const Isometry3<double>& pose0, double duration) const {
     // Limit surface A_11.
@@ -248,11 +230,8 @@ class RobotPlanRunner {
 
     DubinsPushPlanner planner(pt, normal, mu, ls_a, ls_b);
 
-    Vector3<double> start_W(0, 0, 0);
-    Vector3<double> goal_W(0.1, 0, 0);
-
-    Vector3<double> start_pose = world_to_zzj(start_W);
-    Vector3<double> goal_pose = world_to_zzj(goal_W);
+    Vector3<double> start_pose(0, 0, 0);
+    Vector3<double> goal_pose(0.1, 0.1, M_PI / 4.);
 
     // Are these sampled uniformly?
     int num_way_points = 100;
@@ -266,20 +245,22 @@ class RobotPlanRunner {
     std::vector<MatrixX<double>> pos(num_way_points);
     eigen_aligned_std_vector<Quaternion<double>> rot(num_way_points);
 
+    std::cout << "psoe0 " << pose0.translation().transpose() << "\n";
+
     for (int i = 0; i < num_way_points; ++i) {
       times[i] = (i + 1) * dt;
 
-      Vector3<double> pt_W = jjz_to_world(pusher_poses.row(i));
-
       pos[i] = pose0.translation();
-      pos[i](0, 0) += pt_W[0];
-      pos[i](1, 0) += pt_W[1];
-      std::cout << pusher_poses.row(i) << "\n";
+      pos[i](0, 0) += pusher_poses(i, 0) - pt[0];
+      pos[i](1, 0) += pusher_poses(i, 1) - pt[1];
+      std::cout << "jjz: " << pusher_poses.row(i) << "\n";
 
-      auto X_WT = AngleAxis<double>(pt_W[2] + M_PI / 2., Vector3<double>::UnitZ());
-      auto X_WE = X_WT * X_TE;
+      // sfeng thinks jjz's angle is somehow 90 deg off from me.
+      Matrix3<double> X_WT(AngleAxis<double>(pusher_poses(i, 2) + M_PI / 2., Vector3<double>::UnitZ()));
+      Matrix3<double> X_WE = X_WT * X_ET.transpose();
       rot[i] = Quaternion<double>(X_WE);
     }
+
     PiecewiseQuaternionSlerp<double> rot_traj(times, rot);
     PiecewisePolynomial<double> pos_traj =
         PiecewisePolynomial<double>::FirstOrderHold(times, pos);
@@ -339,7 +320,7 @@ class RobotPlanRunner {
 
     Isometry3<double> X_WE0 = Isometry3<double>::Identity();
     X_WE0.translation() << 0.479828, 0, 0.393142;
-    X_WE0.linear() = X_TE.toRotationMatrix();
+    X_WE0.linear() = Matrix3<double>::Identity() * X_ET.transpose();
 
     VectorX<double> q1 = PointIk(X_WE0);
 
