@@ -39,12 +39,6 @@ class JacobianIk {
             std::vector<VectorX<double>>* q_sol) const;
 
   /**
-   * This function solves two quadratic programs to find a generalized
-   * velocity v s.t.
-   * 1) the resulting end effector velocity matches @p V_WE as closely as
-   * possible.
-   * 2) Without sacrificing 1), use redundancy in the robot to tracking a
-   * nominal configuration.
    * @param cache0 Captures the current state of the robot.
    * @param V_WE Desired end effector (frame E) velocity in the world frame.
    * @param dt Delta time.

@@ -1,7 +1,6 @@
+#include "drake/examples/PlanarPushing/dubins_interface.h"
+
 #include <iostream>
-#include <Eigen/Core>
-#include <Eigen/Geometry>
-#include "dubins_interface.h"
 
 int main() {
   // Limit surface A_11.
