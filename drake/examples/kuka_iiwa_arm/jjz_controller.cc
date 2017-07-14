@@ -222,7 +222,7 @@ class RobotPlanRunner {
     // Limit surface A_33 / rho^2
     double ls_b = 4500;
     // Coefficient of contact friction
-    double mu = 0.25;
+    double mu = 0.15;
 
     // local frame.
     Vector2<double> pt(-0.02, 0);
@@ -231,7 +231,7 @@ class RobotPlanRunner {
     DubinsPushPlanner planner(pt, normal, mu, ls_a, ls_b);
 
     Vector3<double> start_pose(0, 0, 0);
-    Vector3<double> goal_pose(0.1, 0.1, M_PI / 2.);
+    Vector3<double> goal_pose(0.2, 0.15, M_PI / 2.);
 
     // Are these sampled uniformly?
     int num_way_points = 100;
@@ -302,7 +302,7 @@ class RobotPlanRunner {
     constexpr int HOME = 1;
     constexpr int JACOBI = 2;
 
-    int STATE = GOTO;
+    int STATE = HOME;
     bool state_init = true;
     double state_t0;
     double control_dt;
@@ -321,7 +321,7 @@ class RobotPlanRunner {
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
     Isometry3<double> X_WE0 = Isometry3<double>::Identity();
-    X_WE0.translation() << 0.479828, 0, 0.393142;
+    X_WE0.translation() << 0.479828, 0, 0.063142;
     X_WE0.linear() = Matrix3<double>::Identity() * X_ET.transpose();
 
     VectorX<double> q1 = PointIk(X_WE0);
@@ -349,21 +349,15 @@ class RobotPlanRunner {
         case GOTO: {
           // make a spline to reset to home.
           if (state_init) {
-            /*
-            VectorX<double> q1 = robot_.getZeroConfiguration();
-            q1[1] += 45. * M_PI / 180.;
-            q1[3] -= M_PI / 2.;
-            q1[5] += 45. * M_PI / 180.;
-            */
             traj = SplineToDesiredConfiguration(state.get_q(), q1,
-                                                state.get_time(), 2);
+                                                state.get_time(), 5);
             state_init = false;
             state_t0 = state.get_time();
           }
 
           q_cmd = traj.value(state.get_time());
 
-          if (state.get_time() - state_t0 > 2.1) {
+          if (state.get_time() - state_t0 > 15) {
             STATE = JACOBI;
             state_init = true;
           }
@@ -374,15 +368,20 @@ class RobotPlanRunner {
         case HOME: {
           // make a spline to reset to home.
           if (state_init) {
-            traj = SplineToDesiredConfiguration(state.get_q(), robot_.getZeroConfiguration(),
-                                                state.get_time(), 2);
+            VectorX<double> q0 = robot_.getZeroConfiguration();
+            q0[1] += 45. * M_PI / 180.;
+            q0[3] -= M_PI / 2.;
+            q0[5] += 45. * M_PI / 180.;
+
+            traj = SplineToDesiredConfiguration(state.get_q(), q0,
+                                                state.get_time(), 3);
             state_init = false;
             state_t0 = state.get_time();
           }
 
           q_cmd = traj.value(state.get_time());
 
-          if (state.get_time() - state_t0 > 2.1) {
+          if (state.get_time() - state_t0 > 3.4) {
             STATE = GOTO;
             state_init = true;
           }
