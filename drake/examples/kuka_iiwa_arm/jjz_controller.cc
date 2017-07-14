@@ -231,7 +231,7 @@ class RobotPlanRunner {
     DubinsPushPlanner planner(pt, normal, mu, ls_a, ls_b);
 
     Vector3<double> start_pose(0, 0, 0);
-    Vector3<double> goal_pose(0.1, 0.1, M_PI / 4.);
+    Vector3<double> goal_pose(0.1, 0.1, M_PI / 2.);
 
     // Are these sampled uniformly?
     int num_way_points = 100;
@@ -251,12 +251,13 @@ class RobotPlanRunner {
       times[i] = (i + 1) * dt;
 
       pos[i] = pose0.translation();
-      pos[i](0, 0) += pusher_poses(i, 0) - pt[0];
-      pos[i](1, 0) += pusher_poses(i, 1) - pt[1];
-      std::cout << "jjz: " << pusher_poses.row(i) << "\n";
+      pos[i](0, 0) += object_poses(i, 0);
+      pos[i](1, 0) += object_poses(i, 1);
+      // std::cout << "jjz: pusher pose" << pusher_poses.row(i) << "\n";
+      std::cout << "jjz: object pose" << object_poses.row(i) << "\n";
 
       // sfeng thinks jjz's angle is somehow 90 deg off from me.
-      Matrix3<double> X_WT(AngleAxis<double>(pusher_poses(i, 2) + M_PI / 2., Vector3<double>::UnitZ()));
+      Matrix3<double> X_WT(AngleAxis<double>(object_poses(i, 2), Vector3<double>::UnitZ()));
       Matrix3<double> X_WE = X_WT * X_ET.transpose();
       rot[i] = Quaternion<double>(X_WE);
     }
@@ -273,14 +274,15 @@ class RobotPlanRunner {
   Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose) const {
     Eigen::Matrix<double, 7, 1> ret;
     ret.head<3>() = pose.translation();
-    ret.segment<3>(3) = math::rotmat2rpy(pose.linear());
+
     /*
+    ret.segment<3>(3) = math::rotmat2rpy(pose.linear());
+    */
     Quaternion<double> quat(pose.linear());
     ret[3] = quat.w();
     ret[4] = quat.x();
     ret[5] = quat.y();
     ret[6] = quat.z();
-    */
 
     return ret;
   }
@@ -437,7 +439,9 @@ class RobotPlanRunner {
 
           auto tmp = pose_to_vec(pose_d);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
-          tmp = pose_to_vec(X_WE);
+          Isometry3<double> aa = Isometry3<double>::Identity();
+          aa.linear() = X_ET;
+          tmp = pose_to_vec(X_WE * aa);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_ik);
           eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
 
