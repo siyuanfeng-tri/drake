@@ -214,6 +214,34 @@ void DubinsPushPlanner::PlanPath(
   }
 }
 
+double DubinsPushPlanner::GetPlannedDubinsCurveLength(
+    const Eigen::Vector3d cart_pose_start, 
+    const Eigen::Vector3d cart_pose_goal) {
+
+  // Compute the dubins frame pose vectors given the object frame pose vectors.
+  Eigen::Vector3d cart_pose_start_dubins =
+      GetDubinsPoseVectorGivenObjectPoseVector(cart_pose_start);
+  Eigen::Vector3d cart_pose_goal_dubins =
+      GetDubinsPoseVectorGivenObjectPoseVector(cart_pose_goal);
+  // Get the corresponding augmented state in flat space.
+  Eigen::Vector3d flat_z_start;
+  Eigen::Vector3d flat_z_goal;
+  CartesianSpaceToFlatSpace(cart_pose_start_dubins, &flat_z_start);
+  CartesianSpaceToFlatSpace(cart_pose_goal_dubins, &flat_z_goal);
+  
+  double start[3];
+  double goal[3];
+  for (int i = 0; i < 3; ++i) {
+    start[i] = flat_z_start(i);
+    goal[i] = flat_z_goal(i);
+  }
+  DubinsPath path;
+  dubins_init(start, goal, r_turn_, &path);
+  double path_length = dubins_path_length(&path);
+  return path_length;
+}
+
+
 Eigen::Vector3d DubinsPushPlanner::GetDubinsPoseVectorGivenObjectPoseVector(
     const Eigen::Vector3d pose_vector_object) {
   Eigen::Isometry2d tf_object = ConvertPoseVectorToSE3(pose_vector_object);

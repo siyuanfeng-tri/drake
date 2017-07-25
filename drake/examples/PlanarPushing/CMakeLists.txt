@@ -4,8 +4,9 @@
 #endif()
 
 add_library_with_exports(LIB_NAME dubinsPushing SOURCE_FILES
-  dubins_interface.cpp
-  dubins.cpp
+  dubins_interface.cc
+  pushing_multi_actions.cc
+  dubins.cc
   )
 target_link_libraries(dubinsPushing Eigen3::Eigen)
 

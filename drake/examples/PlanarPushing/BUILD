@@ -18,10 +18,12 @@ drake_cc_library(
     srcs = [
         "dubins_interface.cc",
         "dubins.cc",
+        "pushing_multi_actions.cc",
     ],
     hdrs = [
         "dubins_interface.h",
         "dubins.h",
+        "pushing_multi_actions.h",
     ],
     deps = [
         "//drake/common:common",

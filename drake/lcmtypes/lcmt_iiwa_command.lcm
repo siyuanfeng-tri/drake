@@ -6,7 +6,7 @@ struct lcmt_iiwa_command {
   int64_t utime;
 
   // Wall clock
-  int64_t wall_time;
+  // int64_t wall_time;
 
   // The reference joint positions. They should always be sent regardless of
   // whether the arm is in position control mode or torque control mode.

@@ -106,6 +106,8 @@ class RobotPlanRunner {
         q_ini_(q_ini) {
     VerifyIiwaTree(robot_);
     lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
+
+    q_calib_ = GenerateCalibrateConfigurations(q_ini_);
   }
 
   PiecewisePolynomial<double> SplineToDesiredConfiguration(
@@ -228,8 +230,6 @@ class RobotPlanRunner {
     const double kTrajTime = 2;
     const double kWaitTime = 2;
 
-    std::vector<VectorX<double>> q_calib =
-        GenerateCalibrateConfigurations(q_ini_);
     size_t calib_index = 0;
 
     while (true) {
@@ -241,7 +241,7 @@ class RobotPlanRunner {
       switch (STATE) {
         case GOTO: {
           if (state_init) {
-            traj = SplineToDesiredConfiguration(q_calib[calib_index], kTrajTime);
+            traj = SplineToDesiredConfiguration(q_calib_[calib_index], kTrajTime);
             calib_index++;
 
             state_init = false;
@@ -265,7 +265,7 @@ class RobotPlanRunner {
           }
 
           if (state_.get_time() - state_t0 > kWaitTime) {
-            if (calib_index >= q_calib.size()) {
+            if (calib_index >= q_calib_.size()) {
               STATE = NOOP;
             } else {
               STATE = GOTO;
@@ -308,6 +308,7 @@ class RobotPlanRunner {
   VectorX<double> q_d_;
 
   VectorX<double> q_ini_;
+  std::vector<VectorX<double>> q_calib_;
 };
 
 int do_main() {
@@ -318,7 +319,8 @@ int do_main() {
 
   // Joint angles for the "center" pose, jjz need to update this.
   VectorX<double> q_center = VectorX<double>::Zero(7);
-  q_center[1] = 45. / 180. * M_PI;
+  q_center[0] = -5 / 180. * M_PI;
+  q_center[1] = 40. / 180. * M_PI;
   q_center[3] = -90. / 180. * M_PI;
   q_center[5] = -45. / 180. * M_PI;
 

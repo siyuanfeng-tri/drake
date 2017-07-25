@@ -451,7 +451,7 @@ class RobotPlanRunner {
       double wall_clock = get_time();
       // Make cmd msg.
       iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
-      iiwa_command.wall_time = static_cast<int64_t>(wall_clock * 1e6);
+      // iiwa_command.wall_time = static_cast<int64_t>(wall_clock * 1e6);
       for (int i = 0; i < robot_.get_num_positions(); i++) {
         iiwa_command.joint_position[i] = q_cmd[i];
       }

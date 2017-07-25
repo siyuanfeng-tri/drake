@@ -33,6 +33,12 @@ class DubinsPushPlanner {
                 Eigen::Matrix<double, Eigen::Dynamic, 3>* object_poses,
                 Eigen::Matrix<double, Eigen::Dynamic, 3>* pusher_poses);
 
+  // Given initial pose and final pose, return the length of the dubins curve in
+  // flat space. This function does not generate way points along the path so 
+  // it's faster. 
+  double GetPlannedDubinsCurveLength(const Eigen::Vector3d cart_pose_start,
+                                     const Eigen::Vector3d cart_pose_goal);
+
  private:
   // Compute the dubins frame (at the differential flat output point akin to
   // center of rear axle) and minimum turning radius.
