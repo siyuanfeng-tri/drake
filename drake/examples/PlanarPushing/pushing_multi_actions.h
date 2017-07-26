@@ -30,9 +30,9 @@ class MultiPushActionsPlanner {
 						   std::vector<Eigen::Vector2d> all_contact_normals,
 						   double mu, double ls_a, double ls_b);
 
+	// Set the workspace of the position part of the object configurations.
 	void SetWorkSpaceBoxConstraint(double min_x = -0.5, double max_x = 0.5, 
-								  double min_y = -0.5, double max_y = 0.5,
-								  double buffer = 0.0);	
+								  double min_y = -0.5, double max_y = 0.5);	
 
 	void SetGraphSize(int num_sample_nodes = 1000);
 
@@ -52,6 +52,24 @@ class MultiPushActionsPlanner {
  private:
    // Sample nodes in (expanded) workspace constraints.
    void SampleNodesInBoxWorkSpace();
+   
+   bool CheckPathWorkSpaceConstraint(
+       const Eigen::Matrix<double, Eigen::Dynamic, 3>& object_poses);
+   // if flag is false (outside workspace constraint), then curve_length is 
+   // returned as 1e+9.
+   void CheckPathAndGetPlannedCurveLength(const Eigen::Vector3d cart_pose_start, 
+       const Eigen::Vector3d cart_pose_goal, int action_id, 
+       bool* flag_inside_workspace, double* curve_length, 
+       int num_way_pts_to_check = 20);
+
+   // Given all the starting poses and action_id for each segment, construct 
+   // densely sampled object and pusher trajectories. The goal pose will be 
+   // appended to the last segment.  
+   void ConstructAllPathSegments(std::vector<Eigen::Vector3d> poses, 
+       std::vector<int> action_ids, 
+       std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
+	   std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses,
+	   int num_way_points_per_seg = 50); 
 
    std::vector<DubinsPushPlanner> action_planners_;
    Eigen::Vector3d goal_pose_;
@@ -65,7 +83,6 @@ class MultiPushActionsPlanner {
    double workspace_max_x_;
    double workspace_min_y_;
    double workspace_max_y_;
-   double buffer_;
    
    double cost_switch_action_;
    
