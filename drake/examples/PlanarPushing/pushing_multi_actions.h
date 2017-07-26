@@ -43,6 +43,7 @@ class MultiPushActionsPlanner {
 	// Given query start pose, return the action ids (index of the action planer),
 	// object poses and pusher poses along each segment of trajectories.
 	void Plan(const Eigen::Vector3d cart_pose_start, 
+	  	 int num_way_points_per_seg,
 		 std::vector<int>* action_id,
 		 std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
 		 std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses);

@@ -1,6 +1,7 @@
 #include "pushing_multi_actions.h"
 #include <cassert>
 #include <random>
+#define CHECKCONSTRAINT
 
 MultiPushActionsPlanner::MultiPushActionsPlanner(
 	std::vector<Eigen::Vector2d> all_contact_points, 
@@ -67,6 +68,9 @@ void MultiPushActionsPlanner::ConstructPlanningGraph() {
   }
   // Dijkstra process.
   for (int i = 0; i < num_expanded_nodes_; ++i) {
+  	if (i % (num_expanded_nodes_ / 10) == 0) {
+  		std::cout << double(i) / num_expanded_nodes_ << std::endl;
+  	}
   	// Find the shortest node to the goal. 
   	double min_dist = 1e+9;
   	int index_min_dist_node = -1;
@@ -87,21 +91,27 @@ void MultiPushActionsPlanner::ConstructPlanningGraph() {
 			if (!mark_shortest[j]) {
 		  	int sample_id = j / num_actions_;
 				int action_id = j - num_actions_ * sample_id;
-				// Compute the distance to the hop point with action_id. 
-				//double dist_hop = action_planners_[action_id].GetPlannedDubinsCurveLength(
-	  		//		sampled_pose_nodes_.row(sample_id).transpose(), 
-	  		//		sampled_pose_nodes_.row(sample_id_min_dist_node).transpose());
 				bool flag_feasible;
-		  	double dist_hop;
+		  	double dist_hop = 0;
+		  	double dist_edge = 0;
+				// Add the switching cost (if any).
+				if (action_id_min_dist_node != action_id) {
+					dist_hop = cost_switch_action_;
+					Eigen::Vector3d offset_vec = 
+						sampled_pose_nodes_.row(sample_id).transpose() - 
+						sampled_pose_nodes_.row(sample_id_min_dist_node).transpose();
+					double straight_line_dist = offset_vec.head(2).norm();
+					double lower_bound_dist = dist_hop + min_dist + straight_line_dist;
+					if (lower_bound_dist >= shortest_distances_[j]) {
+						continue;
+					}
+				}
   			CheckPathAndGetPlannedCurveLength(
   					sampled_pose_nodes_.row(sample_id).transpose(), 
   					sampled_pose_nodes_.row(sample_id_min_dist_node).transpose(), 
-  					action_id, &flag_feasible, &dist_hop);
+  					action_id, &flag_feasible, &dist_edge);
+  			dist_hop = dist_hop + dist_edge;
   			if (flag_feasible) {
-					// Add the switching cost (if any).
-					if (action_id_min_dist_node != action_id) {
-						dist_hop = dist_hop + cost_switch_action_;
-					}
 					dist_hop = dist_hop + min_dist;
 					// Check to see if we should update the current node.
 					if (dist_hop < shortest_distances_[j]) {
@@ -113,7 +123,9 @@ void MultiPushActionsPlanner::ConstructPlanningGraph() {
 			}
   	}  // Dijkstra update.
   } // Outer for loop dijkstra. 
-
+  for (int j = 0; j < num_expanded_nodes_; ++j) {
+  	std::cout << shortest_distances_[j] << std::endl;
+  }
 }
 
 void MultiPushActionsPlanner::SampleNodesInBoxWorkSpace() {
@@ -132,7 +144,8 @@ void MultiPushActionsPlanner::SampleNodesInBoxWorkSpace() {
 }
 
 
-void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start, 
+void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
+	  int num_way_points_per_seg, 
   	std::vector<int>* all_action_ids, 
 	  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
 	  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses) {
@@ -152,6 +165,8 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 			dist = curve_length;
 		}
 	}
+	std::cout << "best direction distance : " << dist << " with action " 
+						<< best_direct_action_id << std::endl;
 	// Next, try all nodes in the graph and find the best hopping node.
 	int best_hopping_node_id = -1;
 	for (int i = 0; i < num_expanded_nodes_; ++i) {
@@ -163,6 +178,8 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 			CheckPathAndGetPlannedCurveLength(cart_pose_start, 
 				sampled_pose_nodes_.row(sample_id).transpose(), 
 				action_id, &flag_feasible, &dist_edge);
+			std::cout << "try hop " << i << " " << dist_edge <<" , " 
+			<<  shortest_distances_[i] << " " << dist_edge + shortest_distances_[i] << std::endl; 
 			if (dist_edge + shortest_distances_[i] < dist) {
 				best_hopping_node_id = i;
 				dist = dist_edge + shortest_distances_[i];
@@ -191,10 +208,11 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 		} 
 	} else {
 		// Otherwise directly go to the goal with best single action.
+		std::cout << "direct action to goal " << std::endl;
 		sol_action_ids.push_back(best_direct_action_id);
 	}
 	ConstructAllPathSegments(sol_poses, sol_action_ids, object_poses, 
-													 pusher_poses); 
+													 pusher_poses, num_way_points_per_seg); 
 	all_action_ids->clear();
 	for (unsigned i = 0; i < sol_action_ids.size(); ++i) {
 		all_action_ids->push_back(sol_action_ids[i]);
@@ -221,10 +239,13 @@ void MultiPushActionsPlanner::CheckPathAndGetPlannedCurveLength(
     int num_way_pts_to_check) {
   Eigen::Matrix<double, Eigen::Dynamic, 3> object_poses;
 	Eigen::Matrix<double, Eigen::Dynamic, 3> pusher_poses;
-	action_planners_[action_id].PlanPath(cart_pose_start, cart_pose_goal, 
-		num_way_pts_to_check, &object_poses, &pusher_poses);
-	bool flag_inside = CheckPathWorkSpaceConstraint(object_poses);
-	*flag_inside_workspace = flag_inside;
+	bool flag_inside = true;
+	#ifdef CHECKCONSTRAINT
+		action_planners_[action_id].PlanPath(cart_pose_start, cart_pose_goal, 
+			num_way_pts_to_check, &object_poses, &pusher_poses);
+		flag_inside = CheckPathWorkSpaceConstraint(object_poses);
+	#endif
+ 	*flag_inside_workspace = flag_inside;
 	if (flag_inside) {
 		*curve_length = action_planners_[action_id].GetPlannedDubinsCurveLength(
 				cart_pose_start, cart_pose_goal);

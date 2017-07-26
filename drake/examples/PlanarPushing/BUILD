@@ -30,3 +30,10 @@ drake_cc_library(
     ],
 )
 
+drake_cc_binary(
+    name = "planar_pushing_demo",
+    srcs = ["demo_dubins_pushing.cc"],
+    deps = [
+        ":planar_pushing",
+    ],
+)

@@ -17,6 +17,8 @@
 #include "drake/multibody/rigid_body_tree.h"
 
 #include "drake/examples/PlanarPushing/dubins_interface.h"
+#include "drake/examples/PlanarPushing/pushing_multi_actions.h"
+
 #include "drake/manipulation/planner/jacobian_ik.h"
 #include "drake/manipulation/util/trajectory_utils.h"
 #include "drake/util/drakeUtil.h"
@@ -214,6 +216,139 @@ class RobotPlanRunner {
     return manipulation::PiecewiseCartesianTrajectory<double>(pos_traj,
                                                               rot_traj);
   }
+  
+  manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTrajMultiAction(
+      const Isometry3<double>& pose0, double duration) const {
+    double height = 0.234;
+    double width = 0.178;
+    double rho = width / 4;
+
+    // Limit surface A_11. If you are unsure, just set it to be 1. 
+    double ls_a = 1;
+    // Limit surface A_33 / rho^2, where rho is a characteristic length, similar
+    // to the minimum bounding circle radius. 
+    double ls_b = ls_a / (rho * rho);
+    // Coefficient of contact friction
+    double mu = 0.3;
+
+    int num_actions = 4;
+    Eigen::Matrix<double, Eigen::Dynamic, 2> ct_pts(num_actions, 2);
+    Eigen::Matrix<double, Eigen::Dynamic, 2> normal_pts(num_actions, 2);
+    ct_pts << 0, -height/2, 
+              -width/2, 0,
+              0, height/2,
+              width/2, 0;
+    normal_pts << 0, 1,
+                  1, 0,
+                  0, -1,
+                  -1, 0;
+    std::vector<Eigen::Vector2d> all_contact_points;
+    std::vector<Eigen::Vector2d> all_normals;
+    for (int i = 0; i < ct_pts.rows(); ++i) {
+      all_contact_points.push_back(ct_pts.row(i).transpose());
+      all_normals.push_back(normal_pts.row(i).transpose());
+    }
+    MultiPushActionsPlanner multi_action_planner(all_contact_points, all_normals, 
+      mu, ls_a, ls_b);
+    double xmin, xmax, ymin, ymax;
+    xmin = -0.2; xmax = 0.2; ymin = 0; ymax = 0.4;
+    //xmin = -0.2; xmax = 0.2; ymin = -0.2; ymax = 0.2;
+    multi_action_planner.SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
+
+    int num_samples_se2 = 200;
+    double switching_action_cost = 0.05;
+    multi_action_planner.SetGraphSize(num_samples_se2);
+    multi_action_planner.SetActionSwitchCost(switching_action_cost);
+
+    multi_action_planner.ConstructPlanningGraph();
+
+    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> > all_object_poses;
+    std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> > all_pusher_poses;
+    std::vector<int> action_id;
+
+    Eigen::Vector3d query_pose;
+    query_pose << 0.0, 0.01, M_PI/2;
+    int num_way_pts_perseg = 100;
+
+    multi_action_planner.Plan(query_pose, num_way_pts_perseg, &action_id, 
+        &all_object_poses, &all_pusher_poses);
+
+    int num_action_segs = all_object_poses.size();
+    double dt = duration / (num_way_pts_perseg - 1);
+    double time_lift_up = 2.0;
+    double time_move_above = 2.0;
+    double time_move_down = 2.0;
+    double dist_lift_up = 0.1;
+
+    int num_points_per_seg = all_pusher_poses[0].rows();
+    int total_way_points = num_points_per_seg * num_action_segs + 
+                           3 * (num_action_segs - 1);
+    std::vector<double> times(total_way_points);
+    std::vector<MatrixX<double>> pos(total_way_points);
+    eigen_aligned_std_vector<Quaternion<double>> rot(total_way_points);
+
+    double cur_time = 0.0;
+    int index = 0;
+    for (int id_traj = 0; id_traj < num_action_segs; ++id_traj) {
+      Eigen::Matrix<double, Eigen::Dynamic, 3> pusher_poses = all_pusher_poses[id_traj];
+      int num_way_points = pusher_poses.rows();
+      for (int i = 0; i < num_way_points; ++i) {
+        cur_time = cur_time + (i + 1) * dt;
+        times[index] = cur_time;
+        pos[index] = pose0.translation();
+        pos[index](0, 0) += pusher_poses(i, 0);
+        pos[index](1, 0) += pusher_poses(i, 1);
+        std::cout << index << " : " << pos[index](0, 0) << "," << pos[index](1, 0) << std::endl;
+        // std::cout << "jjz: pusher pose" << pusher_poses.row(i) << "\n";
+        //std::cout << "jjz: object pose" << object_poses.row(i) << "\n";
+
+        // sfeng thinks jjz's angle is somehow 90 deg off from me.
+        Matrix3<double> X_WT(AngleAxis<double>(pusher_poses(i, 2), Vector3<double>::UnitZ()));
+        Matrix3<double> X_WE = X_WT * X_ET.transpose();
+        rot[index] = Quaternion<double>(X_WE);
+        ++index;
+      }
+      if (id_traj < num_action_segs - 1) {
+        // The robot first moves up. 
+        cur_time = cur_time + time_lift_up;
+        times[index] = cur_time;
+        pos[index] = pos[index - 1];
+        // Add z value.
+        pos[index](2, 0) = pos[index](2, 0) + dist_lift_up;
+        rot[index] = rot[index - 1];
+        index++;
+        // The robot then moves to the plane above the next pushing location and 
+        // align with the initial pose of the next trajectory.
+        cur_time = cur_time + time_move_above;
+        times[index] = cur_time;
+        Eigen::Vector3d nxt_push_pose = all_pusher_poses[id_traj + 1].row(0).transpose(); 
+        pos[index] = pose0.translation();
+        pos[index](0, 0) += nxt_push_pose(0);
+        pos[index](1, 0) += (nxt_push_pose(1) + dist_lift_up);
+        Matrix3<double> X_WT(AngleAxis<double>(nxt_push_pose(2), Vector3<double>::UnitZ()));
+        Matrix3<double> X_WE = X_WT * X_ET.transpose();
+        rot[index] = Quaternion<double>(X_WE);
+        index++;
+        // The robot then moves down to the next pushing location.
+        cur_time = cur_time + time_move_down;
+        times[index] = cur_time;
+        pos[index] = pose0.translation();
+        pos[index](0, 0) += nxt_push_pose(0);
+        pos[index](1, 0) += nxt_push_pose(1);
+        rot[index] = rot[index - 1];
+        index++; 
+      }
+  }
+
+    PiecewiseQuaternionSlerp<double> rot_traj(times, rot);
+    PiecewisePolynomial<double> pos_traj =
+        PiecewisePolynomial<double>::FirstOrderHold(times, pos);
+    manipulation::PiecewiseCartesianTrajectory<double> traj(pos_traj,
+                                                            rot_traj);
+
+    return traj;
+
+  }
 
   manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTraj(
       const Isometry3<double>& pose0, double duration) const {
@@ -404,8 +539,8 @@ class RobotPlanRunner {
             Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
                 cc, jaco_planner_.get_end_effector());
 
-            ee_traj = PlanPlanarPushingTraj(X_WE, 5);
-
+            //ee_traj = PlanPlanarPushingTraj(X_WE, 5);
+            ee_traj = PlanPlanarPushingTrajMultiAction(X_WE, 5);  
             /*
             const double radius = 0.1;
             const double dt = 3e-3;

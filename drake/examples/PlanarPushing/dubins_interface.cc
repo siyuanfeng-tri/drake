@@ -198,16 +198,18 @@ void DubinsPushPlanner::PlanPath(
   GetCartesianPathGivenFlatOutputPath(flat_z_traj, &cartesian_dubins_traj);
 
   // Get the trajectory of object frame from the trajectory of the dubins frame.
-  object_poses->resize(num_way_points, 3);
-  pusher_poses->resize(num_way_points, 3);
+  object_poses->resize(num_way_points + 1, 3);
+  pusher_poses->resize(num_way_points + 1, 3);
+  // Add the initial pose. 
+  object_poses->row(0) = cart_pose_start;
   for (int i = 0; i < num_way_points - 1; ++i) {
-    object_poses->row(i) =
+    object_poses->row(i+1) =
         GetObjectPoseVectorGivenDubinsPoseVector(cartesian_dubins_traj.row(i));
   }
   // Add the final goal pose.
-  object_poses->row(num_way_points - 1) = cart_pose_goal;
+  object_poses->row(num_way_points) = cart_pose_goal;
   // Compute the pusher pose.
-  for (int i = 0; i < num_way_points; ++i) {
+  for (int i = 0; i < num_way_points + 1; ++i) {
     Eigen::Isometry2d tf_pusher =
         ConvertPoseVectorToSE3(object_poses->row(i)) * tf_pusher_frame_;
     pusher_poses->row(i) = ConvertSE3ToPoseVector(tf_pusher);
