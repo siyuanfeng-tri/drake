@@ -125,12 +125,10 @@ int DoMain() {
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
+  const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_link_ee", tree.FindBody("iiwa_link_ee"),
-                             Isometry3<double>::Identity()));
-  local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_link_7", tree.FindBody("iiwa_link_7"),
-                             Isometry3<double>::Identity()));
+      RigidBodyFrame<double>("iiwa_tool", tree.FindBody("iiwa_link_7"),
+                             Isometry3<double>(R_ET)));
   auto frame_viz = base_builder->AddSystem<systems::FrameVisualizer>(
       &tree, local_transforms, &lcm);
   base_builder->Connect(plant->get_output_port(0),

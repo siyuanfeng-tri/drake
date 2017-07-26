@@ -45,7 +45,8 @@ const std::string kPath =
 const std::string kEEName = "iiwa_link_7";
 const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
 
-const Matrix3<double>X_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
+const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
+Isometry3<double> X_ET(R_ET);
 
 class IiwaState {
  public:
@@ -152,6 +153,9 @@ class RobotPlanRunner {
   }
 
   VectorX<double> PointIk(const Isometry3<double>& pose) const {
+    std::cout << "PointIk: " << pose.translation().transpose() << "\n";
+    std::cout << pose.linear() << "\n";
+
     std::vector<RigidBodyConstraint*> constraint_array;
     RigidBodyTree<double>* cao_robot = (RigidBodyTree<double>*)&robot_;
 
@@ -176,10 +180,14 @@ class RobotPlanRunner {
 
     VectorX<double> q_res = VectorX<double>::Zero(7);
     VectorX<double> zero = VectorX<double>::Zero(7);
+    VectorX<double> q_ini = zero;
+    q_ini[1] = 45. * M_PI / 180;
+    q_ini[3] = -90. * M_PI / 180;
+    q_ini[5] = 45. * M_PI / 180;
 
     int info;
     std::vector<std::string> infeasible_constraints;
-    inverseKin(cao_robot, zero, zero,
+    inverseKin(cao_robot, q_ini, zero,
         constraint_array.size(),
         constraint_array.data(), ikoptions, &q_res, &info,
         &infeasible_constraints);
@@ -216,17 +224,18 @@ class RobotPlanRunner {
     return manipulation::PiecewiseCartesianTrajectory<double>(pos_traj,
                                                               rot_traj);
   }
-  
+
+  // Returned stuff is in Goal frame. 0 is origin of Goal frame, orientation is world aligned.
   manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTrajMultiAction(
-      const Isometry3<double>& pose0, double duration) const {
+      const Vector3<double>& x_GQ, double duration) const {
     double height = 0.234;
     double width = 0.178;
     double rho = width / 4;
 
-    // Limit surface A_11. If you are unsure, just set it to be 1. 
+    // Limit surface A_11. If you are unsure, just set it to be 1.
     double ls_a = 1;
     // Limit surface A_33 / rho^2, where rho is a characteristic length, similar
-    // to the minimum bounding circle radius. 
+    // to the minimum bounding circle radius.
     double ls_b = ls_a / (rho * rho);
     // Coefficient of contact friction
     double mu = 0.3;
@@ -234,7 +243,7 @@ class RobotPlanRunner {
     int num_actions = 4;
     Eigen::Matrix<double, Eigen::Dynamic, 2> ct_pts(num_actions, 2);
     Eigen::Matrix<double, Eigen::Dynamic, 2> normal_pts(num_actions, 2);
-    ct_pts << 0, -height/2, 
+    ct_pts << 0, -height/2,
               -width/2, 0,
               0, height/2,
               width/2, 0;
@@ -248,7 +257,7 @@ class RobotPlanRunner {
       all_contact_points.push_back(ct_pts.row(i).transpose());
       all_normals.push_back(normal_pts.row(i).transpose());
     }
-    MultiPushActionsPlanner multi_action_planner(all_contact_points, all_normals, 
+    MultiPushActionsPlanner multi_action_planner(all_contact_points, all_normals,
       mu, ls_a, ls_b);
     double xmin, xmax, ymin, ymax;
     xmin = -0.2; xmax = 0.2; ymin = 0; ymax = 0.4;
@@ -266,11 +275,10 @@ class RobotPlanRunner {
     std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> > all_pusher_poses;
     std::vector<int> action_id;
 
-    Eigen::Vector3d query_pose;
-    query_pose << 0.0, 0.0, M_PI/2;
     int num_way_pts_perseg = 100;
+    ////////////////////////////////////////////
 
-    multi_action_planner.Plan(query_pose, num_way_pts_perseg, &action_id, 
+    multi_action_planner.Plan(x_GQ, num_way_pts_perseg, &action_id,
         &all_object_poses, &all_pusher_poses);
 
     int num_action_segs = all_object_poses.size();
@@ -281,36 +289,33 @@ class RobotPlanRunner {
     double dist_lift_up = 0.1;
 
     int num_points_per_seg = all_pusher_poses[0].rows();
-    int total_way_points = num_points_per_seg * num_action_segs + 
+    int total_way_points = num_points_per_seg * num_action_segs +
                            3 * (num_action_segs - 1);
     std::vector<double> times(total_way_points);
-    std::vector<MatrixX<double>> pos(total_way_points);
+    std::vector<MatrixX<double>> pos(total_way_points, MatrixX<double>::Zero(3, 1));
     eigen_aligned_std_vector<Quaternion<double>> rot(total_way_points);
 
     double cur_time = 0.0;
     int index = 0;
-    std::cout << "start pose" << pose0.translation().transpose() << std::endl;
     for (int id_traj = 0; id_traj < num_action_segs; ++id_traj) {
       Eigen::Matrix<double, Eigen::Dynamic, 3> pusher_poses = all_pusher_poses[id_traj];
       int num_way_points = pusher_poses.rows();
       for (int i = 0; i < num_way_points; ++i) {
         cur_time = cur_time + dt;
         times[index] = cur_time;
-        pos[index] = pose0.translation();
-        pos[index](0, 0) += pusher_poses(i, 0);
-        pos[index](1, 0) += pusher_poses(i, 1);
+        pos[index](0, 0) = pusher_poses(i, 0);
+        pos[index](1, 0) = pusher_poses(i, 1);
         std::cout << index << " : " << cur_time <<"," << pos[index](0, 0) << "," << pos[index](1, 0) << std::endl;
         // std::cout << "jjz: pusher pose" << pusher_poses.row(i) << "\n";
         //std::cout << "jjz: object pose" << object_poses.row(i) << "\n";
 
         // sfeng thinks jjz's angle is somehow 90 deg off from me.
-        Matrix3<double> X_WT(AngleAxis<double>(pusher_poses(i, 2), Vector3<double>::UnitZ()));
-        Matrix3<double> X_WE = X_WT * X_ET.transpose();
-        rot[index] = Quaternion<double>(X_WE);
+        Matrix3<double> X_GT(AngleAxis<double>(pusher_poses(i, 2), Vector3<double>::UnitZ()));
+        rot[index] = Quaternion<double>(X_GT);
         ++index;
       }
       if (id_traj < num_action_segs - 1) {
-        // The robot first moves up. 
+        // The robot first moves up.
         cur_time = cur_time + time_lift_up;
         times[index] = cur_time;
         pos[index] = pos[index - 1];
@@ -318,28 +323,25 @@ class RobotPlanRunner {
         pos[index](2, 0) = pos[index](2, 0) + dist_lift_up;
         rot[index] = rot[index - 1];
         index++;
-        // The robot then moves to the plane above the next pushing location and 
+        // The robot then moves to the plane above the next pushing location and
         // align with the initial pose of the next trajectory.
         cur_time = cur_time + time_move_above;
         times[index] = cur_time;
-        Eigen::Vector3d nxt_push_pose = all_pusher_poses[id_traj + 1].row(0).transpose(); 
-        pos[index] = pose0.translation();
-        pos[index](0, 0) += nxt_push_pose(0);
-        pos[index](1, 0) += (nxt_push_pose(1) + dist_lift_up);
-        Matrix3<double> X_WT(AngleAxis<double>(nxt_push_pose(2), Vector3<double>::UnitZ()));
-        Matrix3<double> X_WE = X_WT * X_ET.transpose();
-        rot[index] = Quaternion<double>(X_WE);
+        Eigen::Vector3d nxt_push_pose = all_pusher_poses[id_traj + 1].row(0).transpose();
+        pos[index](0, 0) = nxt_push_pose(0);
+        pos[index](1, 0) = (nxt_push_pose(1) + dist_lift_up);
+        Matrix3<double> X_GT(AngleAxis<double>(nxt_push_pose(2), Vector3<double>::UnitZ()));
+        rot[index] = Quaternion<double>(X_GT);
         index++;
         // The robot then moves down to the next pushing location.
         cur_time = cur_time + time_move_down;
         times[index] = cur_time;
-        pos[index] = pose0.translation();
-        pos[index](0, 0) += nxt_push_pose(0);
-        pos[index](1, 0) += nxt_push_pose(1);
+        pos[index](0, 0) = nxt_push_pose(0);
+        pos[index](1, 0) = nxt_push_pose(1);
         rot[index] = rot[index - 1];
-        index++; 
+        index++;
       }
-  }
+    }
 
     PiecewiseQuaternionSlerp<double> rot_traj(times, rot);
     PiecewisePolynomial<double> pos_traj =
@@ -394,7 +396,7 @@ class RobotPlanRunner {
 
       // sfeng thinks jjz's angle is somehow 90 deg off from me.
       Matrix3<double> X_WT(AngleAxis<double>(object_poses(i, 2), Vector3<double>::UnitZ()));
-      Matrix3<double> X_WE = X_WT * X_ET.transpose();
+      Matrix3<double> X_WE = X_WT * R_ET.transpose();
       rot[i] = Quaternion<double>(X_WE);
     }
 
@@ -438,7 +440,7 @@ class RobotPlanRunner {
     constexpr int HOME = 1;
     constexpr int JACOBI = 2;
 
-    int STATE = HOME;
+    int STATE = GOTO;
     bool state_init = true;
     double state_t0;
     double control_dt;
@@ -456,11 +458,21 @@ class RobotPlanRunner {
     VectorX<double> q_nominal = robot_.getZeroConfiguration();
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
-    Isometry3<double> X_WE0 = Isometry3<double>::Identity();
-    X_WE0.translation() << 0.479828, 0, 0.063142;
-    X_WE0.linear() = Matrix3<double>::Identity() * X_ET.transpose();
+    // Goal point.
+    Isometry3<double> X_WG = Isometry3<double>::Identity();
+    X_WG.linear() = AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()).toRotationMatrix();
+    X_WG.translation() = Vector3<double>(0.47, 0., 0.06);
 
-    VectorX<double> q1 = PointIk(X_WE0);
+    // Starting point.
+    Vector3<double> x_GQ(0.1, 0, 0);
+    //Vector3<double> x_GQ(0, 0, M_PI / 2.);
+    Isometry3<double> X_GQ = Isometry3<double>::Identity();
+    X_GQ.linear() = AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
+    X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
+    Isometry3<double> X_WQ = X_WG * X_GQ;
+    VectorX<double> q1 = PointIk(X_WQ * X_ET.inverse());
+
+    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
 
     while (true) {
       // Call lcm handle until at least one status message is
@@ -481,7 +493,6 @@ class RobotPlanRunner {
       }
 
       switch (STATE) {
-        // go home.
         case GOTO: {
           // make a spline to reset to home.
           if (state_init) {
@@ -489,6 +500,7 @@ class RobotPlanRunner {
                                                 state.get_time(), 5);
             state_init = false;
             state_t0 = state.get_time();
+            std::cout << "GOTO start: " << state_t0 << "\n";
           }
 
           q_cmd = traj.value(state.get_time());
@@ -505,14 +517,11 @@ class RobotPlanRunner {
           // make a spline to reset to home.
           if (state_init) {
             VectorX<double> q0 = robot_.getZeroConfiguration();
-            q0[1] += 45. * M_PI / 180.;
-            q0[3] -= M_PI / 2.;
-            q0[5] += 45. * M_PI / 180.;
-
             traj = SplineToDesiredConfiguration(state.get_q(), q0,
                                                 state.get_time(), 3);
             state_init = false;
             state_t0 = state.get_time();
+            std::cout << "HOME start: " << state_t0 << "\n";
           }
 
           q_cmd = traj.value(state.get_time());
@@ -528,41 +537,24 @@ class RobotPlanRunner {
         case JACOBI: {
           // const double period = 5;
           if (state_init) {
-            /*
-            VectorX<double> q1 = robot_.getZeroConfiguration();
-            q1[1] += 45. * M_PI / 180.;
-            q1[3] -= M_PI / 2.;
-            q1[5] += 45. * M_PI / 180.;
-            */
+            state_init = false;
+            state_t0 = state.get_time();
+            std::cout << "PUSHING start: " << state_t0 << "\n";
 
             cc.initialize(q1);
             robot_.doKinematics(cc);
-            Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
-                cc, jaco_planner_.get_end_effector());
-
-            //ee_traj = PlanPlanarPushingTraj(X_WE, 5);
-            ee_traj = PlanPlanarPushingTrajMultiAction(X_WE, 5);  
-            /*
-            const double radius = 0.1;
-            const double dt = 3e-3;
-            ee_traj = GenerateEETraj(q1, radius, period, dt);
-            cc.initialize(state.get_q());
-            robot_.doKinematics(cc);
-            */
-
-            state_init = false;
-            state_t0 = state.get_time();
           }
 
           double interp_t = state.get_time() - state_t0;
           // double interp_t = std::fmod((state.get_time() - state_t0), period);
-          const Isometry3<double> pose_d = ee_traj.get_pose(interp_t);
+
+          const Isometry3<double> X_WE_d = X_WG * ee_traj.get_pose(interp_t) * X_ET.inverse();
 
           Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
               cc, jaco_planner_.get_end_effector());
 
           Vector6<double> V_WE_d =
-              jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, pose_d) /
+              jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, X_WE_d) /
               control_dt;
 
           VectorX<double> v = jaco_planner_.ComputeDofVelocity(
@@ -572,10 +564,10 @@ class RobotPlanRunner {
 
           q_cmd = cc.getQ();
 
-          auto tmp = pose_to_vec(pose_d);
+          auto tmp = pose_to_vec(X_WE_d);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
           Isometry3<double> aa = Isometry3<double>::Identity();
-          aa.linear() = X_ET;
+          aa.linear() = R_ET;
           tmp = pose_to_vec(X_WE * aa);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_ik);
           eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
