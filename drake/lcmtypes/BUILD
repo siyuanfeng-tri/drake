@@ -94,6 +94,13 @@ lcm_cc_library(
 )
 
 lcm_cc_library(
+    name = "jjz_controller",
+    lcm_package = "drake",
+    lcm_srcs = ["lcmt_jjz_controller.lcm"],
+    deps = ["@lcmtypes_bot2_core"],
+)
+
+lcm_cc_library(
     name = "manipulator_plan_move_end_effector",
     lcm_package = "drake",
     lcm_srcs = ["lcmt_manipulator_plan_move_end_effector.lcm"],
@@ -274,6 +281,7 @@ DRAKE_LCMTYPES = [
     ":iiwa",
     ":inverse_dynamics_debug_info",
     ":joint_pd_override",
+    ":jjz_controller",
     ":manipulator_plan_move_end_effector",
     ":piecewise_polynomial",
     ":plan_eval_debug_info",
