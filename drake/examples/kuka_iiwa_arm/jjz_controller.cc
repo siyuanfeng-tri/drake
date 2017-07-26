@@ -255,7 +255,7 @@ class RobotPlanRunner {
     //xmin = -0.2; xmax = 0.2; ymin = -0.2; ymax = 0.2;
     multi_action_planner.SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
 
-    int num_samples_se2 = 200;
+    int num_samples_se2 = 100;
     double switching_action_cost = 0.05;
     multi_action_planner.SetGraphSize(num_samples_se2);
     multi_action_planner.SetActionSwitchCost(switching_action_cost);
@@ -267,7 +267,7 @@ class RobotPlanRunner {
     std::vector<int> action_id;
 
     Eigen::Vector3d query_pose;
-    query_pose << 0.0, 0.01, M_PI/2;
+    query_pose << 0.0, 0.0, M_PI/2;
     int num_way_pts_perseg = 100;
 
     multi_action_planner.Plan(query_pose, num_way_pts_perseg, &action_id, 
@@ -289,16 +289,17 @@ class RobotPlanRunner {
 
     double cur_time = 0.0;
     int index = 0;
+    std::cout << "start pose" << pose0.translation().transpose() << std::endl;
     for (int id_traj = 0; id_traj < num_action_segs; ++id_traj) {
       Eigen::Matrix<double, Eigen::Dynamic, 3> pusher_poses = all_pusher_poses[id_traj];
       int num_way_points = pusher_poses.rows();
       for (int i = 0; i < num_way_points; ++i) {
-        cur_time = cur_time + (i + 1) * dt;
+        cur_time = cur_time + dt;
         times[index] = cur_time;
         pos[index] = pose0.translation();
         pos[index](0, 0) += pusher_poses(i, 0);
         pos[index](1, 0) += pusher_poses(i, 1);
-        std::cout << index << " : " << pos[index](0, 0) << "," << pos[index](1, 0) << std::endl;
+        std::cout << index << " : " << cur_time <<"," << pos[index](0, 0) << "," << pos[index](1, 0) << std::endl;
         // std::cout << "jjz: pusher pose" << pusher_poses.row(i) << "\n";
         //std::cout << "jjz: object pose" << object_poses.row(i) << "\n";
 

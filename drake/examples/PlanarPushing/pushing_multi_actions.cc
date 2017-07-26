@@ -178,8 +178,8 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 			CheckPathAndGetPlannedCurveLength(cart_pose_start, 
 				sampled_pose_nodes_.row(sample_id).transpose(), 
 				action_id, &flag_feasible, &dist_edge);
-			std::cout << "try hop " << i << " " << dist_edge <<" , " 
-			<<  shortest_distances_[i] << " " << dist_edge + shortest_distances_[i] << std::endl; 
+			//std::cout << "try hop " << i << " " << dist_edge <<" , " 
+			//<<  shortest_distances_[i] << " " << dist_edge + shortest_distances_[i] << std::endl; 
 			if (dist_edge + shortest_distances_[i] < dist) {
 				best_hopping_node_id = i;
 				dist = dist_edge + shortest_distances_[i];
