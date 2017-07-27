@@ -36,7 +36,7 @@ namespace {
 
 const char* const kLcmStatusChannel = "IIWA_STATUS";
 const char* const kLcmCommandChannel = "IIWA_COMMAND";
-const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
+//const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
 
 constexpr double kUninitTime = -1.0;
 const std::string kPath =
@@ -46,7 +46,7 @@ const std::string kEEName = "iiwa_link_7";
 const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
 
 const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
-Isometry3<double> X_ET(R_ET);
+const Isometry3<double> X_ET(R_ET);
 
 class IiwaState {
  public:
@@ -139,7 +139,8 @@ class RobotPlanRunner {
       : jaco_planner_(model_path, end_effector_name, X_WB),
         robot_(jaco_planner_.get_robot()) {
     VerifyIiwaTree(robot_);
-    lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
+    lcm::Subscription* sub = lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
+    sub->setQueueCapacity(1);
   }
 
   PiecewisePolynomial<double> SplineToDesiredConfiguration(
@@ -152,9 +153,8 @@ class RobotPlanRunner {
     return PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
   }
 
-  VectorX<double> PointIk(const Isometry3<double>& pose) const {
-    std::cout << "PointIk: " << pose.translation().transpose() << "\n";
-    std::cout << pose.linear() << "\n";
+  VectorX<double> PointIk(const Isometry3<double>& X_WE) const {
+    std::cout << "PointIk: desired pose:\n" << X_WE.matrix() << "\n\n";
 
     std::vector<RigidBodyConstraint*> constraint_array;
     RigidBodyTree<double>* cao_robot = (RigidBodyTree<double>*)&robot_;
@@ -163,8 +163,8 @@ class RobotPlanRunner {
 
     Vector3<double> pos_tol(0.001, 0.001, 0.001);
     double rot_tol = 0.001;
-    Vector3<double> pos_lb = pose.translation() - pos_tol;
-    Vector3<double> pos_ub = pose.translation() + pos_tol;
+    Vector3<double> pos_lb = X_WE.translation() - pos_tol;
+    Vector3<double> pos_ub = X_WE.translation() + pos_tol;
 
     WorldPositionConstraint pos_con(cao_robot, jaco_planner_.get_end_effector().get_body_index(),
         Vector3<double>::Zero(), pos_lb, pos_ub,
@@ -174,7 +174,7 @@ class RobotPlanRunner {
 
     // Adds a rotation constraint.
     WorldQuatConstraint quat_con(cao_robot, jaco_planner_.get_end_effector().get_body_index(),
-        math::rotmat2quat(pose.linear()), rot_tol,
+        math::rotmat2quat(X_WE.linear()), rot_tol,
         Vector2<double>::Zero());
     constraint_array.push_back(&quat_con);
 
@@ -225,9 +225,11 @@ class RobotPlanRunner {
                                                               rot_traj);
   }
 
-  // Returned stuff is in Goal frame. 0 is origin of Goal frame, orientation is world aligned.
+  // Returned stuff is in ZZJ's Goal frame. 0 is origin of Goal frame.
   manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTrajMultiAction(
-      const Vector3<double>& x_GQ, double duration) const {
+      const Vector3<double>& x_ZQ, double duration) const {
+    std::cout << "x_ZQ " << x_ZQ.transpose() << "\n";
+
     double height = 0.234;
     double width = 0.178;
     double rho = width / 4;
@@ -247,10 +249,12 @@ class RobotPlanRunner {
               -width/2, 0,
               0, height/2,
               width/2, 0;
+    // jjz
     normal_pts << 0, 1,
                   1, 0,
                   0, -1,
                   -1, 0;
+
     std::vector<Eigen::Vector2d> all_contact_points;
     std::vector<Eigen::Vector2d> all_normals;
     for (int i = 0; i < ct_pts.rows(); ++i) {
@@ -278,7 +282,7 @@ class RobotPlanRunner {
     int num_way_pts_perseg = 100;
     ////////////////////////////////////////////
 
-    multi_action_planner.Plan(x_GQ, num_way_pts_perseg, &action_id,
+    multi_action_planner.Plan(x_ZQ, num_way_pts_perseg, &action_id,
         &all_object_poses, &all_pusher_poses);
 
     int num_action_segs = all_object_poses.size();
@@ -305,13 +309,14 @@ class RobotPlanRunner {
         times[index] = cur_time;
         pos[index](0, 0) = pusher_poses(i, 0);
         pos[index](1, 0) = pusher_poses(i, 1);
-        std::cout << index << " : " << cur_time <<"," << pos[index](0, 0) << "," << pos[index](1, 0) << std::endl;
+        // std::cout << index << " : " << cur_time <<"," << pos[index](0, 0) << "," << pos[index](1, 0) << std::endl;
         // std::cout << "jjz: pusher pose" << pusher_poses.row(i) << "\n";
         //std::cout << "jjz: object pose" << object_poses.row(i) << "\n";
 
         // sfeng thinks jjz's angle is somehow 90 deg off from me.
-        Matrix3<double> X_GT(AngleAxis<double>(pusher_poses(i, 2), Vector3<double>::UnitZ()));
-        rot[index] = Quaternion<double>(X_GT);
+        std::cout << "t: " << cur_time << ", pose " << pusher_poses.row(i) << "\n";
+        Matrix3<double> X_ZT(AngleAxis<double>(pusher_poses(i, 2), Vector3<double>::UnitZ()));
+        rot[index] = Quaternion<double>(X_ZT);
         ++index;
       }
       if (id_traj < num_action_segs - 1) {
@@ -330,8 +335,9 @@ class RobotPlanRunner {
         Eigen::Vector3d nxt_push_pose = all_pusher_poses[id_traj + 1].row(0).transpose();
         pos[index](0, 0) = nxt_push_pose(0);
         pos[index](1, 0) = (nxt_push_pose(1) + dist_lift_up);
-        Matrix3<double> X_GT(AngleAxis<double>(nxt_push_pose(2), Vector3<double>::UnitZ()));
-        rot[index] = Quaternion<double>(X_GT);
+        std::cout << "t: " << cur_time << ", pose " << nxt_push_pose.transpose() << "\n";
+        Matrix3<double> X_ZT(AngleAxis<double>(nxt_push_pose(2), Vector3<double>::UnitZ()));
+        rot[index] = Quaternion<double>(X_ZT);
         index++;
         // The robot then moves down to the next pushing location.
         cur_time = cur_time + time_move_down;
@@ -464,20 +470,45 @@ class RobotPlanRunner {
     X_WG.translation() = Vector3<double>(0.47, 0., 0.06);
 
     // Starting point.
-    Vector3<double> x_GQ(0.1, 0, 0);
-    //Vector3<double> x_GQ(0, 0, M_PI / 2.);
+    // Vector3<double> x_GQ(0.1, 0, 0);
+    Vector3<double> x_GQ(0, 0, M_PI / 2.);
     Isometry3<double> X_GQ = Isometry3<double>::Identity();
     X_GQ.linear() = AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
     X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
     Isometry3<double> X_WQ = X_WG * X_GQ;
-    VectorX<double> q1 = PointIk(X_WQ * X_ET.inverse());
 
-    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
+    std::cout << "X_GQ:\n" << X_GQ.matrix() << "\n\n";
+
+    Isometry3<double> X_WE0 = X_WQ * X_ET.inverse();
+    VectorX<double> q1 = PointIk(X_WE0);
+
+    Eigen::Transform<double, 2, Eigen::Affine> X2_GQ;
+    X2_GQ.linear() = Eigen::Rotation2Dd(x_GQ(2)).matrix();
+    X2_GQ.translation() = x_GQ.head<2>();
+
+    Eigen::Transform<double, 2, Eigen::Affine> X2_GZ = Eigen::Transform<double, 2, Eigen::Affine>::Identity();
+    X2_GZ.linear() = Eigen::Rotation2Dd(-M_PI / 2.).matrix();
+    Eigen::Transform<double, 2, Eigen::Affine> X2_ZQ = X2_GZ.inverse() * X2_GQ;
+
+    Vector3<double> x_ZQ;
+    x_ZQ.head<2>() = X2_ZQ.translation();
+    x_ZQ(2) = Eigen::Rotation2Dd(X2_ZQ.linear()).angle();
+
+    ee_traj = PlanPlanarPushingTrajMultiAction(x_ZQ, 5);
+    // double wall_clock0 = get_time();
+
+    getchar();
+
+    // VERY IMPORTANT HACK
+    for (int i = 0; i < 5; i++) {
+      while (0 >= lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
+      }
+    }
 
     while (true) {
       // Call lcm handle until at least one status message is
       // processed.
-      while (0 == lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
+      while (0 >= lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
       }
 
       // No new states.
@@ -505,7 +536,7 @@ class RobotPlanRunner {
 
           q_cmd = traj.value(state.get_time());
 
-          if (state.get_time() - state_t0 > 15) {
+          if (state.get_time() - state_t0 > 5.1) {
             STATE = JACOBI;
             state_init = true;
           }
@@ -547,8 +578,13 @@ class RobotPlanRunner {
 
           double interp_t = state.get_time() - state_t0;
           // double interp_t = std::fmod((state.get_time() - state_t0), period);
+          const Isometry3<double> X_ZT = ee_traj.get_pose(interp_t);
+          const Isometry3<double> X_GZ(AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
+          const Isometry3<double> X_GT = X_GZ * X_ZT;
 
-          const Isometry3<double> X_WE_d = X_WG * ee_traj.get_pose(interp_t) * X_ET.inverse();
+          const Isometry3<double> X_WT_d = X_WG * X_GT;
+          std::cout << "tool:\n" << X_WT_d.matrix() << "\n\n";
+          const Isometry3<double> X_WE_d = X_WT_d * X_ET.inverse();
 
           Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
               cc, jaco_planner_.get_end_effector());
@@ -556,6 +592,8 @@ class RobotPlanRunner {
           Vector6<double> V_WE_d =
               jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, X_WE_d) /
               control_dt;
+
+          std::cout << "dt: " << control_dt << "  " << V_WE_d.transpose() << "\n";
 
           VectorX<double> v = jaco_planner_.ComputeDofVelocity(
               cc, V_WE_d, q_nominal, control_dt);
@@ -576,7 +614,7 @@ class RobotPlanRunner {
         }
       }
 
-      double wall_clock = get_time();
+      // double wall_clock = get_time() - wall_clock0;
       // Make cmd msg.
       iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
       // iiwa_command.wall_time = static_cast<int64_t>(wall_clock * 1e6);
@@ -585,6 +623,7 @@ class RobotPlanRunner {
       }
       lcm_.publish(kLcmCommandChannel, &iiwa_command);
 
+      /*
       // Make debug msg.
       ctrl_debug.utime = static_cast<int64_t>(state.get_time() * 1e6);
       if (ctrl_debug.wall_time == -1) {
@@ -602,6 +641,7 @@ class RobotPlanRunner {
       eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
       eigenVectorToCArray(q_cmd, ctrl_debug.q1);
       lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
+      */
     }
   }
 
