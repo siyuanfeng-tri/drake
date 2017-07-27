@@ -191,6 +191,46 @@ drake_cc_binary(
     ],
 )
 
+drake_cc_binary(
+    name = "kuka_camera_calibrate",
+    srcs = ["kuka_camera_calibrate.cc"],
+    data = [
+        ":models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":iiwa_common",
+        ":iiwa_lcm",
+        "//drake/common:find_resource",
+        "//drake/multibody:inverse_kinematics",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
+drake_cc_binary(
+    name = "jjz_controller",
+    srcs = ["jjz_controller.cc"],
+    data = [
+        ":models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":iiwa_common",
+        ":iiwa_lcm",
+        "//drake/examples/PlanarPushing:planar_pushing",
+        "//drake/lcmtypes:jjz_controller",
+        "//drake/multibody:inverse_kinematics",
+        "//drake/manipulation/planner:jacobian_ik",
+        "//drake/manipulation/util:trajectory_utils",
+        "//drake/common:find_resource",
+        "//drake/util:util",
+        "//drake/util:lcm_util",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
 # === test/ ===
 
 drake_cc_googletest(

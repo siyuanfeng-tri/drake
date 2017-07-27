@@ -24,6 +24,19 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "jacobian_ik",
+    srcs = ["jacobian_ik.cc"],
+    hdrs = ["jacobian_ik.h"],
+    deps = [
+        "//drake/common/trajectories:piecewise_polynomial_trajectory",
+        "//drake/multibody:inverse_kinematics",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/parsers",
+    ],
+)
+
+
 # === test/ ===
 
 drake_cc_googletest(
@@ -41,6 +54,22 @@ drake_cc_googletest(
     deps = [
         ":constraint_relaxing_ik",
         "//drake/common:find_resource",
+    ],
+)
+
+drake_cc_googletest(
+    name = "jacobian_ik_test",
+    size = "medium",
+    srcs = ["test/jacobian_ik_test.cc"],
+    data = [
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    tags = ["snopt"],
+    deps = [
+        ":constraint_relaxing_ik",
+        ":jacobian_ik",
+        "//drake/common:find_resource",
+        "//drake/manipulation/util:simple_tree_visualizer",
     ],
 )
 

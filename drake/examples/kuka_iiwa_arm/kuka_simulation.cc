@@ -125,12 +125,19 @@ int DoMain() {
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
+  const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
+  const Isometry3<double> X_ET =
+      Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) *
+      Isometry3<double>(R_ET);
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_link_ee", tree.FindBody("iiwa_link_ee"),
-                             Isometry3<double>::Identity()));
+      RigidBodyFrame<double>("iiwa_tool", tree.FindBody("iiwa_link_7"), X_ET));
+  Isometry3<double> X_WG = Isometry3<double>::Identity();
+  X_WG.linear() = AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ())
+                      .toRotationMatrix();
+  X_WG.translation() = Vector3<double>(0.5, 0.2, 0.0);
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_link_7", tree.FindBody("iiwa_link_7"),
-                             Isometry3<double>::Identity()));
+      RigidBodyFrame<double>("goal", tree.FindBody("world"), X_WG));
+
   auto frame_viz = base_builder->AddSystem<systems::FrameVisualizer>(
       &tree, local_transforms, &lcm);
   base_builder->Connect(plant->get_output_port(0),
@@ -144,11 +151,21 @@ int DoMain() {
   lcm.StartReceiveThread();
   simulator.set_publish_every_time_step(false);
   simulator.Initialize();
+  simulator.set_target_realtime_rate(1.0);
+
+  VectorX<double> q0 = tree.getZeroConfiguration();
+
+  Context<double>& plant_context =
+      sys->GetMutableSubsystemContext(*plant, simulator.get_mutable_context());
+  systems::VectorBase<double>* plant_q0 =
+      plant_context.get_mutable_continuous_state()
+          ->get_mutable_generalized_position();
+  plant_q0->SetFromVector(q0);
 
   command_receiver->set_initial_position(
       &sys->GetMutableSubsystemContext(*command_receiver,
                                        simulator.get_mutable_context()),
-      VectorX<double>::Zero(tree.get_num_positions()));
+      q0);
 
   // Simulate for a very long time.
   simulator.StepTo(FLAGS_simulation_sec);

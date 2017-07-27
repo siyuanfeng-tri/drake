@@ -5,6 +5,7 @@
 #include "drake/common/drake_assert.h"
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
+#include "drake/util/drakeUtil.h"
 
 namespace drake {
 namespace examples {
@@ -205,6 +206,7 @@ void IiwaStatusSender::OutputStatus(
   lcmt_iiwa_status& status = *output;
 
   status.utime = context.get_time() * 1e6;
+  // status.wall_time = get_time() * 1e6;
   const systems::BasicVector<double>* command =
       this->EvalVectorInput(context, 0);
   const systems::BasicVector<double>* state =
