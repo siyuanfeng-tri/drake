@@ -467,7 +467,7 @@ void ParseCollision(RigidBody<double>* body, XMLElement* node,
         body->get_name() + " has a collision element without geometry");
   }
 
-  DrakeCollision::Element element(T_element_to_link, body);
+  drake::multibody::collision::Element element(T_element_to_link, body);
   if (!ParseGeometry(geometry_node, package_map, root_dir, element)) {
     throw runtime_error(string(__FILE__) + ": " + __func__ + ": ERROR: Failed "
         "to parse collision element in link " + body->get_name() + ".");
@@ -535,7 +535,8 @@ template <typename JointType>
 void SetDynamics(XMLElement* node, FixedAxisOneDoFJoint<JointType>* fjoint) {
   XMLElement* dynamics_node = node->FirstChildElement("dynamics");
   if (fjoint != nullptr && dynamics_node) {
-    double damping = 0.0, coulomb_friction = 0.0, coulomb_window = 0.0;
+    double damping = 0.0, coulomb_friction = 0.0;
+    double coulomb_window = std::numeric_limits<double>::epsilon();
     parseScalarAttribute(dynamics_node, "damping", damping);
     parseScalarAttribute(dynamics_node, "friction", coulomb_friction);
     parseScalarAttribute(dynamics_node, "coulomb_window", coulomb_window);

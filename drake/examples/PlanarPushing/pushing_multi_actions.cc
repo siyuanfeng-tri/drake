@@ -3,6 +3,12 @@
 #include <random>
 #define CHECKCONSTRAINT
 
+
+MultiPushActionsPlanner::MultiPushActionsPlanner(std::string file_name) {
+	std::ifstream in(file_name);
+	Deserialize(in);
+	in.close();
+}
 MultiPushActionsPlanner::MultiPushActionsPlanner(
 	std::vector<Eigen::Vector2d> all_contact_points, 
 	std::vector<Eigen::Vector2d> all_contact_normals, double mu, double ls_a, 
@@ -282,5 +288,67 @@ void MultiPushActionsPlanner::ConstructAllPathSegments(
 }
 
 
+void MultiPushActionsPlanner::Serialize(std::ofstream& out) {
+	out << num_actions_ << std::endl;
+	for (int i = 0; i < num_actions_; ++i) {
+		action_planners_[i].Serialize(out);
+	}
+	for (int i = 0; i < 3; ++i) {
+		out << goal_pose_[i] << std::endl;
+	}
+	out << ls_a_ << " " << ls_b_ << " "  << mu_ << " " << std::endl;
+	
+	out << workspace_min_x_ << " " << workspace_max_x_ << " " 
+			<< workspace_min_y_ << " " << workspace_max_y_ << " " << std::endl;
+	out << cost_switch_action_ << std::endl;
+	out << num_sample_nodes_ << " " << num_expanded_nodes_ << std::endl;
+	for (int i = 0; i < num_sample_nodes_; ++i) {
+		out << sampled_pose_nodes_.row(i) << std::endl;
+	}
+	for (int i = 0; i < num_expanded_nodes_; ++i) {
+		out << nxt_index_[i] << " ";
+	}
+	out << std::endl;
+	for (int i = 0; i < num_expanded_nodes_; ++i) {
+		out << shortest_distances_[i] << " ";
+	}
+	out << std::endl;
+}
 
+void MultiPushActionsPlanner::Deserialize(std::ifstream& in) {
+	in >> num_actions_;
+	action_planners_.clear();
+	action_planners_.resize(num_actions_);
+	for (int i = 0; i < num_actions_; ++i) {
+
+		action_planners_[i].Deserialize(in);
+	}
+	for (int i = 0; i < 3; ++i) {
+		in >> goal_pose_[i];
+	}
+	in >> ls_a_;
+	in >> ls_b_;
+	in >> mu_;
+	in >> workspace_min_x_;
+	in >> workspace_max_x_;
+	in >> workspace_min_y_;
+	in >> workspace_max_y_;
+	in >> cost_switch_action_;
+	in >> num_sample_nodes_;
+	in >> num_expanded_nodes_;
+	sampled_pose_nodes_.resize(num_sample_nodes_, 3);
+	for (int i = 0; i < num_sample_nodes_; ++i) {
+		for (int j = 0; j < 3; ++j) {
+			in >> sampled_pose_nodes_(i, j);
+		}
+	}
+	nxt_index_.resize(num_expanded_nodes_);
+	for (int i = 0; i < num_expanded_nodes_; ++i) {
+		in >> nxt_index_[i];
+	}
+	shortest_distances_.resize(num_expanded_nodes_);
+	for (int i = 0; i < num_expanded_nodes_; ++i) {
+		in >> shortest_distances_[i];
+	}
+}
 

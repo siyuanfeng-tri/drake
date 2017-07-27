@@ -20,11 +20,12 @@ drake_cc_library(
     ],
     deps = [
         "//drake/common:eigen_matrix_compare",
+        "//drake/common:find_resource",
         "//drake/multibody:global_inverse_kinematics",
         "//drake/multibody:inverse_kinematics",
         "//drake/multibody:rigid_body_tree_construction",
         "//drake/multibody/parsers",
-        "@gtest//:main",
+        "@gtest//:without_main",
     ],
 )
 
@@ -64,6 +65,19 @@ drake_cc_googletest(
         "//drake/manipulation/models/iiwa_description:models",
     ],
     # Excluding because an assertion fails in LLVM code. Issue #6179.
+    tags = gurobi_test_tags() + ["no_tsan"],
+    deps = [
+        ":global_inverse_kinematics_test_util",
+    ],
+)
+
+drake_cc_googletest(
+    name = "global_inverse_kinematics_feasible_posture_test",
+    size = "large",
+    srcs = ["test/global_inverse_kinematics_feasible_posture_test.cc"],
+    data = [
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
     tags = gurobi_test_tags() + ["no_tsan"],
     deps = [
         ":global_inverse_kinematics_test_util",

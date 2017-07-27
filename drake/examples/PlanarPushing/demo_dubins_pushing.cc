@@ -1,6 +1,7 @@
 #include "drake/examples/PlanarPushing/dubins_interface.h"
 #include "drake/examples/PlanarPushing/pushing_multi_actions.h"
 #include <iostream>
+#include <fstream>
 #include <ctime>
 
 int main() {
@@ -8,7 +9,7 @@ int main() {
   double width = 0.178;
   //double height = 0.05;
   //double width = 0.04;
-  double rho = width / 2;
+  double rho = width / 4;
 
   // Limit surface A_11. If you are unsure, just set it to be 1. 
   double ls_a = 1;
@@ -63,7 +64,7 @@ int main() {
   multi_action_planner.SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
   //int nd = 5;
   //int num_samples_se2 = nd * nd * nd;
-  int num_samples_se2 = 300;
+  int num_samples_se2 = 100;
   double switching_action_cost = 0.05;
   multi_action_planner.SetGraphSize(num_samples_se2);
   multi_action_planner.SetActionSwitchCost(switching_action_cost);
@@ -94,6 +95,21 @@ int main() {
     for (unsigned j = 0; j < all_object_poses[i].rows(); ++j) {
       std::cout << all_object_poses[i].row(j) << std::endl;
     }
-
   }
+  std::string file_output = "test_output.txt";
+  std::ofstream out(file_output);
+  multi_action_planner.Serialize(out);
+  out.close();
+  MultiPushActionsPlanner multi_action_planner_load_test(file_output);
+  std::cout << "Load file test" << std::endl;
+  multi_action_planner_load_test.Plan(query_pose, num_way_pts_perseg, &action_id, 
+      &all_object_poses, &all_pusher_poses);
+  
+  std::string file_output2 = "test_output_loaded.txt";
+  std::ofstream out2(file_output2);
+  multi_action_planner_load_test.Serialize(out2);
+  out2.close();
+  
+  //multi_action_planner_load_test.Deserialize(in);
+  //in.close();
 }

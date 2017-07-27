@@ -1,5 +1,6 @@
 #include "dubins_interface.h"
 #include <limits>
+
 int num_samples = 1;
 int ind_data = 0;
 int StoreData(double q[3], double x, void* user_data) {
@@ -24,8 +25,8 @@ DubinsPushPlanner::DubinsPushPlanner(Eigen::Vector2d contact_point,
 
   ls_a_ = ls_a;
   ls_b_ = ls_b;
-  unit_length_ = ls_a_ / ls_b_;
   mu_ = mu;
+
 
   // Compute all relevant parameters through the reduction logic.
   DubinsReduction();
@@ -34,6 +35,7 @@ DubinsPushPlanner::DubinsPushPlanner(Eigen::Vector2d contact_point,
 DubinsPushPlanner::~DubinsPushPlanner() {}
 
 void DubinsPushPlanner::DubinsPushPlanner::DubinsReduction() {
+  unit_length_ = ls_a_ / ls_b_;
   ComputeFrictionCone();
   ComputeCenterOfRearAxleAndTurningRadius();
   ComputeDubinsFrame();
@@ -274,4 +276,23 @@ Eigen::Isometry2d DubinsPushPlanner::ConvertPoseVectorToSE3(
   tf.translation() = pose_vector.head(2);
   tf.linear() = Eigen::Rotation2D<double>(pose_vector(2)).toRotationMatrix();
   return tf;
+}
+
+void DubinsPushPlanner::Serialize(std::ofstream& out) {
+  out << contact_point_ << std::endl;
+  out << contact_normal_ << std::endl;
+  out << ls_a_ << " " << ls_b_ << " " << mu_ << std::endl;
+}
+
+void DubinsPushPlanner::Deserialize(std::ifstream& in) {
+  for (int i = 0; i < 2; ++i) {
+    in >> contact_point_[i];
+  }
+  for (int i = 0; i < 2; ++i) {
+    in >> contact_normal_[i];
+  }
+  in >> ls_a_;
+  in >> ls_b_;
+  in >> mu_;
+  DubinsReduction();
 }

@@ -23,10 +23,11 @@ namespace kuka_iiwa_arm {
 /// `OracularStateEstimation` systems are coupled with the output of the
 /// `systems::RigidBodyPlant`. The resulting diagram exposes input ports for
 /// the IIWA state and acceleration (for the
-/// `systems::InverseDynamicsController` of the IIWA robot), WSG (for the
-/// `systems::PidController` for the Schunk WSG Gripper) and output ports for
-/// IIWA state, WSG state, the complete `systems::RigidBodyPlant` state
-/// messages for the IIWA robot and an object for manipulation.
+/// `systems::InverseDynamicsController` of the IIWA robot), WSG
+/// (directly feeds through to the actuator for the Schunk WSG
+/// Gripper) and output ports for IIWA state, WSG state, the complete
+/// `systems::RigidBodyPlant` state messages for the IIWA robot and an
+/// object for manipulation.
 ///
 /// This class is explicitly instantiated for the following scalar type(s). No
 /// other scalar types are supported.
@@ -97,8 +98,8 @@ class IiwaAndWsgPlantWithStateEstimator : public systems::Diagram<T> {
   OracularStateEstimation<T>* iiwa_state_est_{nullptr};
   OracularStateEstimation<T>* box_state_est_{nullptr};
   std::unique_ptr<RigidBodyTree<T>> object_{nullptr};
-  systems::InverseDynamicsController<T>* iiwa_controller_{nullptr};
-  systems::PidController<T>* wsg_controller_{nullptr};
+  systems::controllers::InverseDynamicsController<T>* iiwa_controller_{nullptr};
+  systems::controllers::PidController<T>* wsg_controller_{nullptr};
   systems::RigidBodyPlant<T>* plant_{nullptr};
 
   int input_port_iiwa_state_command_{-1};

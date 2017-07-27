@@ -3,6 +3,7 @@
 #include "drake/examples/PlanarPushing/dubins.h"
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 #include "drake/common/eigen_types.h"
@@ -21,6 +22,7 @@
 class DubinsPushPlanner {
  public:
   // Construct the class and set parameters for reduction.
+  DubinsPushPlanner(){};
   DubinsPushPlanner(Eigen::Vector2d contact_point,
                     Eigen::Vector2d contact_normal, double mu, double ls_a,
                     double ls_b);
@@ -38,6 +40,10 @@ class DubinsPushPlanner {
   // it's faster. 
   double GetPlannedDubinsCurveLength(const Eigen::Vector3d cart_pose_start,
                                      const Eigen::Vector3d cart_pose_goal);
+
+  void Serialize(std::ofstream& out);
+  void Deserialize(std::ifstream& in);
+
 
  private:
   // Compute the dubins frame (at the differential flat output point akin to

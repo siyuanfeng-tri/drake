@@ -6,9 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include "drake/common/symbolic_environment.h"
-#include "drake/common/symbolic_expression.h"
-#include "drake/common/symbolic_variable.h"
+#include "drake/common/symbolic.h"
 #include "drake/common/test/symbolic_test_util.h"
 
 using std::function;
@@ -105,6 +103,10 @@ TEST_F(SymbolicExpansionTest, ExpressionExpansion) {
 
   vector<pair<Expression, Expression>> test_exprs;
 
+  // (2xy²)² = 4x²y⁴
+  test_exprs.emplace_back(pow(2 * x_ * y_ * y_, 2),
+                          4 * pow(x_, 2) * pow(y_, 4));
+
   //   5 * (3 + 2y) + 30 * (7 + x_)
   // = 15 + 10y + 210 + 30x
   // = 225 + 30x + 10y
@@ -196,6 +198,8 @@ TEST_F(SymbolicExpansionTest, MathFunctions) {
   contexts.push_back([&](const Expression& x) { return min(y_, x); });
   contexts.push_back([&](const Expression& x) { return max(x, z_); });
   contexts.push_back([&](const Expression& x) { return max(z_, x); });
+  contexts.push_back([](const Expression& x) { return ceil(x); });
+  contexts.push_back([](const Expression& x) { return floor(x); });
   contexts.push_back([&](const Expression& x) { return atan2(x, y_); });
   contexts.push_back([&](const Expression& x) { return atan2(y_, x); });
 
@@ -235,14 +239,14 @@ TEST_F(SymbolicExpansionTest, UninterpretedFunction) {
 }
 
 TEST_F(SymbolicExpansionTest, DivideByConstant) {
-  // (x) / 2 => x / 2  (no simplification)
-  EXPECT_PRED2(ExprEqual, (x_ / 2).Expand(), x_ / 2);
+  // (x) / 2 => 0.5 * x
+  EXPECT_PRED2(ExprEqual, (x_ / 2).Expand(), 0.5 * x_);
 
   // 3 / 2 => 3 / 2  (no simplification)
   EXPECT_PRED2(ExprEqual, (Expression(3.0) / 2).Expand(), 3.0 / 2);
 
-  // pow(x, y) / 2 => pow(x, y) / 2  (no simplification)
-  EXPECT_PRED2(ExprEqual, (pow(x_, y_) / 2).Expand(), pow(x_, y_) / 2);
+  // pow(x, y) / 2 => 0.5 * pow(x, y)
+  EXPECT_PRED2(ExprEqual, (pow(x_, y_) / 2).Expand(), 0.5 * pow(x_, y_));
 
   // (2x) / 2 => x
   EXPECT_PRED2(ExprEqual, ((2 * x_) / 2).Expand(), x_);

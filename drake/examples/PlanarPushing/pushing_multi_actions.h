@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dubins_interface.h"
-
+#include <fstream>
 // This class implements a planning logic that finds the best sequence of push
 // actions to push from a given initial pose to the origin pose (0,0,0).
 // Note that proper coordinate transformation needs to be applied such that the
@@ -24,6 +24,8 @@
 
 class MultiPushActionsPlanner {
  public:
+ 	MultiPushActionsPlanner(){};
+ 	MultiPushActionsPlanner(std::string file_name);
 	// Initialize with given contact points, normals, coefficient of contact 
 	// friction, limit surface paramters. 
 	MultiPushActionsPlanner(std::vector<Eigen::Vector2d> all_contact_points,
@@ -48,6 +50,8 @@ class MultiPushActionsPlanner {
 		 std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
 		 std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses);
 
+	void Serialize(std::ofstream& out);
+	void Deserialize(std::ifstream& in);
    
 
  private:

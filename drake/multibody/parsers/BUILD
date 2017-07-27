@@ -30,7 +30,6 @@ drake_cc_library(
         "xml_util.h",
     ],
     deps = [
-        "//drake/common:drake_path",
         "//drake/multibody:rigid_body_tree",
         "//drake/thirdParty:spruce",
         "//drake/thirdParty:tinydir",
@@ -46,6 +45,7 @@ drake_cc_googletest(
     ],
     deps = [
         ":parsers",
+        "//drake/common:find_resource",
     ],
 )
 
@@ -73,7 +73,7 @@ drake_cc_googletest(
     srcs = ["test/urdf_parser_test/urdf_parser_test.cc"],
     data = [
         ":test_models",
-        "//drake/examples/Atlas:models",
+        "//drake/examples/atlas:models",
     ],
     deps = [
         ":parsers",
