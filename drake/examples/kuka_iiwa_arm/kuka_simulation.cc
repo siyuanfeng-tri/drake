@@ -90,18 +90,10 @@ int DoMain() {
         iiwa_kd.head(kIiwaArmNumJoints);
   }
 
-<<<<<<< HEAD
-  auto controller =
-      builder.AddController<systems::InverseDynamicsController<double>>(
-          RigidBodyTreeConstants::kFirstNonWorldModelInstanceId, tree.Clone(),
-          iiwa_kp, iiwa_ki, iiwa_kd,
-          false /* without feedforward acceleration */);
-=======
   auto controller = builder.AddController<
       systems::controllers::InverseDynamicsController<double>>(
       RigidBodyTreeConstants::kFirstNonWorldModelInstanceId, tree.Clone(),
       iiwa_kp, iiwa_ki, iiwa_kd, false /* without feedforward acceleration */);
->>>>>>> 09fbbf8ed28f1495a91665f169a94625fc793b97
 
   // Create the command subscriber and status publisher.
   systems::DiagramBuilder<double>* base_builder = builder.get_mutable_builder();
@@ -130,13 +122,13 @@ int DoMain() {
                         status_sender->get_command_input_port());
   base_builder->Connect(status_sender->get_output_port(0),
                         status_pub->get_input_port(0));
-<<<<<<< HEAD
-=======
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
   const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
-  const Isometry3<double> X_ET = Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) * Isometry3<double>(R_ET);
+  const Isometry3<double> X_ET =
+      Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) *
+      Isometry3<double>(R_ET);
   local_transforms.push_back(
       RigidBodyFrame<double>("iiwa_tool", tree.FindBody("iiwa_link_7"), X_ET));
   Isometry3<double> X_WG = Isometry3<double>::Identity();
@@ -152,7 +144,6 @@ int DoMain() {
                         frame_viz->get_input_port(0));
   frame_viz->set_publish_period(kIiwaLcmStatusPeriod);
 
->>>>>>> 09fbbf8ed28f1495a91665f169a94625fc793b97
   auto sys = builder.Build();
 
   Simulator<double> simulator(*sys);
