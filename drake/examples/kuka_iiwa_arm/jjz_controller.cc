@@ -30,6 +30,8 @@
 #include "drake/multibody/ik_options.h"
 #include "drake/multibody/rigid_body_ik.h"
 
+#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
@@ -45,9 +47,6 @@ const std::string kPath =
     "iiwa14_polytope_collision.urdf";
 const std::string kEEName = "iiwa_link_7";
 const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
-
-const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
-const Isometry3<double> X_ET = Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) * Isometry3<double>(R_ET);
 
 class IiwaState {
  public:
@@ -138,7 +137,7 @@ class RobotPlanRunner {
                   const Isometry3<double>& X_WB)
       : jaco_planner_(model_path, X_WB),
         robot_(jaco_planner_.get_robot()),
-        frame_T_("tool", robot_.FindBody(kEEName), X_ET) {
+        frame_T_("tool", robot_.FindBody(kEEName), jjz::X_ET) {
     VerifyIiwaTree(robot_);
     lcm::Subscription* sub =
         lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
@@ -279,7 +278,7 @@ class RobotPlanRunner {
       // xmin = -0.2; xmax = 0.2; ymin = -0.2; ymax = 0.2;
       multi_action_planner->SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
 
-      int num_samples_se2 = 500;
+      int num_samples_se2 = 100;
       // int num_samples_se2 = 100;
       double switching_action_cost = 0.05;
       multi_action_planner->SetGraphSize(num_samples_se2);
@@ -391,6 +390,7 @@ class RobotPlanRunner {
     return traj;
   }
 
+  /*
   manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTraj(
       const Isometry3<double>& pose0, double duration) const {
     // Limit surface A_11.
@@ -435,7 +435,7 @@ class RobotPlanRunner {
       // sfeng thinks jjz's angle is somehow 90 deg off from me.
       Matrix3<double> X_WT(
           AngleAxis<double>(object_poses(i, 2), Vector3<double>::UnitZ()));
-      Matrix3<double> X_WE = X_WT * R_ET.transpose();
+      Matrix3<double> X_WE = X_WT * jjz::R_ET.transpose();
       rot[i] = Quaternion<double>(X_WE);
     }
 
@@ -446,6 +446,7 @@ class RobotPlanRunner {
 
     return traj;
   }
+  */
 
   Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose) const {
     Eigen::Matrix<double, 7, 1> ret;
@@ -496,12 +497,6 @@ class RobotPlanRunner {
     VectorX<double> q_nominal = robot_.getZeroConfiguration();
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
-    // Goal point.
-    Isometry3<double> X_WG = Isometry3<double>::Identity();
-    X_WG.linear() = AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ())
-                        .toRotationMatrix();
-    X_WG.translation() = Vector3<double>(0.5, 0.2, 0.0);
-
     // Starting point.
     // Vector3<double> x_GQ(0.1, 0, 0);
     Vector3<double> x_GQ(0, 0, M_PI / 2.);
@@ -509,7 +504,6 @@ class RobotPlanRunner {
     X_GQ.linear() =
         AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
     X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
-    // Isometry3<double> X_WQ = X_WG * X_GQ;
 
     std::cout << "X_GQ:\n" << X_GQ.matrix() << "\n\n";
 
@@ -517,7 +511,7 @@ class RobotPlanRunner {
 
     //ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
 
-    VectorX<double> q1 = PointIk(X_WG * ee_traj.get_pose(0) * X_ET.inverse());
+    VectorX<double> q1 = PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
 
     // double wall_clock0 = get_time();
 
@@ -604,7 +598,7 @@ class RobotPlanRunner {
           // double interp_t = std::fmod((state.get_time() - state_t0), period);
           const Isometry3<double> X_GT = ee_traj.get_pose(interp_t);
 
-          const Isometry3<double> X_WT_d = X_WG * X_GT;
+          const Isometry3<double> X_WT_d = jjz::X_WG * X_GT;
           //std::cout << "tool:\n" << X_WT_d.matrix() << "\n\n";
           Isometry3<double> X_WT = robot_.CalcFramePoseInWorldFrame(
               cc, frame_T_);

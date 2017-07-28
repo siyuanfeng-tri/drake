@@ -30,6 +30,8 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/primitives/constant_vector_source.h"
 
+#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
 DEFINE_string(urdf, "", "Name of urdf to load");
@@ -125,18 +127,10 @@ int DoMain() {
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
-  const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
-  const Isometry3<double> X_ET =
-      Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) *
-      Isometry3<double>(R_ET);
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_tool", tree.FindBody("iiwa_link_7"), X_ET));
-  Isometry3<double> X_WG = Isometry3<double>::Identity();
-  X_WG.linear() = AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ())
-                      .toRotationMatrix();
-  X_WG.translation() = Vector3<double>(0.5, 0.2, 0.0);
+      RigidBodyFrame<double>("iiwa_tool", tree.FindBody("iiwa_link_7"), jjz::X_ET));
   local_transforms.push_back(
-      RigidBodyFrame<double>("goal", tree.FindBody("world"), X_WG));
+      RigidBodyFrame<double>("goal", tree.FindBody("world"), jjz::X_WG));
 
   auto frame_viz = base_builder->AddSystem<systems::FrameVisualizer>(
       &tree, local_transforms, &lcm);
