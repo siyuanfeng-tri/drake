@@ -39,7 +39,7 @@ namespace {
 
 const char* const kLcmStatusChannel = "IIWA_STATUS";
 const char* const kLcmCommandChannel = "IIWA_COMMAND";
-// const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
+const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
 
 const std::string kPath =
     "drake/manipulation/models/iiwa_description/urdf/"
@@ -433,6 +433,7 @@ class RobotPlanRunner {
     }
 
     Isometry3<double> X_WT_d, X_WT;
+    double wall_clock0 = get_time();
 
     while (true) {
       // Call lcm handle until at least one status message is
@@ -467,13 +468,11 @@ class RobotPlanRunner {
 
           q_cmd = traj.value(state.get_time());
 
-          /*
           if (state.get_time() - state_t0 > 5.1) {
             STATE = FORCE_SERVO;
             //STATE = JACOBI;
             state_init = true;
           }
-          */
 
           break;
         }
@@ -540,7 +539,6 @@ class RobotPlanRunner {
           aa.linear() = R_ET;
           tmp = pose_to_vec(X_WE * aa);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_ik);
-          eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
           */
 
           break;
@@ -583,6 +581,11 @@ class RobotPlanRunner {
             // notice the -
             X_WT_d.translation() -= force_i_gain * f_diff;
 
+            auto tmp = pose_to_vec(X_WT_d);
+            eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
+            tmp = pose_to_vec(X_WT);
+            eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
+
             Vector6<double> V_WT_d =
                 jaco_planner_.ComputePoseDiffInWorldFrame(X_WT, X_WT_d) /
                 control_dt;
@@ -598,7 +601,7 @@ class RobotPlanRunner {
         }
       }
 
-      // double wall_clock = get_time() - wall_clock0;
+      double wall_clock = get_time() - wall_clock0;
       // Make cmd msg.
       iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
       // iiwa_command.wall_time = static_cast<int64_t>(wall_clock * 1e6);
@@ -607,7 +610,6 @@ class RobotPlanRunner {
       }
       lcm_.publish(kLcmCommandChannel, &iiwa_command);
 
-      /*
       // Make debug msg.
       ctrl_debug.utime = static_cast<int64_t>(state.get_time() * 1e6);
       if (ctrl_debug.wall_time == -1) {
@@ -617,15 +619,16 @@ class RobotPlanRunner {
       }
       ctrl_debug.wall_time = static_cast<int64_t>(wall_clock * 1e6);
       ctrl_debug.dt = control_dt;
-      Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
-          state.get_cache(), jaco_planner_.get_end_effector());
-      auto tmp = pose_to_vec(X_WE);
+
+      Isometry3<double> X_WT = robot_.CalcFramePoseInWorldFrame(
+          state.get_cache(), frame_T_);
+      auto tmp = pose_to_vec(X_WT);
       eigenVectorToCArray(tmp, ctrl_debug.X_WE);
 
+      eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
       eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
       eigenVectorToCArray(q_cmd, ctrl_debug.q1);
       lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
-      */
     }
   }
 
