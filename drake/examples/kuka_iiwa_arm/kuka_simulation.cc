@@ -64,6 +64,7 @@ int DoMain() {
     auto tree = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
         urdf, multibody::joints::kFixed, tree.get());
+    multibody::AddFlatTerrainToWorld(tree.get(), 100., 10.);
     plant = builder.AddPlant(std::move(tree));
   }
   // Creates and adds LCM publisher for visualization.
@@ -111,7 +112,8 @@ int DoMain() {
                                                                &lcm));
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(kIiwaLcmStatusPeriod);
-  auto status_sender = base_builder->AddSystem<IiwaStatusSender>(num_joints);
+  auto status_sender = base_builder->AddSystem<IiwaStatusSender>(&tree);
+  //auto status_sender = base_builder->AddSystem<IiwaStatusSender>(num_joints);
   status_sender->set_name("status_sender");
 
   base_builder->Connect(command_sub->get_output_port(0),
@@ -122,13 +124,15 @@ int DoMain() {
                         status_sender->get_state_input_port());
   base_builder->Connect(command_receiver->get_output_port(0),
                         status_sender->get_command_input_port());
+  base_builder->Connect(controller->get_output_port_control(),
+                        status_sender->get_torque_input_port());
   base_builder->Connect(status_sender->get_output_port(0),
                         status_pub->get_input_port(0));
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_tool", tree.FindBody("iiwa_link_7"), jjz::X_ET));
+      RigidBodyFrame<double>("iiwa_tool", tree.FindBody(jjz::kEEName), jjz::X_ET));
   local_transforms.push_back(
       RigidBodyFrame<double>("goal", tree.FindBody("world"), jjz::X_WG));
 

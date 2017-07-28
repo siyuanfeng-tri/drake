@@ -101,6 +101,8 @@ drake_cc_library(
     hdrs = ["jjz_common.h"],
     deps = [
         "//drake/common:common",
+        "//drake/lcmtypes:iiwa",
+        "//drake/multibody:rigid_body_tree",
     ],
 )
 

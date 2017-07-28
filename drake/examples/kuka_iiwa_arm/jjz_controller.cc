@@ -41,95 +41,10 @@ const char* const kLcmStatusChannel = "IIWA_STATUS";
 const char* const kLcmCommandChannel = "IIWA_COMMAND";
 // const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
 
-constexpr double kUninitTime = -1.0;
 const std::string kPath =
     "drake/manipulation/models/iiwa_description/urdf/"
     "iiwa14_polytope_collision.urdf";
-const std::string kEEName = "iiwa_link_7";
 const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
-
-class IiwaState {
- public:
-  IiwaState(const RigidBodyTree<double>& iiwa)
-      : iiwa_(iiwa),
-        end_effector_(*iiwa_.FindBody(kEEName)),
-        cache_(iiwa.CreateKinematicsCache()),
-        q_(VectorX<double>::Zero(iiwa.get_num_positions())),
-        v_(VectorX<double>::Zero(iiwa.get_num_velocities())),
-        trq_(VectorX<double>::Zero(iiwa.get_num_actuators())),
-        ext_trq_(VectorX<double>::Zero(iiwa.get_num_actuators())) {
-    DRAKE_DEMAND(iiwa.get_num_positions() == iiwa.get_num_velocities());
-    DRAKE_DEMAND(iiwa.get_num_actuators() == iiwa.get_num_velocities());
-  }
-
-  bool UpdateState(const lcmt_iiwa_status& msg) {
-    // Check msg.
-    DRAKE_DEMAND(msg.num_joints == iiwa_.get_num_positions());
-
-    const double cur_time = msg.utime / 1e6;
-    // Same time stamp, should just return.
-    if (init_ && cur_time == time_) return false;
-
-    // Do velocity update first.
-    if (init_) {
-      // TODO need to filter.
-      delta_time_ = cur_time - time_;
-      for (int i = 0; i < msg.num_joints; ++i) {
-        v_[i] = (msg.joint_position_measured[i] - q_[i]) / delta_time_;
-      }
-    } else {
-      delta_time_ = 0;
-      v_.setZero();
-    }
-
-    // Update time, position, and torque.
-    time_ = cur_time;
-    for (int i = 0; i < msg.num_joints; ++i) {
-      q_[i] = msg.joint_position_measured[i];
-      trq_[i] = msg.joint_torque_measured[i];
-      ext_trq_[i] = msg.joint_torque_external[i];
-    }
-
-    // Update kinematics.
-    cache_.initialize(q_, v_);
-    iiwa_.doKinematics(cache_);
-
-    J_ = iiwa_.CalcBodySpatialVelocityJacobianInWorldFrame(cache_,
-                                                           end_effector_);
-    ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
-
-    init_ = true;
-
-    return true;
-  }
-
-  const KinematicsCache<double>& get_cache() const { return cache_; }
-  const VectorX<double>& get_q() const { return q_; }
-  const VectorX<double>& get_v() const { return v_; }
-  const VectorX<double>& get_ext_trq() const { return ext_trq_; }
-  const VectorX<double>& get_trq() const { return trq_; }
-  const Vector6<double>& get_ext_wrench() const { return ext_wrench_; }
-  double get_time() const { return time_; }
-  double get_dt() const { return delta_time_; }
-
- private:
-  const RigidBodyTree<double>& iiwa_;
-  const RigidBody<double>& end_effector_;
-  KinematicsCache<double> cache_;
-  double time_{kUninitTime};
-  double delta_time_{0};
-
-  VectorX<double> q_;
-  VectorX<double> v_;
-  VectorX<double> trq_;
-  VectorX<double> ext_trq_;
-  MatrixX<double> J_;
-
-  // J^T * F = ext_trq_
-  Vector6<double> ext_wrench_;
-
-  bool init_{false};
-};
 
 class RobotPlanRunner {
  public:
@@ -137,7 +52,7 @@ class RobotPlanRunner {
                   const Isometry3<double>& X_WB)
       : jaco_planner_(model_path, X_WB),
         robot_(jaco_planner_.get_robot()),
-        frame_T_("tool", robot_.FindBody(kEEName), jjz::X_ET) {
+        frame_T_("tool", robot_.FindBody(jjz::kEEName), jjz::X_ET) {
     VerifyIiwaTree(robot_);
     lcm::Subscription* sub =
         lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
@@ -473,11 +388,12 @@ class RobotPlanRunner {
 
     iiwa_status_.utime = -1;
     bool first_tick = true;
-    IiwaState state(robot_);
+    jjz::IiwaState state(robot_);
 
     constexpr int GOTO = 0;
     constexpr int HOME = 1;
     constexpr int JACOBI = 2;
+    constexpr int FORCE_SERVO = 3;
 
     int STATE = GOTO;
     bool state_init = true;
@@ -498,30 +414,25 @@ class RobotPlanRunner {
     KinematicsCache<double> cc = robot_.CreateKinematicsCache();
 
     // Starting point.
-    // Vector3<double> x_GQ(0.1, 0, 0);
     Vector3<double> x_GQ(0, 0, M_PI / 2.);
     Isometry3<double> X_GQ = Isometry3<double>::Identity();
     X_GQ.linear() =
         AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
     X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
 
-    std::cout << "X_GQ:\n" << X_GQ.matrix() << "\n\n";
-
-     ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
-
-    //ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
-
+    // ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
+    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
     VectorX<double> q1 = PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
 
-    // double wall_clock0 = get_time();
-
-    getchar();
+    // getchar();
 
     // VERY IMPORTANT HACK
     for (int i = 0; i < 5; i++) {
       while (0 >= lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
       }
     }
+
+    Isometry3<double> X_WT_d, X_WT;
 
     while (true) {
       // Call lcm handle until at least one status message is
@@ -541,6 +452,8 @@ class RobotPlanRunner {
         first_tick = false;
       }
 
+      std::cout << "f_ext: " << state.get_ext_wrench().transpose() << "\n";
+
       switch (STATE) {
         case GOTO: {
           // make a spline to reset to home.
@@ -554,10 +467,13 @@ class RobotPlanRunner {
 
           q_cmd = traj.value(state.get_time());
 
+          /*
           if (state.get_time() - state_t0 > 5.1) {
-            STATE = JACOBI;
+            STATE = FORCE_SERVO;
+            //STATE = JACOBI;
             state_init = true;
           }
+          */
 
           break;
         }
@@ -598,10 +514,8 @@ class RobotPlanRunner {
           // double interp_t = std::fmod((state.get_time() - state_t0), period);
           const Isometry3<double> X_GT = ee_traj.get_pose(interp_t);
 
-          const Isometry3<double> X_WT_d = jjz::X_WG * X_GT;
-          //std::cout << "tool:\n" << X_WT_d.matrix() << "\n\n";
-          Isometry3<double> X_WT = robot_.CalcFramePoseInWorldFrame(
-              cc, frame_T_);
+          X_WT_d = jjz::X_WG * X_GT;
+          X_WT = robot_.CalcFramePoseInWorldFrame(cc, frame_T_);
 
           Vector6<double> V_WT_d =
               jaco_planner_.ComputePoseDiffInWorldFrame(X_WT, X_WT_d) /
@@ -628,6 +542,57 @@ class RobotPlanRunner {
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_ik);
           eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
           */
+
+          break;
+        }
+
+        case FORCE_SERVO: {
+          if (state_init) {
+            state_init = false;
+            state_t0 = state.get_time();
+            std::cout << "FORCE_SERVO start: " << state_t0 << "\n";
+
+            cc.initialize(q1);
+            robot_.doKinematics(cc);
+
+            X_WT_d = robot_.CalcFramePoseInWorldFrame(cc, frame_T_);
+          }
+
+          double state_t = state.get_time() - state_t0;
+          X_WT = robot_.CalcFramePoseInWorldFrame(cc, frame_T_);
+
+          double force_i_gain = 0.00001;
+          double force_min_range = 5;
+
+
+          if (state_t > 1) {
+            // Just the force part.
+            Vector3<double> f_W_d = Vector3<double>::Zero();
+            f_W_d[2] = 10;
+
+            // Measure force
+            Vector3<double> f_W = state.get_ext_wrench().tail<3>();
+
+            Vector3<double> f_diff = f_W_d - f_W;
+            for (int i = 0; i < 3; i++) {
+              if (std::abs(f_diff[i]) < force_min_range) {
+                f_diff[i] = 0;
+              }
+            }
+
+            // notice the -
+            X_WT_d.translation() -= force_i_gain * f_diff;
+
+            Vector6<double> V_WT_d =
+                jaco_planner_.ComputePoseDiffInWorldFrame(X_WT, X_WT_d) /
+                control_dt;
+            VectorX<double> v = jaco_planner_.ComputeDofVelocity(
+                cc, frame_T_, V_WT_d, q_nominal, control_dt);
+            cc.initialize(cc.getQ() + v * control_dt);
+            robot_.doKinematics(cc);
+
+            q_cmd = cc.getQ();
+          }
 
           break;
         }
