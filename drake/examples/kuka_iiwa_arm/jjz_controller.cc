@@ -135,13 +135,14 @@ class IiwaState {
 class RobotPlanRunner {
  public:
   RobotPlanRunner(const std::string& model_path,
-                  const std::string& end_effector_name,
                   const Isometry3<double>& X_WB)
-      : jaco_planner_(model_path, end_effector_name, X_WB),
-        robot_(jaco_planner_.get_robot()) {
+      : jaco_planner_(model_path, X_WB),
+        robot_(jaco_planner_.get_robot()),
+        frame_T_("tool", robot_.FindBody(kEEName), X_ET) {
     VerifyIiwaTree(robot_);
     lcm::Subscription* sub =
         lcm_.subscribe(kLcmStatusChannel, &RobotPlanRunner::HandleStatus, this);
+    // THIS IS VERY IMPORTANT!!
     sub->setQueueCapacity(1);
   }
 
@@ -169,14 +170,14 @@ class RobotPlanRunner {
     Vector3<double> pos_ub = X_WE.translation() + pos_tol;
 
     WorldPositionConstraint pos_con(
-        cao_robot, jaco_planner_.get_end_effector().get_body_index(),
+        cao_robot, frame_T_.get_rigid_body().get_body_index(),
         Vector3<double>::Zero(), pos_lb, pos_ub, Vector2<double>::Zero());
 
     constraint_array.push_back(&pos_con);
 
     // Adds a rotation constraint.
     WorldQuatConstraint quat_con(
-        cao_robot, jaco_planner_.get_end_effector().get_body_index(),
+        cao_robot, frame_T_.get_rigid_body().get_body_index(),
         math::rotmat2quat(X_WE.linear()), rot_tol, Vector2<double>::Zero());
     constraint_array.push_back(&quat_con);
 
@@ -197,15 +198,15 @@ class RobotPlanRunner {
     return q_res;
   }
 
-  manipulation::PiecewiseCartesianTrajectory<double> GenerateEETraj(
+  /*
+  manipulation::PiecewiseCartesianTrajectory<double> GenerateToolTraj(
       const VectorX<double>& q, double r, double period, double dt) const {
     const int N = std::ceil(period / dt);
 
     KinematicsCache<double> cache = robot_.CreateKinematicsCache();
     cache.initialize(q);
     robot_.doKinematics(cache);
-    Isometry3<double> X_WE0 = robot_.CalcBodyPoseInWorldFrame(
-        cache, jaco_planner_.get_end_effector());
+    Isometry3<double> X_WT0 = robot_.CalcFramePoseInWorldFrame(cache, frame_T_);
 
     std::vector<double> times(N);
     std::vector<MatrixX<double>> pos(N);
@@ -213,11 +214,11 @@ class RobotPlanRunner {
 
     for (int i = 0; i < N; ++i) {
       times[i] = (i + 1) * dt;
-      pos[i] = X_WE0.translation();
+      pos[i] = X_WT0.translation();
       pos[i](0, 0) -= r * (std::cos(2 * M_PI * times[i] / period) - 1);
       pos[i](1, 0) += r * std::sin(2 * M_PI * times[i] / period);
 
-      rot[i] = Quaternion<double>(X_WE0.linear());
+      rot[i] = Quaternion<double>(X_WT0.linear());
     }
     PiecewiseQuaternionSlerp<double> rot_traj(times, rot);
     PiecewisePolynomial<double> pos_traj =
@@ -225,6 +226,7 @@ class RobotPlanRunner {
     return manipulation::PiecewiseCartesianTrajectory<double>(pos_traj,
                                                               rot_traj);
   }
+  */
 
   // Returned stuff is in ZZJ's Goal frame. 0 is origin of Goal frame.
   manipulation::PiecewiseCartesianTrajectory<double>
@@ -233,11 +235,11 @@ class RobotPlanRunner {
     std::unique_ptr<MultiPushActionsPlanner> multi_action_planner;
 
     if (!load_file_name.empty()) {
-    
+
       std:: cout << "about to load graph" << std::endl;
       //std::cin.get();
-      multi_action_planner = std::make_unique<MultiPushActionsPlanner>(load_file_name);  
-    
+      multi_action_planner = std::make_unique<MultiPushActionsPlanner>(load_file_name);
+
     } else {
       double height = 0.234;
       double width = 0.178;
@@ -270,14 +272,15 @@ class RobotPlanRunner {
       multi_action_planner = std::make_unique<MultiPushActionsPlanner>(
       all_contact_points, all_normals, mu, ls_a, ls_b);
       double xmin, xmax, ymin, ymax;
-      xmin = -0.1;
-      xmax = 0.2;
-      ymin = 0;
-      ymax = 0.25;
+      xmin = -0.01;
+      xmax = 0.3;
+      ymin = -0.1;
+      ymax = 0.1;
       // xmin = -0.2; xmax = 0.2; ymin = -0.2; ymax = 0.2;
       multi_action_planner->SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
 
-      int num_samples_se2 = 100;
+      int num_samples_se2 = 500;
+      // int num_samples_se2 = 100;
       double switching_action_cost = 0.05;
       multi_action_planner->SetGraphSize(num_samples_se2);
       multi_action_planner->SetActionSwitchCost(switching_action_cost);
@@ -510,9 +513,9 @@ class RobotPlanRunner {
 
     std::cout << "X_GQ:\n" << X_GQ.matrix() << "\n\n";
 
-    //ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
+     ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
 
-    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
+    //ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
 
     VectorX<double> q1 = PointIk(X_WG * ee_traj.get_pose(0) * X_ET.inverse());
 
@@ -603,25 +606,26 @@ class RobotPlanRunner {
 
           const Isometry3<double> X_WT_d = X_WG * X_GT;
           //std::cout << "tool:\n" << X_WT_d.matrix() << "\n\n";
-          const Isometry3<double> X_WE_d = X_WT_d * X_ET.inverse();
+          Isometry3<double> X_WT = robot_.CalcFramePoseInWorldFrame(
+              cc, frame_T_);
 
-          Isometry3<double> X_WE = robot_.CalcBodyPoseInWorldFrame(
-              cc, jaco_planner_.get_end_effector());
-
-          Vector6<double> V_WE_d =
-              jaco_planner_.ComputePoseDiffInWorldFrame(X_WE, X_WE_d) /
+          Vector6<double> V_WT_d =
+              jaco_planner_.ComputePoseDiffInWorldFrame(X_WT, X_WT_d) /
               control_dt;
 
           //std::cout << "dt: " << control_dt << "  " << V_WE_d.transpose()
           //          << "\n";
 
+          Vector6<double> gain_T = Vector6<double>::Constant(1);
+          gain_T(1) = 0; // no pitch tracking.
           VectorX<double> v = jaco_planner_.ComputeDofVelocity(
-              cc, V_WE_d, q_nominal, control_dt);
+              cc, frame_T_, V_WT_d, q_nominal, control_dt, gain_T);
           cc.initialize(cc.getQ() + v * control_dt);
           robot_.doKinematics(cc);
 
           q_cmd = cc.getQ();
 
+          /*
           auto tmp = pose_to_vec(X_WE_d);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_d);
           Isometry3<double> aa = Isometry3<double>::Identity();
@@ -629,6 +633,7 @@ class RobotPlanRunner {
           tmp = pose_to_vec(X_WE * aa);
           eigenVectorToCArray(tmp, ctrl_debug.X_WE_ik);
           eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
+          */
 
           break;
         }
@@ -684,6 +689,7 @@ class RobotPlanRunner {
   lcm::LCM lcm_;
   manipulation::planner::JacobianIk jaco_planner_;
   const RigidBodyTree<double>& robot_;
+  const RigidBodyFrame<double> frame_T_;
 
   mutable std::mutex state_lock_;
   lcmt_iiwa_status iiwa_status_{};
@@ -694,7 +700,7 @@ class RobotPlanRunner {
 
 int do_main() {
   auto tree = std::make_unique<RigidBodyTree<double>>();
-  RobotPlanRunner runner(kPath, kEEName, kBaseOffset);
+  RobotPlanRunner runner(kPath, kBaseOffset);
   runner.Run();
   return 0;
 }

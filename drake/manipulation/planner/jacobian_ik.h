@@ -30,11 +30,11 @@ class JacobianIk {
    * Assumes that q.size() == v.size().
    */
   JacobianIk(const std::string& model_path,
-             const std::string& end_effector_link_name,
              const Isometry3<double>& base_to_world);
 
   bool Plan(const VectorX<double>& q0, const std::vector<double>& times,
             const std::vector<Isometry3<double>>& pose_traj,
+            const RigidBodyFrame<double>& frame_E,
             const VectorX<double>& q_nominal,
             std::vector<VectorX<double>>* q_sol) const;
 
@@ -42,30 +42,15 @@ class JacobianIk {
    * @param cache0 Captures the current state of the robot.
    * @param V_WE Desired end effector (frame E) velocity in the world frame.
    * @param dt Delta time.
+   * @param gain_E Gain on V_WE_E specified in the end effector frame.
    * @return Resulting generalized velocity.
    */
   VectorX<double> ComputeDofVelocity(const KinematicsCache<double>& cache0,
-                                     const Vector6<double>& V_WE,
-                                     const VectorX<double>& q_nominal,
-                                     double dt) const;
-
-  /**
-   * Sets end effector to @p end_effector_body.
-   */
-  void SetEndEffector(const RigidBody<double>& end_effector_body) {
-    end_effector_ = &end_effector_body;
-    end_effector_body_idx_ = end_effector_body.get_body_index();
-  }
-
-  /**
-   * Sets end effector to @p link_name.
-   */
-  void SetEndEffector(const std::string& link_name) {
-    end_effector_ = robot_->FindBody(link_name);
-    end_effector_body_idx_ = end_effector_->get_body_index();
-  }
-
-  const RigidBody<double>& get_end_effector() const { return *end_effector_; }
+      const RigidBodyFrame<double>& frame_E,
+      const Vector6<double>& V_WE,
+      const VectorX<double>& q_nominal,
+      double dt,
+      const Vector6<double>& gain_E = Vector6<double>::Constant(1)) const;
 
   /**
    * Returns constant reference to the robot model.
@@ -78,8 +63,6 @@ class JacobianIk {
 
  private:
   std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
-  const RigidBody<double>* end_effector_{nullptr};
-  int end_effector_body_idx_{};
   double sampling_dt_{5e-3};
 
   VectorX<double> q_lower_;
