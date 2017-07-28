@@ -95,6 +95,15 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "jjz_common",
+    srcs = ["jjz_common.cc"],
+    hdrs = ["jjz_common.h"],
+    deps = [
+        "//drake/common:common",
+    ],
+)
+
 drake_cc_binary(
     name = "iiwa_controller",
     srcs = ["iiwa_controller.cc"],
@@ -161,6 +170,7 @@ drake_cc_binary(
     test_rule_args = ["--simulation_sec=0.1"],
     deps = [
         ":iiwa_common",
+        ":jjz_common",
         ":iiwa_lcm",
         ":sim_diagram_builder",
         "//drake/common:find_resource",
@@ -217,6 +227,7 @@ drake_cc_binary(
     ],
     deps = [
         ":iiwa_common",
+        ":jjz_common",
         ":iiwa_lcm",
         "//drake/examples/PlanarPushing:planar_pushing",
         "//drake/lcmtypes:jjz_controller",
