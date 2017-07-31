@@ -31,6 +31,13 @@
 #include "drake/systems/primitives/constant_vector_source.h"
 
 #include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+#include "drake/systems/sensors/rgbd_camera.h"
+#include "drake/systems/sensors/image_to_lcm_image_array_t.h"
+
+constexpr char kColorCameraFrameName[] = "color_camera_optical_frame";
+constexpr char kDepthCameraFrameName[] = "depth_camera_optical_frame";
+constexpr char kLabelCameraFrameName[] = "label_camera_optical_frame";
+constexpr char kImageArrayLcmChannelName[] = "DRAKE_RGBD_CAMERA_IMAGES";
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
@@ -116,6 +123,45 @@ int DoMain() {
   //auto status_sender = base_builder->AddSystem<IiwaStatusSender>(num_joints);
   status_sender->set_name("status_sender");
 
+  //////////////////////////////////////////////////////////////////////
+  // Add a rgbd camera
+  Isometry3<double> X_BC = Eigen::Translation3d(0., 0.02, 0.) *
+      Eigen::AngleAxisd(-M_PI_2, Eigen::Vector3d::UnitX()) *
+      Eigen::AngleAxisd(M_PI_2, Eigen::Vector3d::UnitY());
+
+  Isometry3<double> X_7C = Isometry3<double>::Identity();
+  X_7C.translation() = Vector3<double>(0.1, 0, 0.1);
+  X_7C.linear() =
+      Eigen::AngleAxisd(-M_PI / 4., Eigen::Vector3d::UnitY()).toRotationMatrix();
+  RigidBodyFrame<double> F_7B(
+      "X_7B", tree.FindBody("iiwa_link_7"), X_7C * X_BC.inverse());
+  auto rgbd = base_builder->AddSystem<systems::sensors::RgbdCamera>(
+      "rgbd", tree, F_7B, 45. * M_PI / 180., true);
+  base_builder->Connect(plant->get_output_port(0),
+                        rgbd->state_input_port());
+  auto image_to_lcm_image_array =
+      base_builder->AddSystem<systems::sensors::ImageToLcmImageArrayT>(
+          kColorCameraFrameName, kDepthCameraFrameName, kLabelCameraFrameName);
+  image_to_lcm_image_array->set_name("converter");
+  auto image_array_lcm_publisher = base_builder->AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<robotlocomotion::image_array_t>(
+          kImageArrayLcmChannelName, &lcm));
+  image_array_lcm_publisher->set_name("publisher");
+  image_array_lcm_publisher->set_publish_period(0.05);
+  base_builder->Connect(
+      rgbd->color_image_output_port(),
+      image_to_lcm_image_array->color_image_input_port());
+  base_builder->Connect(
+      rgbd->depth_image_output_port(),
+      image_to_lcm_image_array->depth_image_input_port());
+  base_builder->Connect(
+      rgbd->label_image_output_port(),
+      image_to_lcm_image_array->label_image_input_port());
+  base_builder->Connect(
+      image_to_lcm_image_array->image_array_t_msg_output_port(),
+      image_array_lcm_publisher->get_input_port(0));
+  //////////////////////////////////////////////////////////////////////
+
   base_builder->Connect(command_sub->get_output_port(0),
                         command_receiver->get_input_port(0));
   base_builder->Connect(command_receiver->get_output_port(0),
@@ -135,6 +181,9 @@ int DoMain() {
       RigidBodyFrame<double>("iiwa_tool", tree.FindBody(jjz::kEEName), jjz::X_ET));
   local_transforms.push_back(
       RigidBodyFrame<double>("goal", tree.FindBody("world"), jjz::X_WG));
+  local_transforms.push_back(
+      RigidBodyFrame<double>("camera", tree.FindBody("iiwa_link_7"),
+                             X_7C));
 
   auto frame_viz = base_builder->AddSystem<systems::FrameVisualizer>(
       &tree, local_transforms, &lcm);
