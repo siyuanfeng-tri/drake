@@ -2,13 +2,14 @@
 #include <cassert>
 #include <random>
 #define CHECKCONSTRAINT
-
+#define INF_DIST 1e+9
 
 MultiPushActionsPlanner::MultiPushActionsPlanner(std::string file_name) {
 	std::ifstream in(file_name);
 	Deserialize(in);
 	in.close();
 }
+
 MultiPushActionsPlanner::MultiPushActionsPlanner(
 	std::vector<Eigen::Vector2d> all_contact_points, 
 	std::vector<Eigen::Vector2d> all_contact_normals, double mu, double ls_a, 
@@ -31,6 +32,8 @@ MultiPushActionsPlanner::MultiPushActionsPlanner(
   SetActionSwitchCost();
   // Set default graph size.
   SetGraphSize();
+  // Set goal set.
+  SetGoalSet();
 }
 
 
@@ -51,6 +54,19 @@ void MultiPushActionsPlanner::SetGraphSize(int num_sample_nodes) {
   num_expanded_nodes_ = num_actions_ * num_sample_nodes_;
 }
 
+void MultiPushActionsPlanner::SetGoalSet(double goal_range_x, 
+		double goal_range_y, double goal_range_theta, int num_goal_samples) {
+	assert(num_goal_samples > 0);
+	num_sample_goals_ = num_goal_samples;
+	Eigen::Vector3d vec_goal_min;
+	vec_goal_min << -goal_range_x / 2.0, -goal_range_y / 2.0, -goal_range_theta / 2.0;	
+	Eigen::Vector3d vec_goal_max;
+	vec_goal_max << goal_range_x / 2.0, goal_range_y / 2.0, goal_range_theta / 2.0;
+	goal_pose_set_.resize(num_sample_goals_, 3);
+	goal_pose_set_ = GetPoseSamplesInBoxConstraint(vec_goal_min, vec_goal_max, 
+																								num_sample_goals_);
+}
+
 void MultiPushActionsPlanner::ConstructPlanningGraph() {
   SampleNodesInBoxWorkSpace();
   shortest_distances_.resize(num_expanded_nodes_);
@@ -60,17 +76,23 @@ void MultiPushActionsPlanner::ConstructPlanningGraph() {
   for (int i = 0; i < num_expanded_nodes_; ++i) {
   	int sample_id = i / num_actions_;
   	int action_id = i - num_actions_ * sample_id;
-  	//shortest_distances_[i] = action_planners_[action_id].GetPlannedDubinsCurveLength(
-  	//	sampled_pose_nodes_.row(sample_id).transpose(), goal_pose_);
-  	bool flag_feasible;
-  	double curve_length;
-  	CheckPathAndGetPlannedCurveLength(
-  		sampled_pose_nodes_.row(sample_id).transpose(), goal_pose_, action_id, 
-  		&flag_feasible, &curve_length);
-  	shortest_distances_[i] = curve_length;
+
+  	// bool flag_feasible;
+  	// double curve_length;
+  	// CheckPathAndGetPlannedCurveLength(
+  	// 	sampled_pose_nodes_.row(sample_id).transpose(), goal_pose_, action_id, 
+  	// 	&flag_feasible, &curve_length);
+  	// shortest_distances_[i] = curve_length;
+  	// nxt_index_[i] = -1; 
+  	
+  	int goal_id;
+  	double dist;
+  	FindNearestGoalAndDistance(sampled_pose_nodes_.row(sample_id).transpose(), 
+  			action_id, &dist, &goal_id);
+  	shortest_distances_[i] = dist; 
+  	nxt_index_[i] = - (1 + goal_id);
 
   	mark_shortest[i] = false;
-  	nxt_index_[i] = -1; 
   }
   // Dijkstra process.
   for (int i = 0; i < num_expanded_nodes_; ++i) {
@@ -78,7 +100,7 @@ void MultiPushActionsPlanner::ConstructPlanningGraph() {
   		std::cout << double(i) / num_expanded_nodes_ << std::endl;
   	}
   	// Find the shortest node to the goal. 
-  	double min_dist = 1e+9;
+  	double min_dist = INF_DIST;
   	int index_min_dist_node = -1;
   	for (int j = 0; j < num_expanded_nodes_; ++j) {
 			if (!mark_shortest[j]) {
@@ -134,20 +156,69 @@ void MultiPushActionsPlanner::ConstructPlanningGraph() {
   }
 }
 
+void MultiPushActionsPlanner::FindNearestGoalAndDistance(Eigen::Vector3d pose, 
+		int action_id, double* dist, int* goal_id) {
+	
+	double best_dist = INF_DIST;
+	int best_id = -1;
+	for (int i = 0; i < num_sample_goals_; ++i) { 
+	  bool flag_feasible;
+	  double curve_length;
+	  CheckPathAndGetPlannedCurveLength(pose, goal_pose_set_.row(i).transpose(), 
+	      action_id, &flag_feasible, &curve_length);
+	  if (curve_length < best_dist) {
+	  	best_dist = curve_length;
+	  	best_id = i;
+	  }
+	}
+	*dist = best_dist;
+	*goal_id = best_id;
+}
+
+
+
 void MultiPushActionsPlanner::SampleNodesInBoxWorkSpace() {
   sampled_pose_nodes_.resize(num_sample_nodes_, 3);
-  unsigned seed = 100;
-  std::default_random_engine generator (seed);
-  std::uniform_real_distribution<double> distribution(0.0, 1.0);
-  // Uniform sampling.
-  for (int i = 0; i < num_sample_nodes_; ++i) {
-  	sampled_pose_nodes_(i, 0) =  workspace_min_x_ + distribution(generator) * 
-  		(workspace_max_x_ - workspace_min_x_);
-  	sampled_pose_nodes_(i, 1) =  workspace_min_y_ + distribution(generator) * 
-  		(workspace_max_y_ - workspace_min_y_);
-  	sampled_pose_nodes_(i, 2) = 2 * M_PI * distribution(generator);
-  }	
+  Eigen::Vector3d vec_min;
+  vec_min << workspace_min_x_, workspace_min_y_, 0.0;
+  Eigen::Vector3d vec_max;
+  vec_max << workspace_max_x_, workspace_max_y_, 2 * M_PI;
+
+  sampled_pose_nodes_ = 
+  		GetPoseSamplesInBoxConstraint(vec_min, vec_max, num_sample_nodes_);
+  // unsigned seed = 100;
+  // std::default_random_engine generator (seed);
+  // std::uniform_real_distribution<double> distribution(0.0, 1.0);
+  // // Uniform sampling.
+  // for (int i = 0; i < num_sample_nodes_; ++i) {
+  // 	sampled_pose_nodes_(i, 0) =  workspace_min_x_ + distribution(generator) * 
+  // 		(workspace_max_x_ - workspace_min_x_);
+  // 	sampled_pose_nodes_(i, 1) =  workspace_min_y_ + distribution(generator) * 
+  // 		(workspace_max_y_ - workspace_min_y_);
+  // 	sampled_pose_nodes_(i, 2) = 2 * M_PI * distribution(generator);
+  //}	
 }
+
+Eigen::Matrix<double, Eigen::Dynamic, 3> 
+    MultiPushActionsPlanner::GetPoseSamplesInBoxConstraint(
+    Eigen::Vector3d vec_min, Eigen::Vector3d vec_max, int num_samples) {
+   
+   assert(num_samples > 0);
+   Eigen::Matrix<double, Eigen::Dynamic, 3> samples(num_samples, 3);
+   
+   unsigned seed = 100;
+   std::default_random_engine generator(seed);
+   std::uniform_real_distribution<double> distribution(0.0, 1.0);
+   
+   for (int i = 0; i < num_samples; ++i) {
+   		for (int j = 0; j < 3; ++j) {
+   			samples(i,j) = vec_min(j) + distribution(generator) * 
+   										(vec_max(j) - vec_min(j));   			
+   		}
+   }
+   return samples;
+}
+
 
 
 void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
@@ -156,34 +227,43 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 	  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
 	  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses) {
 	// First, try direction connection to the goal with all actions.
-	double dist = 1e+9;
+	double dist = INF_DIST;
 	int best_direct_action_id = -1;
+	int best_direct_goal_id = 0;
 	for (int i = 0; i < num_actions_; ++i) {
-		bool flag_feasible;
-  	double curve_length;
+		//bool flag_feasible;
+  	//double curve_length;
   	int direct_action_id = i;
+		// CheckPathAndGetPlannedCurveLength(cart_pose_start, goal_pose_, 
+		//     direct_action_id, &flag_feasible, &curve_length);
 
-		CheckPathAndGetPlannedCurveLength(cart_pose_start, goal_pose_, 
-		    direct_action_id, &flag_feasible, &curve_length);
-		
+		int goal_id;
+  	double curve_length;
+  	FindNearestGoalAndDistance(cart_pose_start, direct_action_id, &curve_length, 
+  														&goal_id);
+
 		if (curve_length < dist) {
 			best_direct_action_id = direct_action_id;
 			dist = curve_length;
+			best_direct_goal_id = goal_id;
 		}
 	}
 	std::cout << "best direction distance : " << dist << " with action " 
-						<< best_direct_action_id << std::endl;
+						<< best_direct_action_id << " to goal id " << best_direct_goal_id 
+						<< std::endl;
 	// Next, try all nodes in the graph and find the best hopping node.
 	int best_hopping_node_id = -1;
 	for (int i = 0; i < num_expanded_nodes_; ++i) {
 		if (shortest_distances_[i] < dist) {
 	  	int sample_id = i / num_actions_;
 			int action_id = i - num_actions_ * sample_id;
+			
 			double dist_edge;
 			bool flag_feasible;
 			CheckPathAndGetPlannedCurveLength(cart_pose_start, 
 				sampled_pose_nodes_.row(sample_id).transpose(), 
 				action_id, &flag_feasible, &dist_edge);
+
 			//std::cout << "try hop " << i << " " << dist_edge <<" , " 
 			//<<  shortest_distances_[i] << " " << dist_edge + shortest_distances_[i] << std::endl; 
 			if (dist_edge + shortest_distances_[i] < dist) {
@@ -196,6 +276,7 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 	// Construct solution paths.
 	std::vector<Eigen::Vector3d> sol_poses;
 	std::vector<int> sol_action_ids;
+	Eigen::Vector3d goal;
 	sol_poses.push_back(cart_pose_start);
 
 	if (best_hopping_node_id != -1) {
@@ -205,19 +286,24 @@ void MultiPushActionsPlanner::Plan(const Eigen::Vector3d cart_pose_start,
 		int action_id = cur_id - sample_id * num_actions_;
 		// The first action will be the same as the immediate hopping node.
 		sol_action_ids.push_back(action_id);
-		while (cur_id != -1) {
+		//while (cur_id != -1) {
+		while(cur_id > 0) {	
 			int sample_id = cur_id / num_actions_;
 			int action_id = cur_id - sample_id * num_actions_;
 			sol_action_ids.push_back(action_id);
 			sol_poses.push_back(sampled_pose_nodes_.row(sample_id).transpose());
 			cur_id = nxt_index_[cur_id];
 		} 
+		// Set the goal.
+		goal = goal_pose_set_.row(1 - cur_id).transpose();
 	} else {
 		// Otherwise directly go to the goal with best single action.
-		std::cout << "direct action to goal " << std::endl;
 		sol_action_ids.push_back(best_direct_action_id);
+		goal = goal_pose_set_.row(1 - best_direct_goal_id).transpose();
+		std::cout << "direct action to goal " << goal.transpose() << std::endl;
 	}
-	ConstructAllPathSegments(sol_poses, sol_action_ids, object_poses, 
+
+	ConstructAllPathSegments(sol_poses, sol_action_ids, goal, object_poses, 
 													 pusher_poses, num_way_points_per_seg); 
 	all_action_ids->clear();
 	for (unsigned i = 0; i < sol_action_ids.size(); ++i) {
@@ -256,12 +342,13 @@ void MultiPushActionsPlanner::CheckPathAndGetPlannedCurveLength(
 		*curve_length = action_planners_[action_id].GetPlannedDubinsCurveLength(
 				cart_pose_start, cart_pose_goal);
 	} else {
-		*curve_length = 1e+9;
+		*curve_length = INF_DIST;
 	}
 }
 
 void MultiPushActionsPlanner::ConstructAllPathSegments(
-    std::vector<Eigen::Vector3d> poses, std::vector<int> action_ids, 
+    std::vector<Eigen::Vector3d> poses, std::vector<int> action_ids,
+    Eigen::Vector3d goal,  
     std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
 	  std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses,
 	  int num_way_pts_per_seg) {
@@ -274,7 +361,8 @@ void MultiPushActionsPlanner::ConstructAllPathSegments(
 		Eigen::Vector3d cart_pose_start = poses[i];
 		Eigen::Vector3d cart_pose_end;
 		if (i == num_segments - 1) {
-			cart_pose_end = goal_pose_;
+			//cart_pose_end = goal_pose_;
+			cart_pose_end = goal;
 		} else {
 			cart_pose_end = poses[i + 1];
 		}
@@ -301,9 +389,13 @@ void MultiPushActionsPlanner::Serialize(std::ofstream& out) {
 	out << workspace_min_x_ << " " << workspace_max_x_ << " " 
 			<< workspace_min_y_ << " " << workspace_max_y_ << " " << std::endl;
 	out << cost_switch_action_ << std::endl;
-	out << num_sample_nodes_ << " " << num_expanded_nodes_ << std::endl;
+	out << num_sample_nodes_ << " " << num_expanded_nodes_ << " " 
+			<< num_sample_goals_ << std::endl;
 	for (int i = 0; i < num_sample_nodes_; ++i) {
 		out << sampled_pose_nodes_.row(i) << std::endl;
+	}
+	for (int i = 0; i < num_sample_goals_; ++i) {
+		out << goal_pose_set_.row(i) << std::endl;
 	}
 	for (int i = 0; i < num_expanded_nodes_; ++i) {
 		out << nxt_index_[i] << " ";
@@ -336,10 +428,17 @@ void MultiPushActionsPlanner::Deserialize(std::ifstream& in) {
 	in >> cost_switch_action_;
 	in >> num_sample_nodes_;
 	in >> num_expanded_nodes_;
+	in >> num_sample_goals_;
 	sampled_pose_nodes_.resize(num_sample_nodes_, 3);
 	for (int i = 0; i < num_sample_nodes_; ++i) {
 		for (int j = 0; j < 3; ++j) {
 			in >> sampled_pose_nodes_(i, j);
+		}
+	}
+	goal_pose_set_.resize(num_sample_goals_, 3);
+	for (int i = 0; i < num_sample_goals_; ++i) {
+		for (int j = 0; j < 3; ++j) {
+			in >> goal_pose_set_(i, j);
 		}
 	}
 	nxt_index_.resize(num_expanded_nodes_);

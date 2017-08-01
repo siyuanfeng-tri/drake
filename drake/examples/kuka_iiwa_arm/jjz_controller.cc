@@ -509,8 +509,8 @@ class RobotPlanRunner {
           q_cmd = traj.value(state.get_time());
 
           if (state.get_time() - state_t0 > 5.1) {
-            //STATE = FORCE_SERVO;
-            STATE = JACOBI;
+            STATE = FORCE_SERVO;
+            //STATE = JACOBI;
             state_init = true;
           }
 
@@ -564,7 +564,6 @@ class RobotPlanRunner {
           gain_T(1) = 0; // no pitch tracking.
           VectorX<double> v = jaco_planner_.ComputeDofVelocity(
               cc, frame_T_, V_WT_d, q_nominal, control_dt, gain_T);
-
           cc.initialize(cc.getQ() + v * control_dt);
           robot_.doKinematics(cc);
 
@@ -699,8 +698,6 @@ class RobotPlanRunner {
 };
 
 int do_main() {
-  // auto tree = std::make_unique<RigidBodyTree<double>>();
-  // RobotPlanRunner runner(kPath, kBaseOffset);
   RigidBodyTree<double> tree;
   drake::parsers::urdf::AddModelInstanceFromUrdfFile(kPath, drake::multibody::joints::kFixed, nullptr, &tree);
   RobotPlanRunner runner(tree);

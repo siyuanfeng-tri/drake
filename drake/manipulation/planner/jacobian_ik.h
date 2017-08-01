@@ -64,6 +64,7 @@ class JacobianIk {
   double GetSamplingDt() const { return sampling_dt_; }
 
  private:
+  void Setup();
   std::unique_ptr<RigidBodyTree<double>> owned_robot_{nullptr};
   const RigidBodyTree<double>* robot_{nullptr};
   double sampling_dt_{5e-3};
@@ -76,8 +77,6 @@ class JacobianIk {
   VectorX<double> zero_;
 
   mutable drake::solvers::GurobiSolver solver_;
-
-  void Setup();
 };
 
 }  // namespace planner
