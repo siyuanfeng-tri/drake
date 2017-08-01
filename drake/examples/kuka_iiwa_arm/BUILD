@@ -95,6 +95,17 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "jjz_common",
+    srcs = ["jjz_common.cc"],
+    hdrs = ["jjz_common.h"],
+    deps = [
+        "//drake/common:common",
+        "//drake/lcmtypes:iiwa",
+        "//drake/multibody:rigid_body_tree",
+    ],
+)
+
 drake_cc_binary(
     name = "iiwa_controller",
     srcs = ["iiwa_controller.cc"],
@@ -161,6 +172,7 @@ drake_cc_binary(
     test_rule_args = ["--simulation_sec=0.1"],
     deps = [
         ":iiwa_common",
+        ":jjz_common",
         ":iiwa_lcm",
         ":sim_diagram_builder",
         "//drake/common:find_resource",
@@ -171,6 +183,8 @@ drake_cc_binary(
         "//drake/systems/analysis:simulator",
         "//drake/systems/controllers:inverse_dynamics_controller",
         "//drake/systems/primitives:constant_vector_source",
+        "//drake/systems/sensors:image_to_lcm_image_array_t",
+        "//drake/systems/sensors:rgbd_camera",
         "@com_github_gflags_gflags//:gflags",
     ],
 )
@@ -186,6 +200,47 @@ drake_cc_binary(
         ":iiwa_common",
         ":iiwa_lcm",
         "//drake/common:find_resource",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
+drake_cc_binary(
+    name = "kuka_camera_calibrate",
+    srcs = ["kuka_camera_calibrate.cc"],
+    data = [
+        ":models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":iiwa_common",
+        ":iiwa_lcm",
+        "//drake/common:find_resource",
+        "//drake/multibody:inverse_kinematics",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
+drake_cc_binary(
+    name = "jjz_controller",
+    srcs = ["jjz_controller.cc"],
+    data = [
+        ":models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":iiwa_common",
+        ":jjz_common",
+        ":iiwa_lcm",
+        "//drake/examples/PlanarPushing:planar_pushing",
+        "//drake/lcmtypes:jjz_controller",
+        "//drake/multibody:inverse_kinematics",
+        "//drake/manipulation/planner:jacobian_ik",
+        "//drake/manipulation/util:trajectory_utils",
+        "//drake/common:find_resource",
+        "//drake/util:util",
+        "//drake/util:lcm_util",
         "@lcmtypes_bot2_core",
         "@lcmtypes_robotlocomotion",
     ],

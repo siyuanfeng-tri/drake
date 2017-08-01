@@ -30,6 +30,15 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/primitives/constant_vector_source.h"
 
+#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+#include "drake/systems/sensors/rgbd_camera.h"
+#include "drake/systems/sensors/image_to_lcm_image_array_t.h"
+
+constexpr char kColorCameraFrameName[] = "color_camera_optical_frame";
+constexpr char kDepthCameraFrameName[] = "depth_camera_optical_frame";
+constexpr char kLabelCameraFrameName[] = "label_camera_optical_frame";
+constexpr char kImageArrayLcmChannelName[] = "DRAKE_RGBD_CAMERA_IMAGES";
+
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
 DEFINE_string(urdf, "", "Name of urdf to load");
@@ -62,6 +71,7 @@ int DoMain() {
     auto tree = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
         urdf, multibody::joints::kFixed, tree.get());
+    multibody::AddFlatTerrainToWorld(tree.get(), 100., 10.);
     plant = builder.AddPlant(std::move(tree));
   }
   // Creates and adds LCM publisher for visualization.
@@ -109,8 +119,48 @@ int DoMain() {
                                                                &lcm));
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(kIiwaLcmStatusPeriod);
-  auto status_sender = base_builder->AddSystem<IiwaStatusSender>(num_joints);
+  auto status_sender = base_builder->AddSystem<IiwaStatusSender>(&tree);
+  //auto status_sender = base_builder->AddSystem<IiwaStatusSender>(num_joints);
   status_sender->set_name("status_sender");
+
+  //////////////////////////////////////////////////////////////////////
+  // Add a rgbd camera
+  Isometry3<double> X_BC = Eigen::Translation3d(0., 0.02, 0.) *
+      Eigen::AngleAxisd(-M_PI_2, Eigen::Vector3d::UnitX()) *
+      Eigen::AngleAxisd(M_PI_2, Eigen::Vector3d::UnitY());
+
+  Isometry3<double> X_7C = Isometry3<double>::Identity();
+  X_7C.translation() = Vector3<double>(0.1, 0, 0.1);
+  X_7C.linear() =
+      Eigen::AngleAxisd(-M_PI / 4., Eigen::Vector3d::UnitY()).toRotationMatrix();
+  RigidBodyFrame<double> F_7B(
+      "X_7B", tree.FindBody("iiwa_link_7"), X_7C * X_BC.inverse());
+  auto rgbd = base_builder->AddSystem<systems::sensors::RgbdCamera>(
+      "rgbd", tree, F_7B, 45. * M_PI / 180., true);
+  base_builder->Connect(plant->get_output_port(0),
+                        rgbd->state_input_port());
+  auto image_to_lcm_image_array =
+      base_builder->AddSystem<systems::sensors::ImageToLcmImageArrayT>(
+          kColorCameraFrameName, kDepthCameraFrameName, kLabelCameraFrameName);
+  image_to_lcm_image_array->set_name("converter");
+  auto image_array_lcm_publisher = base_builder->AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<robotlocomotion::image_array_t>(
+          kImageArrayLcmChannelName, &lcm));
+  image_array_lcm_publisher->set_name("publisher");
+  image_array_lcm_publisher->set_publish_period(0.05);
+  base_builder->Connect(
+      rgbd->color_image_output_port(),
+      image_to_lcm_image_array->color_image_input_port());
+  base_builder->Connect(
+      rgbd->depth_image_output_port(),
+      image_to_lcm_image_array->depth_image_input_port());
+  base_builder->Connect(
+      rgbd->label_image_output_port(),
+      image_to_lcm_image_array->label_image_input_port());
+  base_builder->Connect(
+      image_to_lcm_image_array->image_array_t_msg_output_port(),
+      image_array_lcm_publisher->get_input_port(0));
+  //////////////////////////////////////////////////////////////////////
 
   base_builder->Connect(command_sub->get_output_port(0),
                         command_receiver->get_input_port(0));
@@ -120,17 +170,21 @@ int DoMain() {
                         status_sender->get_state_input_port());
   base_builder->Connect(command_receiver->get_output_port(0),
                         status_sender->get_command_input_port());
+  base_builder->Connect(controller->get_output_port_control(),
+                        status_sender->get_torque_input_port());
   base_builder->Connect(status_sender->get_output_port(0),
                         status_pub->get_input_port(0));
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_link_ee", tree.FindBody("iiwa_link_ee"),
-                             Isometry3<double>::Identity()));
+      RigidBodyFrame<double>("iiwa_tool", tree.FindBody(jjz::kEEName), jjz::X_ET));
   local_transforms.push_back(
-      RigidBodyFrame<double>("iiwa_link_7", tree.FindBody("iiwa_link_7"),
-                             Isometry3<double>::Identity()));
+      RigidBodyFrame<double>("goal", tree.FindBody("world"), jjz::X_WG));
+  local_transforms.push_back(
+      RigidBodyFrame<double>("camera", tree.FindBody("iiwa_link_7"),
+                             X_7C));
+
   auto frame_viz = base_builder->AddSystem<systems::FrameVisualizer>(
       &tree, local_transforms, &lcm);
   base_builder->Connect(plant->get_output_port(0),
@@ -144,11 +198,21 @@ int DoMain() {
   lcm.StartReceiveThread();
   simulator.set_publish_every_time_step(false);
   simulator.Initialize();
+  simulator.set_target_realtime_rate(1.0);
+
+  VectorX<double> q0 = tree.getZeroConfiguration();
+
+  Context<double>& plant_context =
+      sys->GetMutableSubsystemContext(*plant, simulator.get_mutable_context());
+  systems::VectorBase<double>* plant_q0 =
+      plant_context.get_mutable_continuous_state()
+          ->get_mutable_generalized_position();
+  plant_q0->SetFromVector(q0);
 
   command_receiver->set_initial_position(
       &sys->GetMutableSubsystemContext(*command_receiver,
                                        simulator.get_mutable_context()),
-      VectorX<double>::Zero(tree.get_num_positions()));
+      q0);
 
   // Simulate for a very long time.
   simulator.StepTo(FLAGS_simulation_sec);

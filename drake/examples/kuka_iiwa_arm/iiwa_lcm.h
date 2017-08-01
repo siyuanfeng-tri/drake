@@ -153,12 +153,20 @@ class IiwaStatusSender : public systems::LeafSystem<double> {
 
   explicit IiwaStatusSender(int num_joints = kIiwaArmNumJoints);
 
+  explicit IiwaStatusSender(const RigidBodyTree<double>* tree);
+
   const systems::InputPortDescriptor<double>& get_command_input_port() const {
-    return this->get_input_port(0);
+    return this->get_input_port(command_input_index_);
   }
 
   const systems::InputPortDescriptor<double>& get_state_input_port() const {
-    return this->get_input_port(1);
+    return this->get_input_port(state_input_index_);
+  }
+
+  const systems::InputPortDescriptor<double>& get_torque_input_port() const {
+    if (torque_input_index_ == -1)
+      throw std::logic_error("torque input port does not exist");
+    return this->get_input_port(torque_input_index_);
   }
 
  private:
@@ -169,7 +177,19 @@ class IiwaStatusSender : public systems::LeafSystem<double> {
   void OutputStatus(const systems::Context<double>& context,
                     lcmt_iiwa_status* output) const;
 
+  int state_input_index_{0};
+  int command_input_index_{0};
+  int torque_input_index_{-1};
+
   const int num_joints_;
+
+  // Hacks
+  const RigidBodyTree<double>* tree_{nullptr};
+  std::unique_ptr<KinematicsCache<double>> cache_;
+  mutable VectorX<double> q_;
+  mutable VectorX<double> v_;
+  mutable VectorX<double> inv_dyn_trq_;
+  VectorX<double> zero_;
 };
 
 }  // namespace kuka_iiwa_arm

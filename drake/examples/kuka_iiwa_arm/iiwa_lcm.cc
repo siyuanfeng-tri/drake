@@ -5,6 +5,7 @@
 #include "drake/common/drake_assert.h"
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
+#include "drake/util/drakeUtil.h"
 
 namespace drake {
 namespace examples {
@@ -180,10 +181,23 @@ void IiwaStatusReceiver::OutputCommandedPosition(
   commanded_position_output = state_value.tail(num_joints_);
 }
 
+IiwaStatusSender::IiwaStatusSender(const RigidBodyTree<double>* tree)
+    : IiwaStatusSender(tree->get_num_positions()) {
+  tree_ = tree;
+  DRAKE_DEMAND(tree_->get_num_positions() == tree_->get_num_velocities());
+  DRAKE_DEMAND(tree_->get_num_positions() == tree_->get_num_actuators());
+  cache_ = std::make_unique<KinematicsCache<double>>(tree_->CreateKinematicsCache());
+  torque_input_index_ = this->DeclareInputPort(systems::kVectorValued, num_joints_).get_index();
+}
+
 IiwaStatusSender::IiwaStatusSender(int num_joints)
-    : num_joints_(num_joints) {
-  this->DeclareInputPort(systems::kVectorValued, num_joints_ * 2);
-  this->DeclareInputPort(systems::kVectorValued, num_joints_ * 2);
+    : num_joints_(num_joints),
+      q_(VectorX<double>::Zero(num_joints)),
+      v_(VectorX<double>::Zero(num_joints)),
+      zero_(VectorX<double>::Zero(num_joints)) {
+  state_input_index_ = this->DeclareInputPort(systems::kVectorValued, num_joints_ * 2).get_index();
+  command_input_index_ = this->DeclareInputPort(systems::kVectorValued, num_joints_ * 2).get_index();
+
   this->DeclareAbstractOutputPort(&IiwaStatusSender::MakeOutputStatus,
                                   &IiwaStatusSender::OutputStatus);
 }
@@ -205,13 +219,37 @@ void IiwaStatusSender::OutputStatus(
   lcmt_iiwa_status& status = *output;
 
   status.utime = context.get_time() * 1e6;
+  // status.wall_time = get_time() * 1e6;
   const systems::BasicVector<double>* command =
-      this->EvalVectorInput(context, 0);
+      this->EvalVectorInput(context, command_input_index_);
   const systems::BasicVector<double>* state =
-      this->EvalVectorInput(context, 1);
+      this->EvalVectorInput(context, state_input_index_);
   for (int i = 0; i < num_joints_; ++i) {
     status.joint_position_measured[i] = state->GetAtIndex(i);
     status.joint_position_commanded[i] = command->GetAtIndex(i);
+
+    q_[i] = state->GetAtIndex(i);
+    v_[i] = state->GetAtIndex(i + num_joints_);
+  }
+
+  if (tree_) {
+    const systems::BasicVector<double>* torque =
+        this->EvalVectorInput(context, torque_input_index_);
+
+    cache_->initialize(q_, v_);
+    tree_->doKinematics(*cache_, true);
+
+    eigen_aligned_std_unordered_map<RigidBody<double> const*, Vector6<double>>
+        f_ext;
+
+    inv_dyn_trq_ = tree_->inverseDynamics(
+        *cache_, f_ext, zero_, true);
+
+    for (int i = 0; i < num_joints_; ++i) {
+      status.joint_torque_measured[i] = torque->GetAtIndex(i);
+      status.joint_torque_external[i] =
+          - status.joint_torque_measured[i] + inv_dyn_trq_[i];
+    }
   }
 }
 
