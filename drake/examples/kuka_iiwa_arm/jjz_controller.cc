@@ -31,6 +31,7 @@
 #include "drake/multibody/rigid_body_ik.h"
 
 #include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+#include "drake/examples/kuka_iiwa_arm/jjz_primitives.h"
 
 namespace drake {
 namespace examples {
@@ -48,10 +49,9 @@ const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
 
 class RobotPlanRunner {
  public:
-  RobotPlanRunner(const std::string& model_path,
-                  const Isometry3<double>& X_WB)
-      : jaco_planner_(model_path, X_WB),
-        robot_(jaco_planner_.get_robot()),
+  RobotPlanRunner(const RigidBodyTree<double>& robot)
+      : jaco_planner_(&robot),
+        robot_(robot),
         frame_T_("tool", robot_.FindBody(jjz::kEEName), jjz::X_ET) {
     VerifyIiwaTree(robot_);
     lcm::Subscription* sub =
@@ -424,8 +424,6 @@ class RobotPlanRunner {
     ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
     VectorX<double> q1 = PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
 
-    // getchar();
-
     // VERY IMPORTANT HACK
     for (int i = 0; i < 5; i++) {
       while (0 >= lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
@@ -434,6 +432,48 @@ class RobotPlanRunner {
 
     Isometry3<double> X_WT_d, X_WT;
     double wall_clock0 = get_time();
+
+    std::unique_ptr<jjz::FSMState> plan;
+    while (true) {
+      // Call lcm handle until at least one status message is
+      // processed.
+      while (0 >= lcm_.handleTimeout(10) || iiwa_status_.utime == -1) {
+      }
+
+      DRAKE_DEMAND(state.UpdateState(iiwa_status_));
+
+      // Initialize command to measured q.
+      if (first_tick) {
+        for (int i = 0; i < robot_.get_num_positions(); i++) {
+          q_cmd[i] = iiwa_status_.joint_position_measured[i];
+        }
+        first_tick = false;
+
+        plan.reset(new jjz::MoveJoint("go_to_q1", q1, 3.));
+      }
+
+      if (!plan->is_init()) {
+        plan->Initialize(state);
+      }
+      plan->Update(state);
+      plan->Control(state, q_cmd);
+
+      // send command
+      iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
+      for (int i = 0; i < robot_.get_num_positions(); i++) {
+        iiwa_command.joint_position[i] = q_cmd[i];
+      }
+      lcm_.publish(kLcmCommandChannel, &iiwa_command);
+
+      // state transition.
+      if (plan->IsDone(state)) {
+        if (plan->get_name().compare("go_to_q1") == 0) {
+          plan.reset(new jjz::MoveToolFollowTraj("pushing", &robot_, q1, q_nominal, ee_traj));
+        }
+      }
+    }
+
+    exit(-1);
 
     while (true) {
       // Call lcm handle until at least one status message is
@@ -469,8 +509,8 @@ class RobotPlanRunner {
           q_cmd = traj.value(state.get_time());
 
           if (state.get_time() - state_t0 > 5.1) {
-            STATE = FORCE_SERVO;
-            //STATE = JACOBI;
+            //STATE = FORCE_SERVO;
+            STATE = JACOBI;
             state_init = true;
           }
 
@@ -520,13 +560,11 @@ class RobotPlanRunner {
               jaco_planner_.ComputePoseDiffInWorldFrame(X_WT, X_WT_d) /
               control_dt;
 
-          //std::cout << "dt: " << control_dt << "  " << V_WE_d.transpose()
-          //          << "\n";
-
           Vector6<double> gain_T = Vector6<double>::Constant(1);
           gain_T(1) = 0; // no pitch tracking.
           VectorX<double> v = jaco_planner_.ComputeDofVelocity(
               cc, frame_T_, V_WT_d, q_nominal, control_dt, gain_T);
+
           cc.initialize(cc.getQ() + v * control_dt);
           robot_.doKinematics(cc);
 
@@ -661,8 +699,11 @@ class RobotPlanRunner {
 };
 
 int do_main() {
-  auto tree = std::make_unique<RigidBodyTree<double>>();
-  RobotPlanRunner runner(kPath, kBaseOffset);
+  // auto tree = std::make_unique<RigidBodyTree<double>>();
+  // RobotPlanRunner runner(kPath, kBaseOffset);
+  RigidBodyTree<double> tree;
+  drake::parsers::urdf::AddModelInstanceFromUrdfFile(kPath, drake::multibody::joints::kFixed, nullptr, &tree);
+  RobotPlanRunner runner(tree);
   runner.Run();
   return 0;
 }

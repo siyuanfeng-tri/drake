@@ -147,7 +147,7 @@ int DoMain() {
       systems::lcm::LcmPublisherSystem::Make<robotlocomotion::image_array_t>(
           kImageArrayLcmChannelName, &lcm));
   image_array_lcm_publisher->set_name("publisher");
-  image_array_lcm_publisher->set_publish_period(0.05);
+  image_array_lcm_publisher->set_publish_period(1);
   base_builder->Connect(
       rgbd->color_image_output_port(),
       image_to_lcm_image_array->color_image_input_port());

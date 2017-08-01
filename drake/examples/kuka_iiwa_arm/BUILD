@@ -96,12 +96,20 @@ drake_cc_library(
 )
 
 drake_cc_library(
-    name = "jjz_common",
-    srcs = ["jjz_common.cc"],
-    hdrs = ["jjz_common.h"],
+    name = "jjz",
+    srcs = [
+        "jjz_common.cc",
+        "jjz_primitives.cc",
+    ],
+    hdrs = [
+        "jjz_common.h",
+        "jjz_primitives.h",
+    ],
     deps = [
         "//drake/common:common",
         "//drake/lcmtypes:iiwa",
+        "//drake/manipulation/planner:jacobian_ik",
+        "//drake/manipulation/util:trajectory_utils",
         "//drake/multibody:rigid_body_tree",
     ],
 )
@@ -172,7 +180,7 @@ drake_cc_binary(
     test_rule_args = ["--simulation_sec=0.1"],
     deps = [
         ":iiwa_common",
-        ":jjz_common",
+        ":jjz",
         ":iiwa_lcm",
         ":sim_diagram_builder",
         "//drake/common:find_resource",
@@ -231,7 +239,7 @@ drake_cc_binary(
     ],
     deps = [
         ":iiwa_common",
-        ":jjz_common",
+        ":jjz",
         ":iiwa_lcm",
         "//drake/examples/PlanarPushing:planar_pushing",
         "//drake/lcmtypes:jjz_controller",

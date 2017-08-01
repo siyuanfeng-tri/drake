@@ -32,6 +32,8 @@ class JacobianIk {
   JacobianIk(const std::string& model_path,
              const Isometry3<double>& base_to_world);
 
+  JacobianIk(const RigidBodyTree<double>* robot);
+
   bool Plan(const VectorX<double>& q0, const std::vector<double>& times,
             const std::vector<Isometry3<double>>& pose_traj,
             const RigidBodyFrame<double>& frame_E,
@@ -62,7 +64,8 @@ class JacobianIk {
   double GetSamplingDt() const { return sampling_dt_; }
 
  private:
-  std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
+  std::unique_ptr<RigidBodyTree<double>> owned_robot_{nullptr};
+  const RigidBodyTree<double>* robot_{nullptr};
   double sampling_dt_{5e-3};
 
   VectorX<double> q_lower_;
@@ -73,6 +76,8 @@ class JacobianIk {
   VectorX<double> zero_;
 
   mutable drake::solvers::GurobiSolver solver_;
+
+  void Setup();
 };
 
 }  // namespace planner

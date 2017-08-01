@@ -29,15 +29,7 @@ Vector6<double> JacobianIk::ComputePoseDiffInWorldFrame(
   return diff;
 }
 
-JacobianIk::JacobianIk(const std::string& model_path,
-                       const Isometry3<double>& base_to_world) {
-  auto base_frame = std::allocate_shared<RigidBodyFrame<double>>(
-      Eigen::aligned_allocator<RigidBodyFrame<double>>(), "world", nullptr,
-      base_to_world);
-
-  robot_ = std::make_unique<RigidBodyTree<double>>();
-  parsers::urdf::AddModelInstanceFromUrdfFile(
-      model_path, multibody::joints::kFixed, base_frame, robot_.get());
+void JacobianIk::Setup() {
   DRAKE_DEMAND(robot_->get_num_positions() == robot_->get_num_velocities());
 
   q_lower_ = robot_->joint_limit_min;
@@ -48,6 +40,26 @@ JacobianIk::JacobianIk(const std::string& model_path,
   identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
                                         robot_->get_num_positions());
   zero_ = VectorX<double>::Zero(robot_->get_num_velocities());
+}
+
+JacobianIk::JacobianIk(const RigidBodyTree<double>* robot)
+    : robot_{robot} {
+  Setup();
+}
+
+JacobianIk::JacobianIk(const std::string& model_path,
+                       const Isometry3<double>& base_to_world) {
+  auto base_frame = std::allocate_shared<RigidBodyFrame<double>>(
+      Eigen::aligned_allocator<RigidBodyFrame<double>>(), "world", nullptr,
+      base_to_world);
+
+  owned_robot_ = std::make_unique<RigidBodyTree<double>>();
+  robot_ = owned_robot_.get();
+
+  parsers::urdf::AddModelInstanceFromUrdfFile(
+      model_path, multibody::joints::kFixed, base_frame, owned_robot_.get());
+
+  Setup();
 }
 
 VectorX<double> JacobianIk::ComputeDofVelocity(
