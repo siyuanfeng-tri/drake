@@ -64,6 +64,15 @@ class ConstraintRelaxingIk {
     end_effector_body_idx_ = robot_->FindBodyIndex(link_name);
   }
 
+  const VectorX<double>& GetNominalConfiguration() const {
+    return q_nominal_;
+  }
+
+  void SetNominalConfiguration(const VectorX<double>& q) {
+    if (q.size() == q_nominal_.size())
+      q_nominal_ = q;
+  }
+
   /**
    * Returns constant reference to the robot model.
    */
@@ -98,6 +107,7 @@ class ConstraintRelaxingIk {
   std::default_random_engine rand_generator_;
   std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
   int end_effector_body_idx_{};
+  VectorX<double> q_nominal_;
 };
 
 }  // namespace planner

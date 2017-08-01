@@ -29,6 +29,8 @@ ConstraintRelaxingIk::ConstraintRelaxingIk(
   parsers::urdf::AddModelInstanceFromUrdfFile(
       model_path, multibody::joints::kFixed, base_frame, robot_.get());
 
+  q_nominal_ = robot_->getZeroConfiguration();
+
   SetEndEffector(end_effector_link_name);
 }
 
@@ -79,7 +81,7 @@ bool ConstraintRelaxingIk::PlanSequentialTrajectory(
 
       std::vector<int> info;
       std::vector<std::string> infeasible_constraints;
-      bool res = SolveIk(waypoint, q0, q_prev, pos_tol, rot_tol, &q_sol, &info,
+      bool res = SolveIk(waypoint, q0, q_nominal_, pos_tol, rot_tol, &q_sol, &info,
                          &infeasible_constraints);
 
       if (res) {

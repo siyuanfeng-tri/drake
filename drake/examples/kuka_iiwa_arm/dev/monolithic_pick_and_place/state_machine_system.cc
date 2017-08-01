@@ -81,6 +81,12 @@ PickAndPlaceStateMachineSystem::PickAndPlaceStateMachineSystem(
               &PickAndPlaceStateMachineSystem::CalcWsgCommand)
           .get_index();
 
+  VectorX<double> q_norm = planner_->get_robot().getZeroConfiguration();
+  q_norm[1] = 45. * M_PI / 180.;
+  q_norm[3] = -90. * M_PI / 180.;
+  q_norm[5] = 45. * M_PI / 180.;
+  planner_->SetNominalConfiguration(q_norm);
+
   this->DeclarePeriodicUnrestrictedUpdate(period_sec, 0);
 }
 
