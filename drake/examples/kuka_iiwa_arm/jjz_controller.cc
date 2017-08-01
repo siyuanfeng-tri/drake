@@ -149,15 +149,12 @@ class RobotPlanRunner {
     std::unique_ptr<MultiPushActionsPlanner> multi_action_planner;
 
     if (!load_file_name.empty()) {
-
       std:: cout << "about to load graph" << std::endl;
-      //std::cin.get();
       multi_action_planner = std::make_unique<MultiPushActionsPlanner>(load_file_name);
-
     } else {
       double height = 0.234;
       double width = 0.178;
-      double rho = width / 4;
+      double rho = width / 5;
 
       // Limit surface A_11. If you are unsure, just set it to be 1.
       double ls_a = 1;
@@ -165,7 +162,7 @@ class RobotPlanRunner {
       // to the minimum bounding circle radius.
       double ls_b = ls_a / (rho * rho);
       // Coefficient of contact friction
-      double mu = 0.3;
+      double mu = 0.4;
 
       int num_actions = 4;
       Eigen::Matrix<double, Eigen::Dynamic, 2> ct_pts(num_actions, 2);
@@ -193,16 +190,26 @@ class RobotPlanRunner {
       // xmin = -0.2; xmax = 0.2; ymin = -0.2; ymax = 0.2;
       multi_action_planner->SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
 
-      int num_samples_se2 = 100;
-      // int num_samples_se2 = 100;
+      int num_samples_se2 = 300;
       double switching_action_cost = 0.05;
       multi_action_planner->SetGraphSize(num_samples_se2);
+
+      // goal set.
+      double goal_x_range = 0.05;
+      double goal_y_range = 0.05;
+      double goal_theta_range = M_PI / 4.0;
+      int num_goals = 100;
+      multi_action_planner->SetGoalSet(goal_x_range, goal_y_range, goal_theta_range, num_goals);
+
       multi_action_planner->SetActionSwitchCost(switching_action_cost);
-        multi_action_planner->ConstructPlanningGraph();
-        std::string output_file_name = "graph.txt";
-        std::ofstream output_ss(output_file_name);
-        multi_action_planner->Serialize(output_ss);
-        output_ss.close();
+      multi_action_planner->ConstructPlanningGraph();
+      std::string output_file_name = "graph.txt";
+      std::ofstream output_ss(output_file_name);
+      multi_action_planner->Serialize(output_ss);
+      output_ss.close();
+
+      std::cout << "graph generated. press Enter to continue.\n";
+      getchar();
     }  // Complete construction of graph planner.
 
     std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3>> all_object_poses;
@@ -420,8 +427,8 @@ class RobotPlanRunner {
         AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
     X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
 
-    // ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
-    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
+    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
+    // ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
     VectorX<double> q1 = PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
 
     // VERY IMPORTANT HACK
