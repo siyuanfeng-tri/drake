@@ -40,6 +40,9 @@ class MultiPushActionsPlanner {
 
 	void SetActionSwitchCost(double cost_switch_action = 0.1);
 
+	void SetGoalSet(double goal_range_x = 0, double goal_range_y = 0, 
+					double goal_range_theta = 0, int num_goal_samples = 1);
+
 	void ConstructPlanningGraph();
 
 	// Given query start pose, return the action ids (index of the action planer),
@@ -57,7 +60,13 @@ class MultiPushActionsPlanner {
  private:
    // Sample nodes in (expanded) workspace constraints.
    void SampleNodesInBoxWorkSpace();
-   
+
+   Eigen::Matrix<double, Eigen::Dynamic, 3> GetPoseSamplesInBoxConstraint(
+       Eigen::Vector3d vec_min, Eigen::Vector3d vec_max, int num_samples);
+
+   void FindNearestGoalAndDistance(Eigen::Vector3d pose, int action_id, 
+   	   double* dist, int* goal_id);
+
    bool CheckPathWorkSpaceConstraint(
        const Eigen::Matrix<double, Eigen::Dynamic, 3>& object_poses);
    // if flag is false (outside workspace constraint), then curve_length is 
@@ -71,13 +80,15 @@ class MultiPushActionsPlanner {
    // densely sampled object and pusher trajectories. The goal pose will be 
    // appended to the last segment.  
    void ConstructAllPathSegments(std::vector<Eigen::Vector3d> poses, 
-       std::vector<int> action_ids, 
+       std::vector<int> action_ids, Eigen::Vector3d goal,
        std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* object_poses,
 	   std::vector<Eigen::Matrix<double, Eigen::Dynamic, 3> >* pusher_poses,
 	   int num_way_points_per_seg = 50); 
 
    std::vector<DubinsPushPlanner> action_planners_;
+   
    Eigen::Vector3d goal_pose_;
+   Eigen::Matrix<double, Eigen::Dynamic, 3> goal_pose_set_;
 
    int num_actions_;
    double mu_;
@@ -91,6 +102,7 @@ class MultiPushActionsPlanner {
    
    double cost_switch_action_;
    
+   int num_sample_goals_;
    int num_sample_nodes_;
    // num_expanded_nodes equals num_sampled_nodes * num_actions_.
    int num_expanded_nodes_;

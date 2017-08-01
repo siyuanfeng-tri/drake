@@ -18,7 +18,7 @@ int main() {
   //double ls_b = 4500;
   double ls_b = ls_a / (rho * rho);
   // Coefficient of contact friction
-  double mu = 0.25;
+  double mu = 0.35;
   
   // Eigen::Vector2d pt;
   // pt << 0, -0.02;
@@ -64,10 +64,16 @@ int main() {
   multi_action_planner.SetWorkSpaceBoxConstraint(xmin, xmax, ymin, ymax);
   //int nd = 5;
   //int num_samples_se2 = nd * nd * nd;
-  int num_samples_se2 = 100;
+  int num_samples_se2 = 400;
   double switching_action_cost = 0.05;
   multi_action_planner.SetGraphSize(num_samples_se2);
   multi_action_planner.SetActionSwitchCost(switching_action_cost);
+
+  double goal_x_range = 0.05;
+  double goal_y_range = 0.05;
+  double goal_theta_range = M_PI / 4.0;
+  int num_goals = 100;
+  multi_action_planner.SetGoalSet(goal_x_range, goal_y_range, goal_theta_range, num_goals);
 
   // Call construction of the graph
   clock_t begin_time = clock();
