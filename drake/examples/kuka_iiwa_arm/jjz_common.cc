@@ -4,9 +4,14 @@ namespace drake {
 namespace examples {
 namespace jjz {
 
-const Matrix3<double> R_ET(AngleAxis<double>(M_PI, Vector3<double>::UnitY()).toRotationMatrix());
-const Isometry3<double> X_ET(Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) * Isometry3<double>(R_ET));
-const Isometry3<double> X_WG(Eigen::Translation<double, 3>(Vector3<double>(0.5, 0.2, 0.)) * AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
+const Matrix3<double> R_ET(
+    AngleAxis<double>(M_PI, Vector3<double>::UnitY()).toRotationMatrix());
+const Isometry3<double> X_ET(
+    Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) *
+    Isometry3<double>(R_ET));
+const Isometry3<double> X_WG(
+    Eigen::Translation<double, 3>(Vector3<double>(0.5, 0.2, 0.)) *
+    AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
 const std::string kEEName("iiwa_link_7");
 
 IiwaState::IiwaState(const RigidBodyTree<double>& iiwa)
@@ -53,16 +58,13 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   cache_.initialize(q_, v_);
   iiwa_.doKinematics(cache_);
 
-  J_ = iiwa_.CalcBodySpatialVelocityJacobianInWorldFrame(cache_,
-      end_effector_);
+  J_ = iiwa_.CalcBodySpatialVelocityJacobianInWorldFrame(cache_, end_effector_);
   ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
 
   init_ = true;
 
   return true;
 }
-
-
 
 }  // namespace jjz
 }  // namespace examples

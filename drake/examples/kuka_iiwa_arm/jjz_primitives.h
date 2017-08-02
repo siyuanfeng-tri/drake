@@ -3,9 +3,9 @@
 #include "drake/common/eigen_types.h"
 #include "drake/multibody/rigid_body_tree.h"
 
+#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
 #include "drake/manipulation/planner/jacobian_ik.h"
 #include "drake/manipulation/util/trajectory_utils.h"
-#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
 
 namespace drake {
 namespace examples {
@@ -14,9 +14,7 @@ namespace jjz {
 class FSMState {
  public:
   FSMState(const std::string& name) : name_(name) {}
-  virtual ~FSMState() {
-    std::cout << "[" << get_name() << "] exiting.\n";
-  }
+  virtual ~FSMState() { std::cout << "[" << get_name() << "] exiting.\n"; }
 
   const std::string& get_name() const { return name_; }
   double get_start_time() const { return start_time_; }
@@ -26,22 +24,21 @@ class FSMState {
   bool is_init() const { return init_; }
 
   void Initialize(const IiwaState& state) {
-    if (is_init())
-      return;
+    if (is_init()) return;
 
     start_time_ = state.get_time();
     init_ = true;
 
     DoInitialize(state);
 
-    std::cout << "[" << get_name() << "] initialized at " << state.get_time() << "\n";
+    std::cout << "[" << get_name() << "] initialized at " << state.get_time()
+              << "\n";
   }
 
   virtual void Update(const IiwaState& state) {}
-  virtual void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d) const {}
-  virtual bool IsDone(const IiwaState& state) const {
-    return false;
-  }
+  virtual void Control(const IiwaState& state,
+                       Eigen::Ref<VectorX<double>> q_d) const {}
+  virtual bool IsDone(const IiwaState& state) const { return false; }
 
  protected:
   virtual void DoInitialize(const IiwaState& state) {}
@@ -54,10 +51,12 @@ class FSMState {
 
 class MoveJoint : public FSMState {
  public:
-  MoveJoint(const std::string& name, const VectorX<double>& q_d, double duration);
+  MoveJoint(const std::string& name, const VectorX<double>& q_d,
+            double duration);
 
   void DoInitialize(const IiwaState& state) override;
-  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d) const override;
+  void Control(const IiwaState& state,
+               Eigen::Ref<VectorX<double>> q_d) const override;
   bool IsDone(const IiwaState& state) const override;
 
  private:
@@ -69,13 +68,15 @@ class MoveJoint : public FSMState {
 class MoveTool : public FSMState {
  public:
   MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
-      const VectorX<double>& q0, const VectorX<double>& q_norm);
+           const VectorX<double>& q0, const VectorX<double>& q_norm);
 
   void DoInitialize(const IiwaState& state) override;
   void Update(const IiwaState& state) override;
-  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d) const override;
+  void Control(const IiwaState& state,
+               Eigen::Ref<VectorX<double>> q_d) const override;
 
-  virtual Isometry3<double> ComputeDesiredToolInWorld(const IiwaState& state) = 0;
+  virtual Isometry3<double> ComputeDesiredToolInWorld(
+      const IiwaState& state) = 0;
 
  private:
   const RigidBodyTree<double>& robot_;
@@ -90,7 +91,8 @@ class MoveTool : public FSMState {
 
 class MoveToolFollowTraj : public MoveTool {
  public:
-  MoveToolFollowTraj(const std::string& name, const RigidBodyTree<double>* robot,
+  MoveToolFollowTraj(
+      const std::string& name, const RigidBodyTree<double>* robot,
       const VectorX<double>& q0, const VectorX<double>& q_norm,
       const manipulation::PiecewiseCartesianTrajectory<double>& traj);
 
@@ -108,7 +110,9 @@ class MoveToolFollowTraj : public MoveTool {
   void set_f_W_d(const Vector3<double>& f) { f_W_d_ = f; }
   void set_f_W_dead_zone(const Vector3<double>& zone) { f_W_dead_zone_ = zone; }
   void set_ki_force(const Vector3<double>& gain) { ki_.tail<3>() = gain; }
-  void set_position_int_max_range(const Vector3<double>& range) { pos_I_range_ = range; }
+  void set_position_int_max_range(const Vector3<double>& range) {
+    pos_I_range_ = range;
+  }
 
   const Vector3<double>& get_f_W_d() const { return f_W_d_; }
   const Vector3<double>& get_f_W_dead_zone() const { return f_W_dead_zone_; }

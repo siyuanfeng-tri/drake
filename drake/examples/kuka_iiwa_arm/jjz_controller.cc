@@ -1,5 +1,5 @@
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <memory>
 
 #include <lcm/lcm-cpp.hpp>
@@ -144,13 +144,14 @@ class RobotPlanRunner {
 
   // Returned stuff is in ZZJ's Goal frame. 0 is origin of Goal frame.
   manipulation::PiecewiseCartesianTrajectory<double>
-  PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
-      double duration, std::string load_file_name = "") const {
+  PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
+                                   std::string load_file_name = "") const {
     std::unique_ptr<MultiPushActionsPlanner> multi_action_planner;
 
     if (!load_file_name.empty()) {
-      std:: cout << "about to load graph" << std::endl;
-      multi_action_planner = std::make_unique<MultiPushActionsPlanner>(load_file_name);
+      std::cout << "about to load graph" << std::endl;
+      multi_action_planner =
+          std::make_unique<MultiPushActionsPlanner>(load_file_name);
     } else {
       double height = 0.234;
       double width = 0.178;
@@ -158,7 +159,8 @@ class RobotPlanRunner {
 
       // Limit surface A_11. If you are unsure, just set it to be 1.
       double ls_a = 1;
-      // Limit surface A_33 / rho^2, where rho is a characteristic length, similar
+      // Limit surface A_33 / rho^2, where rho is a characteristic length,
+      // similar
       // to the minimum bounding circle radius.
       double ls_b = ls_a / (rho * rho);
       // Coefficient of contact friction
@@ -169,10 +171,7 @@ class RobotPlanRunner {
       Eigen::Matrix<double, Eigen::Dynamic, 2> normal_pts(num_actions, 2);
       ct_pts << 0, -height / 2, -width / 2, 0, 0, height / 2, width / 2, 0;
       // jjz
-      normal_pts << 0, 1,
-                    1, 0,
-                    0, -1,
-                    -1, 0;
+      normal_pts << 0, 1, 1, 0, 0, -1, -1, 0;
 
       std::vector<Eigen::Vector2d> all_contact_points;
       std::vector<Eigen::Vector2d> all_normals;
@@ -181,7 +180,7 @@ class RobotPlanRunner {
         all_normals.push_back(normal_pts.row(i).transpose());
       }
       multi_action_planner = std::make_unique<MultiPushActionsPlanner>(
-      all_contact_points, all_normals, mu, ls_a, ls_b);
+          all_contact_points, all_normals, mu, ls_a, ls_b);
       double xmin, xmax, ymin, ymax;
       xmin = -0.01;
       xmax = 0.3;
@@ -199,7 +198,8 @@ class RobotPlanRunner {
       double goal_y_range = 0.05;
       double goal_theta_range = M_PI / 4.0;
       int num_goals = 100;
-      multi_action_planner->SetGoalSet(goal_x_range, goal_y_range, goal_theta_range, num_goals);
+      multi_action_planner->SetGoalSet(goal_x_range, goal_y_range,
+                                       goal_theta_range, num_goals);
 
       multi_action_planner->SetActionSwitchCost(switching_action_cost);
       multi_action_planner->ConstructPlanningGraph();
@@ -220,11 +220,11 @@ class RobotPlanRunner {
     ////////////////////////////////////////////
 
     multi_action_planner->Plan(x_GQ, num_way_pts_perseg, &action_id,
-                              &all_object_poses, &all_pusher_poses);
+                               &all_object_poses, &all_pusher_poses);
 
     int num_switches = 0;
     for (unsigned i = 0; i < action_id.size() - 1; ++i) {
-      if (action_id[i] != action_id[i+1]) {
+      if (action_id[i] != action_id[i + 1]) {
         num_switches++;
       }
     }
@@ -263,12 +263,13 @@ class RobotPlanRunner {
         // sfeng thinks jjz's angle is somehow 90 deg off from me.
         std::cout << "t: " << cur_time << ", pose " << pusher_poses.row(i)
                   << "\n";
-        Matrix3<double> X_GT(
-            AngleAxis<double>(pusher_poses(i, 2) + M_PI / 2., Vector3<double>::UnitZ()));
+        Matrix3<double> X_GT(AngleAxis<double>(pusher_poses(i, 2) + M_PI / 2.,
+                                               Vector3<double>::UnitZ()));
         rot[index] = Quaternion<double>(X_GT);
         ++index;
       }
-      if (id_traj < num_action_segs - 1 && action_id[id_traj] != action_id[id_traj + 1]) {
+      if (id_traj < num_action_segs - 1 &&
+          action_id[id_traj] != action_id[id_traj + 1]) {
         // The robot first moves up.
         cur_time = cur_time + time_lift_up;
         times[index] = cur_time;
@@ -288,8 +289,8 @@ class RobotPlanRunner {
         pos[index](2, 0) = dist_lift_up;
         std::cout << "t: " << cur_time << ", pose " << nxt_push_pose.transpose()
                   << "\n";
-        Matrix3<double> X_GT(
-            AngleAxis<double>(nxt_push_pose(2) + M_PI / 2., Vector3<double>::UnitZ()));
+        Matrix3<double> X_GT(AngleAxis<double>(nxt_push_pose(2) + M_PI / 2.,
+                                               Vector3<double>::UnitZ()));
         rot[index] = Quaternion<double>(X_GT);
         index++;
         // The robot then moves down to the next pushing location.
@@ -429,7 +430,8 @@ class RobotPlanRunner {
 
     // ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
     ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
-    VectorX<double> q1 = PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
+    VectorX<double> q1 =
+        PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
 
     // VERY IMPORTANT HACK
     for (int i = 0; i < 5; i++) {
@@ -475,7 +477,8 @@ class RobotPlanRunner {
       // state transition.
       if (plan->IsDone(state)) {
         if (plan->get_name().compare("go_to_q1") == 0) {
-          jjz::MoveToolFollowTraj* new_plan = new jjz::MoveToolFollowTraj("pushing", &robot_, q1, q_nominal, ee_traj);
+          jjz::MoveToolFollowTraj* new_plan = new jjz::MoveToolFollowTraj(
+              "pushing", &robot_, q1, q_nominal, ee_traj);
           // new_plan->set_integrating(true);
           new_plan->set_f_W_d(Vector3<double>(0, 0, 1));
           new_plan->set_ki_force(Vector3<double>::Constant(0.00001));
@@ -523,7 +526,7 @@ class RobotPlanRunner {
 
           if (state.get_time() - state_t0 > 5.1) {
             STATE = FORCE_SERVO;
-            //STATE = JACOBI;
+            // STATE = JACOBI;
             state_init = true;
           }
 
@@ -574,7 +577,7 @@ class RobotPlanRunner {
               control_dt;
 
           Vector6<double> gain_T = Vector6<double>::Constant(1);
-          gain_T(1) = 0; // no pitch tracking.
+          gain_T(1) = 0;  // no pitch tracking.
           VectorX<double> v = jaco_planner_.ComputeDofVelocity(
               cc, frame_T_, V_WT_d, q_nominal, control_dt, gain_T);
           cc.initialize(cc.getQ() + v * control_dt);
@@ -611,7 +614,6 @@ class RobotPlanRunner {
 
           double force_i_gain = 0.00001;
           double force_min_range = 5;
-
 
           if (state_t > 1) {
             // Just the force part.
@@ -670,8 +672,8 @@ class RobotPlanRunner {
       ctrl_debug.wall_time = static_cast<int64_t>(wall_clock * 1e6);
       ctrl_debug.dt = control_dt;
 
-      Isometry3<double> X_WT = robot_.CalcFramePoseInWorldFrame(
-          state.get_cache(), frame_T_);
+      Isometry3<double> X_WT =
+          robot_.CalcFramePoseInWorldFrame(state.get_cache(), frame_T_);
       auto tmp = pose_to_vec(X_WT);
       eigenVectorToCArray(tmp, ctrl_debug.X_WE);
 
@@ -712,7 +714,8 @@ class RobotPlanRunner {
 
 int do_main() {
   RigidBodyTree<double> tree;
-  drake::parsers::urdf::AddModelInstanceFromUrdfFile(kPath, drake::multibody::joints::kFixed, nullptr, &tree);
+  drake::parsers::urdf::AddModelInstanceFromUrdfFile(
+      kPath, drake::multibody::joints::kFixed, nullptr, &tree);
   RobotPlanRunner runner(tree);
   runner.Run();
   return 0;
