@@ -2,6 +2,7 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/lcmt_iiwa_status.hpp"
+#include "drake/manipulation/util/trajectory_utils.h"
 #include "drake/multibody/rigid_body_tree.h"
 
 namespace drake {
@@ -46,6 +47,27 @@ class IiwaState {
 
   bool init_{false};
 };
+
+template <typename T>
+const T& clamp(const T& val, const T& lo, const T& hi) {
+  DRAKE_DEMAND(lo < hi);
+
+  if (val <= lo)
+    return lo;
+  else if (val >= hi)
+    return hi;
+  else
+    return val;
+}
+
+Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose);
+VectorX<double> PointIk(const Isometry3<double>& X_WT,
+                        const RigidBodyFrame<double>& frame_T,
+                        RigidBodyTree<double>* robot);
+
+manipulation::PiecewiseCartesianTrajectory<double>
+PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
+                                 std::string load_file_name = "");
 
 }  // namespace jjz
 }  // namespace examples

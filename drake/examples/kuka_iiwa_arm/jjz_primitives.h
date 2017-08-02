@@ -99,8 +99,6 @@ class MoveToolFollowTraj : public MoveTool {
   bool IsDone(const IiwaState& state) const override;
   Isometry3<double> ComputeDesiredToolInWorld(const IiwaState& state) override;
 
-  void DoInitialize(const IiwaState& state) override;
-
   bool is_integrating() const { return is_integrating_; }
   const Isometry3<double>& get_pose_int() const { return pose_err_I_; }
 

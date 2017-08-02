@@ -78,11 +78,6 @@ MoveToolFollowTraj::MoveToolFollowTraj(
     const manipulation::PiecewiseCartesianTrajectory<double>& traj)
     : MoveTool(name, robot, q0, q_norm), ee_traj_(traj) {}
 
-void MoveToolFollowTraj::DoInitialize(const IiwaState& state) {
-  MoveTool::DoInitialize(state);
-  reset_pose_integrator();
-}
-
 Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
     const IiwaState& state) {
   const double interp_t = get_in_state_time(state);
@@ -100,6 +95,11 @@ Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
     // -= because of reaction force.
     pose_err_I_.translation() -=
         (f_err_W.array() * ki_.tail<3>().array()).matrix();
+  }
+
+  for (int i = 0; i < 3; i++) {
+    pose_err_I_.translation()[i] =
+        clamp(pose_err_I_.translation()[i], -pos_I_range_[i], pos_I_range_[i]);
   }
 
   X_WT.translation() += pose_err_I_.translation();
