@@ -427,8 +427,8 @@ class RobotPlanRunner {
         AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
     X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
 
-    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
-    // ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
+    // ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5);
+    ee_traj = PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
     VectorX<double> q1 = PointIk(jjz::X_WG * ee_traj.get_pose(0) * jjz::X_ET.inverse());
 
     // VERY IMPORTANT HACK
@@ -475,7 +475,13 @@ class RobotPlanRunner {
       // state transition.
       if (plan->IsDone(state)) {
         if (plan->get_name().compare("go_to_q1") == 0) {
-          plan.reset(new jjz::MoveToolFollowTraj("pushing", &robot_, q1, q_nominal, ee_traj));
+          jjz::MoveToolFollowTraj* new_plan = new jjz::MoveToolFollowTraj("pushing", &robot_, q1, q_nominal, ee_traj);
+          // new_plan->set_integrating(true);
+          new_plan->set_f_W_d(Vector3<double>(0, 0, 1));
+          new_plan->set_ki_force(Vector3<double>::Constant(0.00001));
+          new_plan->set_f_W_dead_zone(Vector3<double>(INFINITY, INFINITY, 0));
+          new_plan->set_position_int_max_range(Vector3<double>::Constant(0.2));
+          plan.reset(new_plan);
         }
       }
     }

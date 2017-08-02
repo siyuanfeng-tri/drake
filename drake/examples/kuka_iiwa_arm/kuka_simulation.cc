@@ -31,6 +31,8 @@
 #include "drake/systems/primitives/constant_vector_source.h"
 
 #include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+
+#ifdef CAMERA
 #include "drake/systems/sensors/rgbd_camera.h"
 #include "drake/systems/sensors/image_to_lcm_image_array_t.h"
 
@@ -38,6 +40,7 @@ constexpr char kColorCameraFrameName[] = "color_camera_optical_frame";
 constexpr char kDepthCameraFrameName[] = "depth_camera_optical_frame";
 constexpr char kLabelCameraFrameName[] = "label_camera_optical_frame";
 constexpr char kImageArrayLcmChannelName[] = "DRAKE_RGBD_CAMERA_IMAGES";
+#endif
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
@@ -125,6 +128,7 @@ int DoMain() {
 
   //////////////////////////////////////////////////////////////////////
   // Add a rgbd camera
+#ifdef CAMERA
   Isometry3<double> X_BC = Eigen::Translation3d(0., 0.02, 0.) *
       Eigen::AngleAxisd(-M_PI_2, Eigen::Vector3d::UnitX()) *
       Eigen::AngleAxisd(M_PI_2, Eigen::Vector3d::UnitY());
@@ -160,6 +164,7 @@ int DoMain() {
   base_builder->Connect(
       image_to_lcm_image_array->image_array_t_msg_output_port(),
       image_array_lcm_publisher->get_input_port(0));
+#endif
   //////////////////////////////////////////////////////////////////////
 
   base_builder->Connect(command_sub->get_output_port(0),
@@ -181,10 +186,11 @@ int DoMain() {
       RigidBodyFrame<double>("iiwa_tool", tree.FindBody(jjz::kEEName), jjz::X_ET));
   local_transforms.push_back(
       RigidBodyFrame<double>("goal", tree.FindBody("world"), jjz::X_WG));
+#ifdef CAMERA
   local_transforms.push_back(
       RigidBodyFrame<double>("camera", tree.FindBody("iiwa_link_7"),
                              X_7C));
-
+#endif
   auto frame_viz = base_builder->AddSystem<systems::FrameVisualizer>(
       &tree, local_transforms, &lcm);
   base_builder->Connect(plant->get_output_port(0),

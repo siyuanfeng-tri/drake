@@ -74,10 +74,31 @@ MoveToolFollowTraj::MoveToolFollowTraj(const std::string& name, const RigidBodyT
   : MoveTool(name, robot, q0, q_norm), ee_traj_(traj) {
 }
 
-Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(const IiwaState& state) const {
+void MoveToolFollowTraj::DoInitialize(const IiwaState& state) {
+  MoveTool::DoInitialize(state);
+  reset_pose_integrator();
+}
+
+Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(const IiwaState& state) {
   const double interp_t = get_in_state_time(state);
   const Isometry3<double> X_GT = ee_traj_.get_pose(interp_t);
-  return jjz::X_WG * X_GT;
+  Isometry3<double> X_WT = jjz::X_WG * X_GT;
+
+  // Just servo wrt to force.
+  if (is_integrating()) {
+    Vector3<double> f_err_W = f_W_d_ - state.get_ext_wrench().tail<3>();
+    for (int i = 0; i < 3; i++) {
+      if (std::abs(f_err_W[i]) < f_W_dead_zone_[i]) {
+        f_err_W[i] = 0;
+      }
+    }
+    // -= because of reaction force.
+    pose_err_I_.translation() -= (f_err_W.array() * ki_.tail<3>().array()).matrix();
+  }
+
+  X_WT.translation() += pose_err_I_.translation();
+
+  return X_WT;
 }
 
 bool MoveToolFollowTraj::IsDone(const IiwaState& state) const {
