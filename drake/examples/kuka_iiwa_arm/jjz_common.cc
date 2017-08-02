@@ -16,7 +16,7 @@ const Isometry3<double> X_ET(
     Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) *
     Isometry3<double>(R_ET));
 const Isometry3<double> X_WG(
-    Eigen::Translation<double, 3>(Vector3<double>(0.5, 0.2, 0.)) *
+    Eigen::Translation<double, 3>(Vector3<double>(0.6, 0.2, 0.)) *
     AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
 const std::string kEEName("iiwa_link_7");
 
@@ -132,7 +132,8 @@ VectorX<double> PointIk(const Isometry3<double>& X_WT,
 
 // Returned stuff is in ZZJ's Goal frame. 0 is origin of Goal frame.
 manipulation::PiecewiseCartesianTrajectory<double>
-PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
+PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
+                                 const Isometry3<double>& X_WG, double duration,
                                  std::string load_file_name) {
   std::unique_ptr<MultiPushActionsPlanner> multi_action_planner;
 
@@ -158,10 +159,7 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
     Eigen::Matrix<double, Eigen::Dynamic, 2> ct_pts(num_actions, 2);
     Eigen::Matrix<double, Eigen::Dynamic, 2> normal_pts(num_actions, 2);
     ct_pts << 0, -height / 2, -width / 2, 0, 0, height / 2, width / 2, 0;
-    normal_pts << 0, 1,
-                  1, 0,
-                  0, -1,
-                  -1, 0;
+    normal_pts << 0, 1, 1, 0, 0, -1, -1, 0;
 
     std::vector<Eigen::Vector2d> all_contact_points;
     std::vector<Eigen::Vector2d> all_normals;
@@ -212,6 +210,14 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
   multi_action_planner->Plan(x_GQ, num_way_pts_perseg, &action_id,
                              &all_object_poses, &all_pusher_poses);
 
+  for (unsigned i = 0; i < all_object_poses.size(); ++i) {
+    std::cout << "Segment Traj " << i << std::endl;
+    std::cout << "Action id " << action_id[i] << std::endl;
+    for (unsigned j = 0; j < all_object_poses[i].rows(); ++j) {
+      std::cout << all_object_poses[i].row(j) << std::endl;
+    }
+  }
+
   int num_switches = 0;
   for (unsigned i = 0; i < action_id.size() - 1; ++i) {
     if (action_id[i] != action_id[i + 1]) {
@@ -230,9 +236,14 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
   int total_way_points =
       num_points_per_seg * num_action_segs + 3 * (num_switches);
   std::vector<double> times(total_way_points);
+  std::vector<Isometry3<double>> X_WT(total_way_points,
+                                      Isometry3<double>::Identity());
+
+  /*
   std::vector<MatrixX<double>> pos(total_way_points,
                                    MatrixX<double>::Zero(3, 1));
   eigen_aligned_std_vector<Quaternion<double>> rot(total_way_points);
+  */
 
   double cur_time = 0.0;
   int index = 0;
@@ -243,8 +254,14 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
     for (int i = 0; i < num_way_points; ++i) {
       cur_time = cur_time + dt;
       times[index] = cur_time;
-      pos[index](0, 0) = pusher_poses(i, 0);
-      pos[index](1, 0) = pusher_poses(i, 1);
+
+      // This is really X_GT
+      X_WT[index].translation()[0] = pusher_poses(i, 0);
+      X_WT[index].translation()[1] = pusher_poses(i, 1);
+
+      // pos[index](0, 0) = pusher_poses(i, 0);
+      // pos[index](1, 0) = pusher_poses(i, 1);
+
       // std::cout << index << " : " << cur_time <<"," << pos[index](0, 0) <<
       // "," << pos[index](1, 0) << std::endl;
       // std::cout << "jjz: pusher pose" << pusher_poses.row(i) << "\n";
@@ -255,7 +272,10 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
                 << "\n";
       Matrix3<double> X_GT(AngleAxis<double>(pusher_poses(i, 2) + M_PI / 2.,
                                              Vector3<double>::UnitZ()));
-      rot[index] = Quaternion<double>(X_GT);
+      // rot[index] = Quaternion<double>(X_GT);
+      X_WT[index].linear() = X_GT;
+      X_WT[index] = X_WG * X_WT[index];
+
       ++index;
     }
     if (id_traj < num_action_segs - 1 &&
@@ -263,10 +283,15 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
       // The robot first moves up.
       cur_time = cur_time + time_lift_up;
       times[index] = cur_time;
+      /*
       pos[index] = pos[index - 1];
       // Add z value.
       pos[index](2, 0) = dist_lift_up;
       rot[index] = rot[index - 1];
+      */
+      X_WT[index] = X_WT[index - 1];
+      X_WT[index].translation()[2] = dist_lift_up;
+
       index++;
       // The robot then moves to the plane above the next pushing location and
       // align with the initial pose of the next trajectory.
@@ -274,26 +299,51 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
       times[index] = cur_time;
       Eigen::Vector3d nxt_push_pose =
           all_pusher_poses[id_traj + 1].row(0).transpose();
+      /*
       pos[index](0, 0) = nxt_push_pose(0);
       pos[index](1, 0) = nxt_push_pose(1);
       pos[index](2, 0) = dist_lift_up;
+      */
+      // This is really X_GT
+      X_WT[index].translation()(0) = nxt_push_pose(0);
+      X_WT[index].translation()(1) = nxt_push_pose(1);
+      X_WT[index].translation()(2) = dist_lift_up;
+
       std::cout << "t: " << cur_time << ", pose " << nxt_push_pose.transpose()
                 << "\n";
       Matrix3<double> X_GT(AngleAxis<double>(nxt_push_pose(2) + M_PI / 2.,
                                              Vector3<double>::UnitZ()));
-      rot[index] = Quaternion<double>(X_GT);
+      // rot[index] = Quaternion<double>(X_GT);
+      X_WT[index].linear() = X_GT;
+      X_WT[index] = X_WG * X_WT[index];
+
       index++;
       // The robot then moves down to the next pushing location.
       cur_time = cur_time + time_move_down;
       times[index] = cur_time;
+      /*
       pos[index](0, 0) = nxt_push_pose(0);
       pos[index](1, 0) = nxt_push_pose(1);
       rot[index] = rot[index - 1];
+      */
+      X_WT[index].translation()[0] = nxt_push_pose(0);
+      X_WT[index].translation()[1] = nxt_push_pose(1);
+      X_WT[index].linear() = X_GT;
+      X_WT[index] = X_WG * X_WT[index];
       index++;
     }
   }
+  DRAKE_DEMAND(index == total_way_points);
 
   std::cout << "i tot" << index << " " << total_way_points << "\n";
+
+  std::vector<MatrixX<double>> pos(total_way_points,
+                                   MatrixX<double>::Zero(3, 1));
+  eigen_aligned_std_vector<Quaternion<double>> rot(total_way_points);
+  for (int i = 0; i < total_way_points; i++) {
+    pos[i] = X_WT[i].translation();
+    rot[i] = Quaternion<double>(X_WT[i].linear());
+  }
 
   PiecewiseQuaternionSlerp<double> rot_traj(times, rot);
   PiecewisePolynomial<double> pos_traj =

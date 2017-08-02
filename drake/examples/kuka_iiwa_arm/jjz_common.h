@@ -65,8 +65,10 @@ VectorX<double> PointIk(const Isometry3<double>& X_WT,
                         const RigidBodyFrame<double>& frame_T,
                         RigidBodyTree<double>* robot);
 
+// Returns a trajectory of T in W frame.
 manipulation::PiecewiseCartesianTrajectory<double>
-PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ, double duration,
+PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
+                                 const Isometry3<double>& X_WG, double duration,
                                  std::string load_file_name = "");
 
 }  // namespace jjz

@@ -8,18 +8,21 @@ struct lcmt_jjz_controller {
 
   double dt;
 
+  // Measured.
+  double q[7];
+  double X_WT[7];
+  double V_WT[6];
+  double ext_wrench[6];  // tau, f.
+
+  // Desired.
   // xyz wxyz
-  double X_WE_d[7];
-  double X_WE_ik[7];
-  double X_WE[7];
+  double X_WT_d[7];
+  double X_WT_int[7];
 
   // wx wy wz, xd yd zd
-  double V_WE_d[6];
-  double V_WE[6];
+  double V_WT_d[6];
 
-  double q0[7];
-  double q1[7];
-
-  // tau, f.
-  double ext_wrench[6];
+  // IK's internal state.
+  double X_WT_ik[7];
+  double q_ik[7];
 }

@@ -1,19 +1,18 @@
 #include "drake/examples/kuka_iiwa_arm/jjz_primitives.h"
+#include "drake/common/drake_assert.h"
 
 namespace drake {
 namespace examples {
 namespace jjz {
 
 ///////////////////////////////////////////////////////////
-MoveJoint::MoveJoint(const std::string& name, const VectorX<double>& q_d,
-                     double duration)
-    : FSMState(name), duration_(duration), q_end_(q_d) {}
-
-void MoveJoint::DoInitialize(const IiwaState& state) {
-  std::vector<double> times = {0, duration_};
-  std::vector<MatrixX<double>> knots = {state.get_q(), q_end_};
-  const int size = state.get_q().size();
-  MatrixX<double> zero = MatrixX<double>::Zero(size, 1);
+MoveJoint::MoveJoint(const std::string& name, const VectorX<double>& q0,
+                     const VectorX<double>& q1, double duration)
+    : FSMState(name) {
+  DRAKE_DEMAND(q0.size() == q1.size());
+  std::vector<double> times = {0, duration};
+  std::vector<MatrixX<double>> knots = {q0, q1};
+  MatrixX<double> zero = MatrixX<double>::Zero(q0.size(), 1);
   traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
 }
 
@@ -24,23 +23,20 @@ void MoveJoint::Control(const IiwaState& state,
 }
 
 bool MoveJoint::IsDone(const IiwaState& state) const {
-  return (get_in_state_time(state) > duration_ + 0.5);
+  return get_in_state_time(state) > (traj_.getEndTime() + 0.5);
 }
 
 ///////////////////////////////////////////////////////////
 MoveTool::MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
-                   const VectorX<double>& q0, const VectorX<double>& q_norm)
+                   const VectorX<double>& q0)
     : FSMState(name),
       robot_(*robot),
       frame_T_("tool", robot_.FindBody(jjz::kEEName), jjz::X_ET),
       cache_(robot_.CreateKinematicsCache()),
       jaco_planner_(robot),
-      q_norm_(q_norm) {
+      q_norm_(robot_.getZeroConfiguration()) {
   cache_.initialize(q0);
   robot_.doKinematics(cache_);
-
-  gain_T_ = Vector6<double>::Constant(1);
-  gain_T_(1) = 0;  // no pitch tracking.
 }
 
 void MoveTool::DoInitialize(const IiwaState& state) {
@@ -74,18 +70,13 @@ void MoveTool::Control(const IiwaState& state,
 ///////////////////////////////////////////////////////////
 MoveToolFollowTraj::MoveToolFollowTraj(
     const std::string& name, const RigidBodyTree<double>* robot,
-    const VectorX<double>& q0, const VectorX<double>& q_norm,
+    const VectorX<double>& q0,
     const manipulation::PiecewiseCartesianTrajectory<double>& traj)
-    : MoveTool(name, robot, q0, q_norm), ee_traj_(traj) {}
+    : MoveTool(name, robot, q0), X_WT_traj_(traj) {}
 
-Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
-    const IiwaState& state) {
-  const double interp_t = get_in_state_time(state);
-  const Isometry3<double> X_GT = ee_traj_.get_pose(interp_t);
-  Isometry3<double> X_WT = jjz::X_WG * X_GT;
-
+void MoveToolFollowTraj::Update(const IiwaState& state) {
   // Just servo wrt to force.
-  if (is_integrating()) {
+  if (is_force_servo()) {
     Vector3<double> f_err_W = f_W_d_ - state.get_ext_wrench().tail<3>();
     for (int i = 0; i < 3; i++) {
       if (std::abs(f_err_W[i]) < f_W_dead_zone_[i]) {
@@ -102,14 +93,37 @@ Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
         clamp(pose_err_I_.translation()[i], -pos_I_range_[i], pos_I_range_[i]);
   }
 
-  X_WT.translation() += pose_err_I_.translation();
+  // Call the parent's
+  MoveTool::Update(state);
+}
 
+Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
+    const IiwaState& state) const {
+  const double interp_t = get_in_state_time(state);
+  Isometry3<double> X_WT = X_WT_traj_.get_pose(interp_t);
+  X_WT.translation() += pose_err_I_.translation();
   return X_WT;
 }
 
 bool MoveToolFollowTraj::IsDone(const IiwaState& state) const {
-  const double duration = ee_traj_.get_position_trajectory().get_end_time();
-  return (get_in_state_time(state) > duration + 0.5);
+  const double duration = X_WT_traj_.get_position_trajectory().get_end_time();
+  bool ret = get_in_state_time(state) > (duration + 0.5);
+  if (is_force_servo()) {
+    ret &= has_touched(state);
+  }
+  return ret;
+}
+
+bool MoveToolFollowTraj::has_touched(const IiwaState& state) const {
+  DRAKE_DEMAND(is_force_servo());
+
+  Vector3<double> f_err_W = f_W_d_ - state.get_ext_wrench().tail<3>();
+  for (int i = 0; i < 3; i++) {
+    if (std::abs(f_err_W[i]) < f_W_dead_zone_[i]) {
+      f_err_W[i] = 0;
+    }
+  }
+  return f_err_W.norm() < 1;
 }
 
 }  // namespace jjz

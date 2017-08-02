@@ -43,6 +43,8 @@ const std::string kPath =
     "iiwa14_polytope_collision.urdf";
 const Isometry3<double> kBaseOffset = Isometry3<double>::Identity();
 
+using manipulation::PiecewiseCartesianTrajectory;
+
 class RobotPlanRunner {
  public:
   RobotPlanRunner(const RigidBodyTree<double>& robot)
@@ -74,7 +76,7 @@ class RobotPlanRunner {
     PiecewisePolynomial<double> traj;
 
     // traj for cartesian mode.
-    manipulation::PiecewiseCartesianTrajectory<double> ee_traj;
+    manipulation::PiecewiseCartesianTrajectory<double> X_WT_traj;
 
     // Starting point.
     Vector3<double> x_GQ(0, 0, M_PI / 2.);
@@ -83,9 +85,10 @@ class RobotPlanRunner {
         AngleAxis<double>(x_GQ[2], Vector3<double>::UnitZ()).toRotationMatrix();
     X_GQ.translation() = Vector3<double>(x_GQ[0], x_GQ[1], 0);
 
-    // ee_traj = jjz::PlanPlanarPushingTrajMultiAction(x_GQ, 5);
-    ee_traj = jjz::PlanPlanarPushingTrajMultiAction(x_GQ, 5, "graph.txt");
-    VectorX<double> q1 = jjz::PointIk(jjz::X_WG * ee_traj.get_pose(0), frame_T_,
+    // X_WT_traj = jjz::PlanPlanarPushingTrajMultiAction(x_GQ, jjz::X_WG, 5);
+    X_WT_traj =
+        jjz::PlanPlanarPushingTrajMultiAction(x_GQ, jjz::X_WG, 5, "graph.txt");
+    VectorX<double> q1 = jjz::PointIk(X_WT_traj.get_pose(0), frame_T_,
                                       (RigidBodyTree<double>*)&robot_);
 
     // VERY IMPORTANT HACK, To make sure that no stale messages are in the
@@ -113,7 +116,7 @@ class RobotPlanRunner {
         first_tick = false;
 
         // Make initial plan to go to q1.
-        plan.reset(new jjz::MoveJoint("go_to_q1", q1, 3.));
+        plan.reset(new jjz::MoveJoint("go_to_q1", state.get_q(), q1, 3.));
       }
 
       if (!plan->is_init()) {
@@ -131,17 +134,83 @@ class RobotPlanRunner {
 
       // state transition.
       if (plan->IsDone(state)) {
+        /*
         // Servo + traj follow after go_to_q1 is done.
         if (plan->get_name().compare("go_to_q1") == 0) {
-          VectorX<double> q_nominal = robot_.getZeroConfiguration();
           jjz::MoveToolFollowTraj* new_plan = new jjz::MoveToolFollowTraj(
-              "pushing", &robot_, q1, q_nominal, ee_traj);
+              "pushing", &robot_, q1, X_WT_traj);
           new_plan->set_integrating(true);
           new_plan->set_f_W_d(Vector3<double>(0, 0, 1));
           new_plan->set_ki_force(Vector3<double>::Constant(0.00001));
           new_plan->set_f_W_dead_zone(Vector3<double>(INFINITY, INFINITY, 0));
           new_plan->set_position_int_max_range(Vector3<double>::Constant(0.2));
           plan.reset(new_plan);
+        }
+        */
+
+        // go straight dodwn.
+        if (plan->get_name().compare("go_to_q1") == 0) {
+          auto cache = robot_.CreateKinematicsCache();
+          cache.initialize(q1);
+          robot_.doKinematics(cache);
+          Isometry3<double> X_WT0 =
+              robot_.CalcFramePoseInWorldFrame(cache, frame_T_);
+          Isometry3<double> X_WT1 = X_WT0;
+          X_WT1.translation()[2] -= 0.05;
+
+          auto traj = PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity({0, 2}, {X_WT0, X_WT1},
+                                                   Vector3<double>::Zero(),
+                                                   Vector3<double>::Zero());
+
+          jjz::MoveToolFollowTraj* new_plan = new jjz::MoveToolFollowTraj(
+              "move_straight_down", &robot_, q1, traj);
+
+          new_plan->set_force_servo(true);
+          new_plan->set_f_W_d(Vector3<double>(0, 0, 10));
+          new_plan->set_ki_force(Vector3<double>::Constant(0.00001));
+          new_plan->set_f_W_dead_zone(Vector3<double>(INFINITY, INFINITY, 5));
+          new_plan->set_position_int_max_range(Vector3<double>::Constant(0.2));
+          plan.reset(new_plan);
+        } else if (plan->get_name().compare("move_straight_down") == 0 ||
+                   plan->get_name().compare("drag_right") == 0) {
+          jjz::MoveToolFollowTraj* move_plan =
+              dynamic_cast<jjz::MoveToolFollowTraj*>(plan.get());
+          // Reset the traj from the current ik's T frame to some random thing.
+          Isometry3<double> X_WT0 = move_plan->get_X_WT_ik();
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, -0.2, 0)) *
+              X_WT0 * AngleAxis<double>(M_PI / 4., Vector3<double>::UnitZ());
+          auto traj = PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity({0, 2}, {X_WT0, X_WT1},
+                                                   Vector3<double>::Zero(),
+                                                   Vector3<double>::Zero());
+          move_plan->set_X_WT_traj(traj);
+
+          // Need to clear the integrator.
+          move_plan->reset_pose_integrator();
+          move_plan->set_name("drag_left");
+          // Reset the timer.
+          move_plan->Initialize(state);
+        } else if (plan->get_name().compare("drag_left") == 0) {
+          jjz::MoveToolFollowTraj* move_plan =
+              dynamic_cast<jjz::MoveToolFollowTraj*>(plan.get());
+          // Reset the traj from the current ik's T frame to some random thing.
+          Isometry3<double> X_WT0 = move_plan->get_X_WT_ik();
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, 0.2, 0)) *
+              X_WT0 * AngleAxis<double>(-M_PI / 4., Vector3<double>::UnitZ());
+          auto traj = PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity({0, 2}, {X_WT0, X_WT1},
+                                                   Vector3<double>::Zero(),
+                                                   Vector3<double>::Zero());
+          move_plan->set_X_WT_traj(traj);
+
+          // Need to clear the integrator.
+          move_plan->reset_pose_integrator();
+          move_plan->set_name("drag_right");
+          // Reset the timer.
+          move_plan->Initialize(state);
         }
         // Others.
       }
