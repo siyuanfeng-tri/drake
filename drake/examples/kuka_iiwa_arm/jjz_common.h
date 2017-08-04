@@ -2,6 +2,7 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/lcmt_iiwa_status.hpp"
+#include "drake/lcmt_jjz_controller.hpp"
 #include "drake/manipulation/util/trajectory_utils.h"
 #include "drake/multibody/rigid_body_tree.h"
 
@@ -16,15 +17,16 @@ extern const std::string kEEName;
 
 inline double get_system_time() {
   struct timespec the_tp;
-  clock_gettime( CLOCK_REALTIME, &the_tp );
-  return ((double) (the_tp.tv_sec)) + 1.0e-9*the_tp.tv_nsec;
+  clock_gettime(CLOCK_REALTIME, &the_tp);
+  return ((double)(the_tp.tv_sec)) + 1.0e-9 * the_tp.tv_nsec;
 }
 
 class IiwaState {
  public:
   static constexpr double kUninitTime = -1.0;
 
-  IiwaState(const RigidBodyTree<double>& iiwa);
+  IiwaState(const RigidBodyTree<double>& iiwa,
+            const RigidBodyFrame<double>& frame_T);
   bool UpdateState(const lcmt_iiwa_status& msg);
   const KinematicsCache<double>& get_cache() const { return cache_; }
   const VectorX<double>& get_q() const { return q_; }
@@ -32,12 +34,14 @@ class IiwaState {
   const VectorX<double>& get_ext_trq() const { return ext_trq_; }
   const VectorX<double>& get_trq() const { return trq_; }
   const Vector6<double>& get_ext_wrench() const { return ext_wrench_; }
+  const Isometry3<double>& get_X_WT() const { return X_WT_; }
+  const Vector6<double>& get_V_WT() const { return V_WT_; }
   double get_time() const { return time_; }
   double get_dt() const { return delta_time_; }
 
  private:
   const RigidBodyTree<double>& iiwa_;
-  const RigidBody<double>& end_effector_;
+  const RigidBodyFrame<double>& frame_T_;
   KinematicsCache<double> cache_;
   double time_{kUninitTime};
   double delta_time_{0};
@@ -48,11 +52,16 @@ class IiwaState {
   VectorX<double> ext_trq_;
   MatrixX<double> J_;
 
+  Isometry3<double> X_WT_;
+  Vector6<double> V_WT_;
+
   // J^T * F = ext_trq_
   Vector6<double> ext_wrench_;
 
   bool init_{false};
 };
+
+void FillDebugMessage(const IiwaState& state, lcmt_jjz_controller* msg);
 
 template <typename T>
 const T& clamp(const T& val, const T& lo, const T& hi) {

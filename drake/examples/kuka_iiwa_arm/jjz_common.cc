@@ -5,6 +5,7 @@
 
 #include "drake/examples/PlanarPushing/dubins_interface.h"
 #include "drake/examples/PlanarPushing/pushing_multi_actions.h"
+#include "drake/util/drakeUtil.h"
 
 namespace drake {
 namespace examples {
@@ -20,9 +21,10 @@ const Isometry3<double> X_WG(
     AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
 const std::string kEEName("iiwa_link_7");
 
-IiwaState::IiwaState(const RigidBodyTree<double>& iiwa)
+IiwaState::IiwaState(const RigidBodyTree<double>& iiwa,
+                     const RigidBodyFrame<double>& frame_T)
     : iiwa_(iiwa),
-      end_effector_(*iiwa_.FindBody(kEEName)),
+      frame_T_(frame_T),
       cache_(iiwa.CreateKinematicsCache()),
       q_(VectorX<double>::Zero(iiwa.get_num_positions())),
       v_(VectorX<double>::Zero(iiwa.get_num_velocities())),
@@ -40,22 +42,17 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   // Same time stamp, should just return.
   if (init_ && cur_time == time_) return false;
 
-  // Do velocity update first.
   if (init_) {
-    // TODO need to filter.
     delta_time_ = cur_time - time_;
-    for (int i = 0; i < msg.num_joints; ++i) {
-      v_[i] = (msg.joint_position_measured[i] - q_[i]) / delta_time_;
-    }
   } else {
     delta_time_ = 0;
-    v_.setZero();
   }
 
   // Update time, position, and torque.
   time_ = cur_time;
   for (int i = 0; i < msg.num_joints; ++i) {
     q_[i] = msg.joint_position_measured[i];
+    v_[i] = msg.joint_velocity_estimated[i];
     trq_[i] = msg.joint_torque_measured[i];
     ext_trq_[i] = msg.joint_torque_external[i];
   }
@@ -63,12 +60,29 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   // Update kinematics.
   cache_.initialize(q_, v_);
   iiwa_.doKinematics(cache_);
-  J_ = iiwa_.CalcBodySpatialVelocityJacobianInWorldFrame(cache_, end_effector_);
+  J_ = iiwa_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
   ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
+
+  X_WT_ = iiwa_.CalcFramePoseInWorldFrame(cache_, frame_T_);
+  V_WT_ = iiwa_.CalcFrameSpatialVelocityInWorldFrame(cache_, frame_T_);
 
   init_ = true;
 
   return true;
+}
+
+void FillDebugMessage(const IiwaState& state, lcmt_jjz_controller* msg) {
+  msg->utime = state.get_time() * 1e6;
+  msg->dt = state.get_dt();
+
+  eigenVectorToCArray(state.get_q(), msg->q);
+  eigenVectorToCArray(state.get_v(), msg->v);
+
+  Eigen::Matrix<double, 7, 1> tmp_pose = jjz::pose_to_vec(state.get_X_WT());
+  eigenVectorToCArray(tmp_pose, msg->X_WT);
+  eigenVectorToCArray(state.get_V_WT(), msg->V_WT);
+
+  eigenVectorToCArray(state.get_ext_wrench(), msg->ext_wrench);
 }
 
 Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose) {

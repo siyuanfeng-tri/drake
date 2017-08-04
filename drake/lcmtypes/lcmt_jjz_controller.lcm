@@ -10,6 +10,7 @@ struct lcmt_jjz_controller {
 
   // Measured.
   double q[7];
+  double v[7];
   double X_WT[7];
   double V_WT[6];
   double ext_wrench[6];  // tau, f.

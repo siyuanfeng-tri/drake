@@ -1,9 +1,10 @@
 #pragma once
 
 #include "drake/common/eigen_types.h"
+#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
 #include "drake/multibody/rigid_body_tree.h"
 
-#include "drake/examples/kuka_iiwa_arm/jjz_common.h"
+#include "drake/lcmt_jjz_controller.hpp"
 #include "drake/manipulation/planner/jacobian_ik.h"
 #include "drake/manipulation/util/trajectory_utils.h"
 
@@ -35,9 +36,9 @@ class FSMState {
 
   void set_name(const std::string& name) { name_ = name; }
 
-  virtual void Update(const IiwaState& state) {}
-  virtual void Control(const IiwaState& state,
-                       Eigen::Ref<VectorX<double>> q_d) const {}
+  virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
+  virtual void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
+                       lcmt_jjz_controller* msg) const {}
   virtual bool IsDone(const IiwaState& state) const { return false; }
 
  protected:
@@ -54,8 +55,8 @@ class MoveJoint : public FSMState {
   MoveJoint(const std::string& name, const VectorX<double>& q0,
             const VectorX<double>& q1, double duration);
 
-  void Control(const IiwaState& state,
-               Eigen::Ref<VectorX<double>> q_d) const override;
+  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
+               lcmt_jjz_controller* msg) const override;
   bool IsDone(const IiwaState& state) const override;
 
  private:
@@ -68,9 +69,9 @@ class MoveTool : public FSMState {
            const VectorX<double>& q0);
 
   void DoInitialize(const IiwaState& state) override;
-  void Update(const IiwaState& state) override;
-  void Control(const IiwaState& state,
-               Eigen::Ref<VectorX<double>> q_d) const override;
+  void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
+  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
+               lcmt_jjz_controller* msg) const override;
 
   virtual Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const = 0;
@@ -105,7 +106,7 @@ class MoveToolFollowTraj : public MoveTool {
     X_WT_traj_ = traj;
   }
 
-  void Update(const IiwaState& state) override;
+  void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
   bool IsDone(const IiwaState& state) const override;
   Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const override;

@@ -36,7 +36,7 @@ namespace {
 
 const char* const kLcmStatusChannel = "IIWA_STATUS";
 const char* const kLcmCommandChannel = "IIWA_COMMAND";
-// const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
+const char* const kLcmJjzControllerDebug = "CTRL_DEBUG";
 
 const std::string kPath =
     "drake/manipulation/models/iiwa_description/urdf/"
@@ -66,11 +66,9 @@ class RobotPlanRunner {
 
     iiwa_status_.utime = -1;
     bool first_tick = true;
-    jjz::IiwaState state(robot_);
+    jjz::IiwaState state(robot_, frame_T_);
 
     VectorX<double> q_cmd(7);
-    lcmt_jjz_controller ctrl_debug{};
-    ctrl_debug.wall_time = -1;
 
     // traj for GOTO state.
     PiecewisePolynomial<double> traj;
@@ -107,6 +105,8 @@ class RobotPlanRunner {
       }
 
       DRAKE_DEMAND(state.UpdateState(iiwa_status_));
+      lcmt_jjz_controller ctrl_debug{};
+      jjz::FillDebugMessage(state, &ctrl_debug);
 
       // Initialize command to measured q.
       if (first_tick) {
@@ -122,8 +122,8 @@ class RobotPlanRunner {
       if (!plan->is_init()) {
         plan->Initialize(state);
       }
-      plan->Update(state);
-      plan->Control(state, q_cmd);
+      plan->Update(state, &ctrl_debug);
+      plan->Control(state, q_cmd, &ctrl_debug);
 
       // send command
       iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
@@ -131,6 +131,9 @@ class RobotPlanRunner {
         iiwa_command.joint_position[i] = q_cmd[i];
       }
       lcm_.publish(kLcmCommandChannel, &iiwa_command);
+
+      // send debug msg.
+      lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
 
       // state transition.
       if (plan->IsDone(state)) {
@@ -167,7 +170,7 @@ class RobotPlanRunner {
               "move_straight_down", &robot_, q1, traj);
 
           new_plan->set_force_servo(true);
-          new_plan->set_f_W_d(Vector3<double>(0, 0, 10));
+          new_plan->set_f_W_d(Vector3<double>(0, 0, 15));
           new_plan->set_ki_force(Vector3<double>::Constant(0.00001));
           new_plan->set_f_W_dead_zone(Vector3<double>(INFINITY, INFINITY, 5));
           new_plan->set_position_int_max_range(Vector3<double>::Constant(0.2));
@@ -286,28 +289,6 @@ manipulation::PiecewiseCartesianTrajectory<double> GenerateToolTraj(
                                                             rot_traj);
 }
 */
-
-/*
-      // Make debug msg.
-      ctrl_debug.utime = static_cast<int64_t>(state.get_time() * 1e6);
-      if (ctrl_debug.wall_time == -1) {
-        ctrl_debug.wall_dt = 0;
-      } else {
-        ctrl_debug.wall_dt = wall_clock - (ctrl_debug.wall_time / 1e6);
-      }
-      ctrl_debug.wall_time = static_cast<int64_t>(wall_clock * 1e6);
-      ctrl_debug.dt = control_dt;
-
-      Isometry3<double> X_WT =
-          robot_.CalcFramePoseInWorldFrame(state.get_cache(), frame_T_);
-      auto tmp = jjz::pose_to_vec(X_WT);
-      eigenVectorToCArray(tmp, ctrl_debug.X_WE);
-
-      eigenVectorToCArray(state.get_ext_wrench(), ctrl_debug.ext_wrench);
-      eigenVectorToCArray(state.get_q(), ctrl_debug.q0);
-      eigenVectorToCArray(q_cmd, ctrl_debug.q1);
-      lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);
-      */
 
 /*
 manipulation::PiecewiseCartesianTrajectory<double> PlanPlanarPushingTraj(

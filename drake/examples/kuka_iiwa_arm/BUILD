@@ -108,6 +108,7 @@ drake_cc_library(
     deps = [
         "//drake/common:common",
         "//drake/lcmtypes:iiwa",
+        "//drake/lcmtypes:jjz_controller",
         "//drake/examples/PlanarPushing:planar_pushing",
         "//drake/manipulation/planner:jacobian_ik",
         "//drake/manipulation/util:trajectory_utils",
@@ -242,7 +243,6 @@ drake_cc_binary(
         ":iiwa_common",
         ":jjz",
         ":iiwa_lcm",
-        "//drake/lcmtypes:jjz_controller",
         "//drake/multibody:inverse_kinematics",
         "//drake/manipulation/planner:jacobian_ik",
         "//drake/manipulation/util:trajectory_utils",
