@@ -61,7 +61,7 @@ class RobotPlanRunner {
     lcmt_iiwa_command iiwa_command;
     iiwa_command.num_joints = robot_.get_num_positions();
     iiwa_command.joint_position.resize(robot_.get_num_positions(), 0.);
-    iiwa_command.num_torques = 0;
+    iiwa_command.num_torques = robot_.get_num_positions();
     iiwa_command.joint_torque.resize(robot_.get_num_positions(), 0.);
 
     iiwa_status_.utime = -1;

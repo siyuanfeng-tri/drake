@@ -63,7 +63,6 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   // Update kinematics.
   cache_.initialize(q_, v_);
   iiwa_.doKinematics(cache_);
-
   J_ = iiwa_.CalcBodySpatialVelocityJacobianInWorldFrame(cache_, end_effector_);
   ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
 

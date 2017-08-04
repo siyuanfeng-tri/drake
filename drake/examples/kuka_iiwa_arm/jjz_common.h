@@ -14,6 +14,12 @@ extern const Isometry3<double> X_ET;
 extern const Isometry3<double> X_WG;
 extern const std::string kEEName;
 
+inline double get_system_time() {
+  struct timespec the_tp;
+  clock_gettime( CLOCK_REALTIME, &the_tp );
+  return ((double) (the_tp.tv_sec)) + 1.0e-9*the_tp.tv_nsec;
+}
+
 class IiwaState {
  public:
   static constexpr double kUninitTime = -1.0;
