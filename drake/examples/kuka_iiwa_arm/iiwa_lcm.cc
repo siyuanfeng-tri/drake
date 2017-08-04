@@ -27,19 +27,22 @@ IiwaCommandReceiver::IiwaCommandReceiver(int num_joints)
     : num_joints_(num_joints) {
   this->DeclareAbstractInputPort();
   this->DeclareVectorOutputPort(systems::BasicVector<double>(num_joints_ * 2),
-                                &IiwaCommandReceiver::OutputCommand);
+                                &IiwaCommandReceiver::OutputStateCmd);
+  this->DeclareVectorOutputPort(systems::BasicVector<double>(num_joints_),
+                                &IiwaCommandReceiver::OutputTrqCmd);
   this->DeclarePeriodicDiscreteUpdate(kIiwaLcmStatusPeriod);
-  this->DeclareDiscreteState(num_joints_ * 2);
+  this->DeclareDiscreteState(num_joints_ * 3);
 }
 
 void IiwaCommandReceiver::set_initial_position(
     Context<double>* context,
-    const Eigen::Ref<const VectorX<double>> x) const {
+    const Eigen::Ref<const VectorX<double>> q) const {
   auto state_value =
       context->get_mutable_discrete_state(0)->get_mutable_value();
-  DRAKE_ASSERT(x.size() == num_joints_);
-  state_value.head(num_joints_) = x;
-  state_value.tail(num_joints_) = VectorX<double>::Zero(num_joints_);
+  DRAKE_ASSERT(q.size() == num_joints_);
+  state_value.head(num_joints_) = q;
+  state_value.segment(num_joints_, num_joints_).setZero();
+  state_value.tail(num_joints_).setZero();
 }
 
 void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
@@ -49,9 +52,6 @@ void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
   const systems::AbstractValue* input = this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(input != nullptr);
   const auto& command = input->GetValue<lcmt_iiwa_command>();
-  // TODO(sam.creasey) Support torque control.
-  DRAKE_ASSERT(command.num_torques == 0);
-
 
   // If we're using a default constructed message (haven't received
   // a command yet), keep using the initial state.
@@ -64,17 +64,30 @@ void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
 
     BasicVector<double>* state = discrete_state->get_mutable_vector(0);
     auto state_value = state->get_mutable_value();
-    state_value.tail(num_joints_) =
+    // Velocity
+    state_value.segment(num_joints_, num_joints_) =
         (new_positions - state_value.head(num_joints_)) / kIiwaLcmStatusPeriod;
+    // Position
     state_value.head(num_joints_) = new_positions;
+    // Torque
+    for (int i = 0; i < command.num_joints; ++i) {
+      state_value(2 * num_joints_ + i) = command.joint_torque[i];
+    }
   }
 }
 
-void IiwaCommandReceiver::OutputCommand(const Context<double>& context,
-                                        BasicVector<double>* output) const {
+void IiwaCommandReceiver::OutputStateCmd(const Context<double>& context,
+                                         BasicVector<double>* output) const {
   Eigen::VectorBlock<VectorX<double>> output_vec =
       output->get_mutable_value();
-  output_vec = context.get_discrete_state(0)->get_value();
+  output_vec = context.get_discrete_state(0)->get_value().head(num_joints_ * 2);
+}
+
+void IiwaCommandReceiver::OutputTrqCmd(const systems::Context<double>& context,
+    systems::BasicVector<double>* output) const {
+  Eigen::VectorBlock<VectorX<double>> output_vec =
+      output->get_mutable_value();
+  output_vec = context.get_discrete_state(0)->get_value().tail(num_joints_);
 }
 
 IiwaCommandSender::IiwaCommandSender(int num_joints)
@@ -206,6 +219,7 @@ lcmt_iiwa_status IiwaStatusSender::MakeOutputStatus() const {
   lcmt_iiwa_status msg{};
   msg.num_joints = num_joints_;
   msg.joint_position_measured.resize(msg.num_joints, 0);
+  msg.joint_velocity_estimated.resize(msg.num_joints, 0);
   msg.joint_position_commanded.resize(msg.num_joints, 0);
   msg.joint_position_ipo.resize(msg.num_joints, 0);
   msg.joint_torque_measured.resize(msg.num_joints, 0);
@@ -226,6 +240,7 @@ void IiwaStatusSender::OutputStatus(
       this->EvalVectorInput(context, state_input_index_);
   for (int i = 0; i < num_joints_; ++i) {
     status.joint_position_measured[i] = state->GetAtIndex(i);
+    status.joint_velocity_estimated[i] = state->GetAtIndex(i + num_joints_);
     status.joint_position_commanded[i] = command->GetAtIndex(i);
 
     q_[i] = state->GetAtIndex(i);
@@ -248,7 +263,7 @@ void IiwaStatusSender::OutputStatus(
     for (int i = 0; i < num_joints_; ++i) {
       status.joint_torque_measured[i] = torque->GetAtIndex(i);
       status.joint_torque_external[i] =
-          - status.joint_torque_measured[i] + inv_dyn_trq_[i];
+          status.joint_torque_measured[i] - inv_dyn_trq_[i];
     }
   }
 }

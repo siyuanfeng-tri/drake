@@ -13,8 +13,9 @@ namespace jjz {
 
 const Matrix3<double> R_ET(
     AngleAxis<double>(M_PI, Vector3<double>::UnitY()).toRotationMatrix());
+// 0.055 is to the rubber plate.
 const Isometry3<double> X_ET(
-    Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.15)) *
+    Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.055)) *
     Isometry3<double>(R_ET));
 const Isometry3<double> X_WG(
     Eigen::Translation<double, 3>(Vector3<double>(0.6, 0.2, 0.)) *
@@ -61,7 +62,11 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   cache_.initialize(q_, v_);
   iiwa_.doKinematics(cache_);
   J_ = iiwa_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
-  ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
+
+  // ext_trq = trq_measured - trq_id
+  //         = M * qdd + h - J^T * F - (M * qdd + h)
+  //         = -J^T * F
+  ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(-ext_trq_);
 
   X_WT_ = iiwa_.CalcFramePoseInWorldFrame(cache_, frame_T_);
   V_WT_ = iiwa_.CalcFrameSpatialVelocityInWorldFrame(cache_, frame_T_);

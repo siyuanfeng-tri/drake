@@ -69,6 +69,7 @@ class RobotPlanRunner {
     jjz::IiwaState state(robot_, frame_T_);
 
     VectorX<double> q_cmd(7);
+    VectorX<double> trq_cmd = VectorX<double>::Zero(7);
 
     // traj for GOTO state.
     PiecewisePolynomial<double> traj;
@@ -86,7 +87,7 @@ class RobotPlanRunner {
     // X_WT_traj = jjz::PlanPlanarPushingTrajMultiAction(x_GQ, jjz::X_WG, 5);
     X_WT_traj =
         jjz::PlanPlanarPushingTrajMultiAction(x_GQ, jjz::X_WG, 5, "graph.txt");
-    VectorX<double> q1 = jjz::PointIk(X_WT_traj.get_pose(0), frame_T_,
+    VectorX<double> q1 = jjz::PointIk(Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.05)) * X_WT_traj.get_pose(0), frame_T_,
                                       (RigidBodyTree<double>*)&robot_);
 
     // VERY IMPORTANT HACK, To make sure that no stale messages are in the
@@ -123,12 +124,13 @@ class RobotPlanRunner {
         plan->Initialize(state);
       }
       plan->Update(state, &ctrl_debug);
-      plan->Control(state, q_cmd, &ctrl_debug);
+      plan->Control(state, q_cmd, trq_cmd, &ctrl_debug);
 
       // send command
       iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);
       for (int i = 0; i < robot_.get_num_positions(); i++) {
         iiwa_command.joint_position[i] = q_cmd[i];
+        iiwa_command.joint_torque[i] = trq_cmd[i];
       }
       lcm_.publish(kLcmCommandChannel, &iiwa_command);
 
@@ -137,6 +139,24 @@ class RobotPlanRunner {
 
       // state transition.
       if (plan->IsDone(state)) {
+        if (plan->get_name().compare("go_to_q1") == 0) {
+          jjz::MoveToolStraightUntilTouch* new_plan =
+              new jjz::MoveToolStraightUntilTouch("go_down",
+                  &robot_, &frame_T_, q1, Vector3<double>(0, 0, -1), 0.03);
+          plan.reset(new_plan);
+        } else if (plan->get_name().compare("go_down") == 0) {
+          jjz::HoldPositionAndApplyForce* new_plan =
+              new jjz::HoldPositionAndApplyForce("hold",
+                  &robot_, &frame_T_);
+          Vector6<double> wrench = Vector6<double>::Zero();
+          wrench[4] = -10;
+          wrench[5] = 10;
+          new_plan->set_desired_ext_wrench(wrench);
+          plan.reset(new_plan);
+        }
+        /*
+        */
+
         /*
         // Servo + traj follow after go_to_q1 is done.
         if (plan->get_name().compare("go_to_q1") == 0) {
@@ -151,6 +171,7 @@ class RobotPlanRunner {
         }
         */
 
+        /*
         // go straight dodwn.
         if (plan->get_name().compare("go_to_q1") == 0) {
           auto cache = robot_.CreateKinematicsCache();
@@ -215,6 +236,7 @@ class RobotPlanRunner {
           // Reset the timer.
           move_plan->Initialize(state);
         }
+        */
         // Others.
       }
     }

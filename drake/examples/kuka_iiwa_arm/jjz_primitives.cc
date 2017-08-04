@@ -18,7 +18,7 @@ MoveJoint::MoveJoint(const std::string& name, const VectorX<double>& q0,
 }
 
 void MoveJoint::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-                        lcmt_jjz_controller* msg) const {
+    Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {
   const double interp_time = get_in_state_time(state);
   q_d = traj_.value(interp_time);
   eigenVectorToCArray(q_d, msg->q_ik);
@@ -30,10 +30,11 @@ bool MoveJoint::IsDone(const IiwaState& state) const {
 
 ///////////////////////////////////////////////////////////
 MoveTool::MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
+    const RigidBodyFrame<double>* frame_T,
                    const VectorX<double>& q0)
     : FSMState(name),
       robot_(*robot),
-      frame_T_("tool", robot_.FindBody(jjz::kEEName), jjz::X_ET),
+      frame_T_(*frame_T),
       cache_(robot_.CreateKinematicsCache()),
       jaco_planner_(robot),
       q_norm_(robot_.getZeroConfiguration()) {
@@ -76,7 +77,7 @@ void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
 }
 
 void MoveTool::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-                       lcmt_jjz_controller* msg) const {
+    Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {
   q_d = cache_.getQ();
   eigenVectorToCArray(q_d, msg->q_ik);
 }
@@ -84,9 +85,10 @@ void MoveTool::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
 ///////////////////////////////////////////////////////////
 MoveToolFollowTraj::MoveToolFollowTraj(
     const std::string& name, const RigidBodyTree<double>* robot,
+    const RigidBodyFrame<double>* frame_T,
     const VectorX<double>& q0,
     const manipulation::PiecewiseCartesianTrajectory<double>& traj)
-    : MoveTool(name, robot, q0), X_WT_traj_(traj) {}
+    : MoveTool(name, robot, frame_T, q0), X_WT_traj_(traj) {}
 
 void MoveToolFollowTraj::Update(const IiwaState& state,
                                 lcmt_jjz_controller* msg) {
@@ -143,6 +145,61 @@ bool MoveToolFollowTraj::has_touched(const IiwaState& state) const {
     }
   }
   return f_err_W.norm() < 1;
+}
+
+///////////////////////////////////////////////////////////
+MoveToolStraightUntilTouch::MoveToolStraightUntilTouch(
+    const std::string& name,
+    const RigidBodyTree<double>* robot,
+    const RigidBodyFrame<double>* frame_T,
+    const VectorX<double>& q0, const Vector3<double>& dir, double vel)
+    : MoveTool(name, robot, frame_T, q0), dir_{dir}, vel_{vel} {
+  dir_.normalize();
+  X_WT0_ = get_X_WT_ik();
+}
+
+Isometry3<double> MoveToolStraightUntilTouch::ComputeDesiredToolInWorld(
+    const IiwaState& state) const {
+  Isometry3<double> ret = X_WT0_;
+  ret.translation() += dir_ * vel_ * get_in_state_time(state);
+  return ret;
+}
+
+bool MoveToolStraightUntilTouch::IsDone(const IiwaState& state) const {
+  return state.get_ext_wrench().tail<3>().norm() > f_ext_thresh_;
+}
+
+///////////////////////////////////////////////////////////
+HoldPositionAndApplyForce::HoldPositionAndApplyForce(
+    const std::string& name,
+    const RigidBodyTree<double>* robot,
+    const RigidBodyFrame<double>* frame_T)
+    : FSMState(name),
+      robot_(*robot),
+      frame_T_(*frame_T),
+      cache_(robot_.CreateKinematicsCache()) {}
+
+void HoldPositionAndApplyForce::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
+  //cache_.initialize(q0_);
+  cache_.initialize(state.get_q(), state.get_v());
+  robot_.doKinematics(cache_);
+}
+
+void HoldPositionAndApplyForce::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
+    Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {
+  MatrixX<double> J = robot_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
+  q_d = q0_;
+  // q_d = cache_.getQ();
+
+  // ext_trq = trq_measured - trq_id
+  //         = M * qdd + h - J^T * F - (M * qdd + h)
+  //         = -J^T * F
+  trq_d = -J.transpose() * ext_wrench_d_;
+
+  // Debug
+  eigenVectorToCArray(q_d, msg->q_ik);
+
+  std::cout << trq_d.transpose() << "\n";
 }
 
 }  // namespace jjz

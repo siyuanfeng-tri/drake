@@ -38,7 +38,7 @@ class FSMState {
 
   virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
   virtual void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-                       lcmt_jjz_controller* msg) const {}
+      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {}
   virtual bool IsDone(const IiwaState& state) const { return false; }
 
  protected:
@@ -56,7 +56,7 @@ class MoveJoint : public FSMState {
             const VectorX<double>& q1, double duration);
 
   void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-               lcmt_jjz_controller* msg) const override;
+      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
   bool IsDone(const IiwaState& state) const override;
 
  private:
@@ -66,12 +66,12 @@ class MoveJoint : public FSMState {
 class MoveTool : public FSMState {
  public:
   MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
-           const VectorX<double>& q0);
+           const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0);
 
   void DoInitialize(const IiwaState& state) override;
   void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
   void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-               lcmt_jjz_controller* msg) const override;
+      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
 
   virtual Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const = 0;
@@ -98,7 +98,7 @@ class MoveToolFollowTraj : public MoveTool {
  public:
   MoveToolFollowTraj(
       const std::string& name, const RigidBodyTree<double>* robot,
-      const VectorX<double>& q0,
+      const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
       const manipulation::PiecewiseCartesianTrajectory<double>& traj);
 
   void set_X_WT_traj(
@@ -143,6 +143,53 @@ class MoveToolFollowTraj : public MoveTool {
   Vector3<double> pos_I_range_{Vector3<double>::Zero()};
   Vector6<double> ki_{Vector6<double>::Zero()};
 };
+
+class MoveToolStraightUntilTouch : public MoveTool {
+ public:
+  MoveToolStraightUntilTouch(const std::string& name,
+      const RigidBodyTree<double>* robot, const RigidBodyFrame<double>* frame_T,
+      const VectorX<double>& q0, const Vector3<double>& dir, double vel);
+
+  Isometry3<double> ComputeDesiredToolInWorld(
+      const IiwaState& state) const override;
+
+  bool IsDone(const IiwaState& state) const override;
+  double get_f_ext_thresh() const { return f_ext_thresh_; }
+  void set_f_ext_thresh(double thresh) { f_ext_thresh_ = thresh; }
+
+ private:
+  Isometry3<double> X_WT0_;
+  Vector3<double> dir_;
+  double vel_;
+
+  double f_ext_thresh_{10};
+};
+
+class HoldPositionAndApplyForce : public FSMState {
+ public:
+  HoldPositionAndApplyForce(const std::string& name,
+      const RigidBodyTree<double>* robot, const RigidBodyFrame<double>* frame_T);
+
+  void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
+  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
+      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
+
+  const Vector6<double>& get_desired_ext_wrench() const { return ext_wrench_d_; }
+  void set_desired_ext_wrench(const Vector6<double>& w) { ext_wrench_d_ = w; }
+
+ private:
+  void DoInitialize(const IiwaState& state) override {
+    q0_ = state.get_q();
+  }
+
+  VectorX<double> q0_;
+
+  Vector6<double> ext_wrench_d_{Vector6<double>::Zero()};
+  const RigidBodyTree<double>& robot_;
+  const RigidBodyFrame<double> frame_T_;
+  KinematicsCache<double> cache_;
+};
+
 
 }  // namespace jjz
 }  // namespace examples

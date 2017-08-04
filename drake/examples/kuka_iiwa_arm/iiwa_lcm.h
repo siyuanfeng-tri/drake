@@ -30,18 +30,21 @@ class IiwaCommandReceiver : public systems::LeafSystem<double> {
   explicit IiwaCommandReceiver(int num_joints = kIiwaArmNumJoints);
 
   /// Sets the initial position of the controlled iiwa prior to any
-  /// commands being received.  @p x contains the starting position.
+  /// commands being received.  @p q contains the starting position.
   /// This position will be the commanded position (with zero
   /// velocity) until a position message is received.  If this
   /// function is not called, the starting position will be the zero
   /// configuration.
   void set_initial_position(
       systems::Context<double>* context,
-      const Eigen::Ref<const VectorX<double>> x) const;
+      const Eigen::Ref<const VectorX<double>> q) const;
 
  private:
-  void OutputCommand(const systems::Context<double>& context,
-                     systems::BasicVector<double>* output) const;
+  void OutputStateCmd(const systems::Context<double>& context,
+                      systems::BasicVector<double>* output) const;
+
+  void OutputTrqCmd(const systems::Context<double>& context,
+                    systems::BasicVector<double>* output) const;
 
   void DoCalcDiscreteVariableUpdates(
       const systems::Context<double>& context,
