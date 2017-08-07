@@ -185,6 +185,7 @@ drake_cc_binary(
         ":jjz",
         ":iiwa_lcm",
         ":sim_diagram_builder",
+        "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
         "//drake/common:find_resource",
         "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
         "//drake/lcm",

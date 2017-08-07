@@ -198,8 +198,6 @@ void HoldPositionAndApplyForce::Control(const IiwaState& state, Eigen::Ref<Vecto
 
   // Debug
   eigenVectorToCArray(q_d, msg->q_ik);
-
-  std::cout << trq_d.transpose() << "\n";
 }
 
 }  // namespace jjz
