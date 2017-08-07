@@ -45,6 +45,7 @@ lcm_wrap_types(
   lcmt_force_torque.lcm
   lcmt_iiwa_command.lcm
   lcmt_iiwa_status.lcm
+  lcmt_jjz_controller.lcm
   lcmt_joint_pd_override.lcm
   lcmt_maliput_railcar_params_t.lcm
   lcmt_maliput_railcar_state_t.lcm
