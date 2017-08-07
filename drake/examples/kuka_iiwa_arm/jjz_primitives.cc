@@ -9,7 +9,7 @@ namespace jjz {
 ///////////////////////////////////////////////////////////
 MoveJoint::MoveJoint(const std::string& name, const VectorX<double>& q0,
                      const VectorX<double>& q1, double duration)
-    : FSMState(name) {
+    : MotionPrimitive(name) {
   DRAKE_DEMAND(q0.size() == q1.size());
   std::vector<double> times = {0, duration};
   std::vector<MatrixX<double>> knots = {q0, q1};
@@ -17,22 +17,22 @@ MoveJoint::MoveJoint(const std::string& name, const VectorX<double>& q0,
   traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
 }
 
-void MoveJoint::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-    Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {
+void MoveJoint::DoControl(const IiwaState& state, PrimitiveOutput* output,
+    lcmt_jjz_controller* msg) const {
   const double interp_time = get_in_state_time(state);
-  q_d = traj_.value(interp_time);
-  eigenVectorToCArray(q_d, msg->q_ik);
-}
+  output->q_cmd = traj_.value(interp_time);
+  eigenVectorToCArray(output->q_cmd, msg->q_ik);
 
-bool MoveJoint::IsDone(const IiwaState& state) const {
-  return get_in_state_time(state) > (traj_.getEndTime() + 0.5);
+  if (get_in_state_time(state) > (traj_.getEndTime() + 0.5)) {
+    output->status = PrimitiveOutput::DONE;
+  }
 }
 
 ///////////////////////////////////////////////////////////
 MoveTool::MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T,
                    const VectorX<double>& q0)
-    : FSMState(name),
+    : MotionPrimitive(name),
       robot_(*robot),
       frame_T_(*frame_T),
       cache_(robot_.CreateKinematicsCache()),
@@ -76,10 +76,9 @@ void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
   robot_.doKinematics(cache_);
 }
 
-void MoveTool::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-    Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {
-  q_d = cache_.getQ();
-  eigenVectorToCArray(q_d, msg->q_ik);
+void MoveTool::DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const {
+  output->q_cmd = cache_.getQ();
+  eigenVectorToCArray(output->q_cmd, msg->q_ik);
 }
 
 ///////////////////////////////////////////////////////////
@@ -100,8 +99,11 @@ Isometry3<double> MoveToolStraightUntilTouch::ComputeDesiredToolInWorld(
   return ret;
 }
 
-bool MoveToolStraightUntilTouch::IsDone(const IiwaState& state) const {
-  return state.get_ext_wrench().tail<3>().norm() > f_ext_thresh_;
+void MoveToolStraightUntilTouch::DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const {
+  MoveTool::DoControl(state, output, msg);
+
+  if (state.get_ext_wrench().tail<3>().norm() > f_ext_thresh_)
+    output->status = PrimitiveOutput::DONE;
 }
 
 ///////////////////////////////////////////////////////////
@@ -109,7 +111,7 @@ HoldPositionAndApplyForce::HoldPositionAndApplyForce(
     const std::string& name,
     const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T)
-    : FSMState(name),
+    : MotionPrimitive(name),
       robot_(*robot),
       frame_T_(*frame_T),
       cache_(robot_.CreateKinematicsCache()) {}
@@ -120,19 +122,21 @@ void HoldPositionAndApplyForce::Update(const IiwaState& state, lcmt_jjz_controll
   robot_.doKinematics(cache_);
 }
 
-void HoldPositionAndApplyForce::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-    Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {
+void HoldPositionAndApplyForce::DoControl(const IiwaState& state, PrimitiveOutput* output,
+    lcmt_jjz_controller* msg) const {
   MatrixX<double> J = robot_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
-  q_d = q0_;
+  output->q_cmd = q0_;
   // q_d = cache_.getQ();
 
   // ext_trq = trq_measured - trq_id
   //         = M * qdd + h - J^T * F - (M * qdd + h)
   //         = -J^T * F
-  trq_d = -J.transpose() * ext_wrench_d_;
+  output->trq_cmd = -J.transpose() * ext_wrench_d_;
 
   // Debug
-  eigenVectorToCArray(q_d, msg->q_ik);
+  eigenVectorToCArray(output->q_cmd, msg->q_ik);
+
+  output->status = PrimitiveOutput::EXECUTING;
 }
 
 ///////////////////////////////////////////////////////////
@@ -150,20 +154,13 @@ Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
   return X_WT;
 }
 
-bool MoveToolFollowTraj::IsDone(const IiwaState& state) const {
-  const double duration = X_WT_traj_.get_position_trajectory().get_end_time();
-  bool ret = get_in_state_time(state) > (duration + 0.5);
-  return ret;
-}
-
-void MoveToolFollowTraj::Control(const IiwaState& state,
-    Eigen::Ref<VectorX<double>> q_d, Eigen::Ref<VectorX<double>> trq_d,
-    lcmt_jjz_controller* msg) const {
+void MoveToolFollowTraj::DoControl(const IiwaState& state,
+    PrimitiveOutput* output, lcmt_jjz_controller* msg) const {
   // Gets the current actual jacobian.
   MatrixX<double> J = get_robot().CalcFrameSpatialVelocityJacobianInWorldFrame(state.get_cache(), get_tool_frame());
 
   // The desired q comes from MoveTool's
-  MoveTool::Control(state, q_d, trq_d, msg);
+  MoveTool::DoControl(state, output, msg);
 
   // Adds the external force part.
   Vector6<double> wrench = Vector6<double>::Zero();
@@ -189,11 +186,16 @@ void MoveToolFollowTraj::Control(const IiwaState& state,
   } else if (V_WT[4] < -vel_thres_) {
     wrench[4] = mu_ * fz_;
   }
-  trq_d = -J.transpose() * wrench;
+  output->trq_cmd = -J.transpose() * wrench;
 
   // HACK
   for (int i = 0; i < 6; i++) {
     msg->X_WT_int[i] = wrench[i];
+  }
+
+  const double duration = X_WT_traj_.get_position_trajectory().get_end_time();
+  if (get_in_state_time(state) > (duration + 0.5)) {
+    output->status = PrimitiveOutput::DONE;
   }
 }
 

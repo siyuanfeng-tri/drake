@@ -25,8 +25,8 @@ class IiwaState {
  public:
   static constexpr double kUninitTime = -1.0;
 
-  IiwaState(const RigidBodyTree<double>& iiwa,
-            const RigidBodyFrame<double>& frame_T);
+  IiwaState(const RigidBodyTree<double>* iiwa,
+            const RigidBodyFrame<double>* frame_T);
   bool UpdateState(const lcmt_iiwa_status& msg);
   const KinematicsCache<double>& get_cache() const { return cache_; }
   const VectorX<double>& get_q() const { return q_; }
@@ -40,8 +40,8 @@ class IiwaState {
   double get_dt() const { return delta_time_; }
 
  private:
-  const RigidBodyTree<double>& iiwa_;
-  const RigidBodyFrame<double>& frame_T_;
+  const RigidBodyTree<double>* iiwa_;
+  const RigidBodyFrame<double>* frame_T_;
   KinematicsCache<double> cache_;
   double time_{kUninitTime};
   double delta_time_{0};

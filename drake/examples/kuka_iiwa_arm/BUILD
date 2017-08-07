@@ -116,6 +116,26 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "jjz_controller",
+    srcs = ["jjz_controller.cc"],
+    hdrs = ["jjz_controller.h"],
+    deps = [
+        ":iiwa_common",
+        ":jjz",
+        ":iiwa_lcm",
+        "//drake/multibody:inverse_kinematics",
+        "//drake/manipulation/planner:jacobian_ik",
+        "//drake/manipulation/util:trajectory_utils",
+        "//drake/common:find_resource",
+        "//drake/util:util",
+        "//drake/util:lcm_util",
+        "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion",
+    ],
+)
+
+
 drake_cc_binary(
     name = "iiwa_controller",
     srcs = ["iiwa_controller.cc"],
@@ -167,6 +187,34 @@ drake_cc_binary(
         "//drake/systems/primitives:constant_vector_source",
         "//drake/systems/primitives:matrix_gain",
         "//drake/util:lcm_util",
+        "@com_github_gflags_gflags//:gflags",
+    ],
+)
+
+drake_cc_binary(
+    name = "jjz_controller_main",
+    srcs = ["jjz_controller_main.cc"],
+    add_test_rule = 1,
+    data = [
+        ":models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":jjz_controller",
+        ":jjz",
+        ":iiwa_lcm",
+        ":sim_diagram_builder",
+        "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
+        "//drake/common:find_resource",
+        "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
+        "//drake/lcm",
+        "//drake/multibody/rigid_body_plant",
+        "//drake/multibody/rigid_body_plant:frame_visualizer",
+        "//drake/systems/analysis:simulator",
+        "//drake/systems/controllers:inverse_dynamics_controller",
+        "//drake/systems/primitives:constant_vector_source",
+        "//drake/systems/sensors:image_to_lcm_image_array_t",
+        "//drake/systems/sensors:rgbd_camera",
         "@com_github_gflags_gflags//:gflags",
     ],
 )
@@ -228,28 +276,6 @@ drake_cc_binary(
         ":iiwa_lcm",
         "//drake/common:find_resource",
         "//drake/multibody:inverse_kinematics",
-        "@lcmtypes_bot2_core",
-        "@lcmtypes_robotlocomotion",
-    ],
-)
-
-drake_cc_binary(
-    name = "jjz_controller",
-    srcs = ["jjz_controller.cc"],
-    data = [
-        ":models",
-        "//drake/manipulation/models/iiwa_description:models",
-    ],
-    deps = [
-        ":iiwa_common",
-        ":jjz",
-        ":iiwa_lcm",
-        "//drake/multibody:inverse_kinematics",
-        "//drake/manipulation/planner:jacobian_ik",
-        "//drake/manipulation/util:trajectory_utils",
-        "//drake/common:find_resource",
-        "//drake/util:util",
-        "//drake/util:lcm_util",
         "@lcmtypes_bot2_core",
         "@lcmtypes_robotlocomotion",
     ],

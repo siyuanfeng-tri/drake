@@ -12,10 +12,23 @@ namespace drake {
 namespace examples {
 namespace jjz {
 
-class FSMState {
+struct PrimitiveOutput {
+  enum Status {
+    EXECUTING = 0,
+    DONE = 1,
+    ERR = 2
+  };
+  int64_t timestamp;
+  Status status;
+  VectorX<double> q_cmd;
+  VectorX<double> trq_cmd;
+  Isometry3<double> X_WT_cmd;
+};
+
+class MotionPrimitive {
  public:
-  FSMState(const std::string& name) : name_(name) {}
-  virtual ~FSMState() { std::cout << "[" << get_name() << "] exiting.\n"; }
+  MotionPrimitive(const std::string& name) : name_(name) {}
+  virtual ~MotionPrimitive() { std::cout << "[" << get_name() << "] exiting.\n"; }
 
   const std::string& get_name() const { return name_; }
   double get_start_time() const { return start_time_; }
@@ -34,15 +47,23 @@ class FSMState {
               << "\n";
   }
 
+  void Control(const IiwaState& state, PrimitiveOutput* output,
+      lcmt_jjz_controller* msg) const {
+    output->status = PrimitiveOutput::EXECUTING;
+    // TODO: HACK!!!
+    output->q_cmd = VectorX<double>::Zero(7);
+    output->trq_cmd = VectorX<double>::Zero(7);
+    DoControl(state, output, msg);
+  }
+
   void set_name(const std::string& name) { name_ = name; }
 
   virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
-  virtual void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const {}
-  virtual bool IsDone(const IiwaState& state) const { return false; }
 
  protected:
   virtual void DoInitialize(const IiwaState& state) {}
+  virtual void DoControl(const IiwaState& state, PrimitiveOutput* output,
+      lcmt_jjz_controller* msg) const {}
 
  private:
   std::string name_;
@@ -50,28 +71,25 @@ class FSMState {
   bool init_{false};
 };
 
-class MoveJoint : public FSMState {
+class MoveJoint : public MotionPrimitive {
  public:
   MoveJoint(const std::string& name, const VectorX<double>& q0,
             const VectorX<double>& q1, double duration);
 
-  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
-  bool IsDone(const IiwaState& state) const override;
+  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
  private:
   PiecewisePolynomial<double> traj_;
 };
 
-class MoveTool : public FSMState {
+class MoveTool : public MotionPrimitive {
  public:
   MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
            const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0);
 
   void DoInitialize(const IiwaState& state) override;
   void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
-  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
+  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
   virtual Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const = 0;
@@ -103,10 +121,10 @@ class MoveToolStraightUntilTouch : public MoveTool {
       const RigidBodyTree<double>* robot, const RigidBodyFrame<double>* frame_T,
       const VectorX<double>& q0, const Vector3<double>& dir, double vel);
 
+  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
   Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const override;
 
-  bool IsDone(const IiwaState& state) const override;
   double get_f_ext_thresh() const { return f_ext_thresh_; }
   void set_f_ext_thresh(double thresh) { f_ext_thresh_ = thresh; }
 
@@ -118,14 +136,13 @@ class MoveToolStraightUntilTouch : public MoveTool {
   double f_ext_thresh_{10};
 };
 
-class HoldPositionAndApplyForce : public FSMState {
+class HoldPositionAndApplyForce : public MotionPrimitive {
  public:
   HoldPositionAndApplyForce(const std::string& name,
       const RigidBodyTree<double>* robot, const RigidBodyFrame<double>* frame_T);
 
   void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
-  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
+  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
   const Vector6<double>& get_desired_ext_wrench() const { return ext_wrench_d_; }
   void set_desired_ext_wrench(const Vector6<double>& w) { ext_wrench_d_ = w; }
@@ -155,11 +172,9 @@ class MoveToolFollowTraj : public MoveTool {
     X_WT_traj_ = traj;
   }
 
-  bool IsDone(const IiwaState& state) const override;
   Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const override;
-  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
-      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
+  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
   //const Vector6<double>& get_desired_ext_wrench() const { return ext_wrench_d_; };
   //void set_desired_ext_wrench(const Vector6<double>& ext_wrench) { ext_wrench_d_ = ext_wrench; }

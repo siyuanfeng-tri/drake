@@ -22,22 +22,22 @@ const Isometry3<double> X_WG(
     AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
 const std::string kEEName("iiwa_link_7");
 
-IiwaState::IiwaState(const RigidBodyTree<double>& iiwa,
-                     const RigidBodyFrame<double>& frame_T)
+IiwaState::IiwaState(const RigidBodyTree<double>* iiwa,
+                     const RigidBodyFrame<double>* frame_T)
     : iiwa_(iiwa),
       frame_T_(frame_T),
-      cache_(iiwa.CreateKinematicsCache()),
-      q_(VectorX<double>::Zero(iiwa.get_num_positions())),
-      v_(VectorX<double>::Zero(iiwa.get_num_velocities())),
-      trq_(VectorX<double>::Zero(iiwa.get_num_actuators())),
-      ext_trq_(VectorX<double>::Zero(iiwa.get_num_actuators())) {
-  DRAKE_DEMAND(iiwa.get_num_positions() == iiwa.get_num_velocities());
-  DRAKE_DEMAND(iiwa.get_num_actuators() == iiwa.get_num_velocities());
+      cache_(iiwa_->CreateKinematicsCache()),
+      q_(VectorX<double>::Zero(iiwa_->get_num_positions())),
+      v_(VectorX<double>::Zero(iiwa_->get_num_velocities())),
+      trq_(VectorX<double>::Zero(iiwa_->get_num_actuators())),
+      ext_trq_(VectorX<double>::Zero(iiwa_->get_num_actuators())) {
+  DRAKE_DEMAND(iiwa_->get_num_positions() == iiwa_->get_num_velocities());
+  DRAKE_DEMAND(iiwa_->get_num_actuators() == iiwa_->get_num_velocities());
 }
 
 bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   // Check msg.
-  DRAKE_DEMAND(msg.num_joints == iiwa_.get_num_positions());
+  DRAKE_DEMAND(msg.num_joints == iiwa_->get_num_positions());
 
   const double cur_time = msg.utime / 1e6;
   // Same time stamp, should just return.
@@ -60,8 +60,8 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
 
   // Update kinematics.
   cache_.initialize(q_, v_);
-  iiwa_.doKinematics(cache_);
-  J_ = iiwa_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
+  iiwa_->doKinematics(cache_);
+  J_ = iiwa_->CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, *frame_T_);
 
   // ext_trq = trq_measured - trq_id
   //         = M * qdd + h - J^T * F - (M * qdd + h)
@@ -70,8 +70,8 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
   //ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(-ext_trq_);
 
-  X_WT_ = iiwa_.CalcFramePoseInWorldFrame(cache_, frame_T_);
-  V_WT_ = iiwa_.CalcFrameSpatialVelocityInWorldFrame(cache_, frame_T_);
+  X_WT_ = iiwa_->CalcFramePoseInWorldFrame(cache_, *frame_T_);
+  V_WT_ = iiwa_->CalcFrameSpatialVelocityInWorldFrame(cache_, *frame_T_);
 
   init_ = true;
 
