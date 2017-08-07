@@ -278,6 +278,8 @@ _LIBDRAKE_COMPONENTS = [
     "//drake/util:lcm_util",
     "//drake/util:util",
     "//drake/util:yaml_util",
+    "//drake/examples/kuka_iiwa_arm:jjz",
+    "//drake/examples/kuka_iiwa_arm:jjz_controller",
     "//drake:vtk_deps",
 ]
 
