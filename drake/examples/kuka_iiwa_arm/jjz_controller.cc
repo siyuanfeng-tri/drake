@@ -91,10 +91,10 @@ class RobotPlanRunner {
         jjz::PlanPlanarPushingTrajMultiAction(x_GQ, jjz::X_WG, 5, "graph.txt");
     VectorX<double> q1 = jjz::PointIk(Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.05)) * X_WT_traj.get_pose(0), frame_T_,
                                       (RigidBodyTree<double>*)&robot_);
-    VectorX<double> q1 = jjz::PointIk(jjz::X_WG, frame_T_, (RigidBodyTree<double>*)&robot_);
     */
-    VectorX<double> q1(7);
-    q1 << 0.467141,   1.33241, -0.249836,  -1.22438,  0.418725,  0.634096,   1.63289;
+    VectorX<double> q1 = jjz::PointIk(
+        Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.05)) * jjz::X_WG,
+        frame_T_, (RigidBodyTree<double>*)&robot_);
 
     // VERY IMPORTANT HACK, To make sure that no stale messages are in the
     // queue.
@@ -150,7 +150,8 @@ class RobotPlanRunner {
               new jjz::MoveToolStraightUntilTouch("go_down",
                   &robot_, &frame_T_, q1, Vector3<double>(0, 0, -1), 0.03);
           plan.reset(new_plan);
-        } else if (plan->get_name().compare("go_down") == 0) {
+        }
+        /* else if (plan->get_name().compare("go_down") == 0) {
           jjz::HoldPositionAndApplyForce* new_plan =
               new jjz::HoldPositionAndApplyForce("hold",
                   &robot_, &frame_T_);
@@ -158,6 +159,30 @@ class RobotPlanRunner {
           // wrench[4] = -10;
           wrench[5] = 100;
           new_plan->set_desired_ext_wrench(wrench);
+          plan.reset(new_plan);
+        }
+        */
+        else if (plan->get_name().compare("go_down") == 0) {
+          auto cache = robot_.CreateKinematicsCache();
+          cache.initialize(q_cmd);
+          robot_.doKinematics(cache);
+          Isometry3<double> X_WT0 =
+              robot_.CalcFramePoseInWorldFrame(cache, frame_T_);
+
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, -0.2, 0)) *
+              X_WT0 * AngleAxis<double>(M_PI / 4., Vector3<double>::UnitZ());
+
+          auto traj = PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity({0.5, 3}, {X_WT0, X_WT1},
+                                                   Vector3<double>::Zero(),
+                                                   Vector3<double>::Zero());
+
+          jjz::MoveToolFollowTraj* new_plan = new jjz::MoveToolFollowTraj(
+              "go_right", &robot_, &frame_T_, q_cmd, traj);
+          new_plan->set_mu(1.);
+          new_plan->set_fz(10);
+
           plan.reset(new_plan);
         }
 

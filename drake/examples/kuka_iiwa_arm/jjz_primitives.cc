@@ -83,71 +83,6 @@ void MoveTool::Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
 }
 
 ///////////////////////////////////////////////////////////
-MoveToolFollowTraj::MoveToolFollowTraj(
-    const std::string& name, const RigidBodyTree<double>* robot,
-    const RigidBodyFrame<double>* frame_T,
-    const VectorX<double>& q0,
-    const manipulation::PiecewiseCartesianTrajectory<double>& traj)
-    : MoveTool(name, robot, frame_T, q0), X_WT_traj_(traj) {}
-
-void MoveToolFollowTraj::Update(const IiwaState& state,
-                                lcmt_jjz_controller* msg) {
-  // Just servo wrt to force.
-  if (is_force_servo()) {
-    Vector3<double> f_err_W = f_W_d_ - state.get_ext_wrench().tail<3>();
-    for (int i = 0; i < 3; i++) {
-      if (std::abs(f_err_W[i]) < f_W_dead_zone_[i]) {
-        f_err_W[i] = 0;
-      }
-    }
-    // -= because of reaction force.
-    pose_err_I_.translation() -=
-        (f_err_W.array() * ki_.tail<3>().array()).matrix();
-  }
-
-  for (int i = 0; i < 3; i++) {
-    pose_err_I_.translation()[i] =
-        clamp(pose_err_I_.translation()[i], -pos_I_range_[i], pos_I_range_[i]);
-  }
-
-  // Make debug msg.
-  Eigen::Matrix<double, 7, 1> tmp_pose = jjz::pose_to_vec(pose_err_I_);
-  eigenVectorToCArray(tmp_pose, msg->X_WT_int);
-
-  // Call the parent's
-  MoveTool::Update(state, msg);
-}
-
-Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
-    const IiwaState& state) const {
-  const double interp_t = get_in_state_time(state);
-  Isometry3<double> X_WT = X_WT_traj_.get_pose(interp_t);
-  X_WT.translation() += pose_err_I_.translation();
-  return X_WT;
-}
-
-bool MoveToolFollowTraj::IsDone(const IiwaState& state) const {
-  const double duration = X_WT_traj_.get_position_trajectory().get_end_time();
-  bool ret = get_in_state_time(state) > (duration + 0.5);
-  if (is_force_servo()) {
-    ret &= has_touched(state);
-  }
-  return ret;
-}
-
-bool MoveToolFollowTraj::has_touched(const IiwaState& state) const {
-  DRAKE_DEMAND(is_force_servo());
-
-  Vector3<double> f_err_W = f_W_d_ - state.get_ext_wrench().tail<3>();
-  for (int i = 0; i < 3; i++) {
-    if (std::abs(f_err_W[i]) < f_W_dead_zone_[i]) {
-      f_err_W[i] = 0;
-    }
-  }
-  return f_err_W.norm() < 1;
-}
-
-///////////////////////////////////////////////////////////
 MoveToolStraightUntilTouch::MoveToolStraightUntilTouch(
     const std::string& name,
     const RigidBodyTree<double>* robot,
@@ -198,6 +133,68 @@ void HoldPositionAndApplyForce::Control(const IiwaState& state, Eigen::Ref<Vecto
 
   // Debug
   eigenVectorToCArray(q_d, msg->q_ik);
+}
+
+///////////////////////////////////////////////////////////
+MoveToolFollowTraj::MoveToolFollowTraj(
+    const std::string& name, const RigidBodyTree<double>* robot,
+    const RigidBodyFrame<double>* frame_T,
+    const VectorX<double>& q0,
+    const manipulation::PiecewiseCartesianTrajectory<double>& traj)
+    : MoveTool(name, robot, frame_T, q0), X_WT_traj_(traj) {}
+
+Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
+    const IiwaState& state) const {
+  const double interp_t = get_in_state_time(state);
+  Isometry3<double> X_WT = X_WT_traj_.get_pose(interp_t);
+  return X_WT;
+}
+
+bool MoveToolFollowTraj::IsDone(const IiwaState& state) const {
+  const double duration = X_WT_traj_.get_position_trajectory().get_end_time();
+  bool ret = get_in_state_time(state) > (duration + 0.5);
+  return ret;
+}
+
+void MoveToolFollowTraj::Control(const IiwaState& state,
+    Eigen::Ref<VectorX<double>> q_d, Eigen::Ref<VectorX<double>> trq_d,
+    lcmt_jjz_controller* msg) const {
+  // Gets the current actual jacobian.
+  MatrixX<double> J = get_robot().CalcFrameSpatialVelocityJacobianInWorldFrame(state.get_cache(), get_tool_frame());
+
+  // The desired q comes from MoveTool's
+  MoveTool::Control(state, q_d, trq_d, msg);
+
+  // Adds the external force part.
+  Vector6<double> wrench = Vector6<double>::Zero();
+  wrench[5] = fz_;
+
+  // Compensate for friction.
+  const double interp_t = get_in_state_time(state);
+  Vector6<double> V_WT = X_WT_traj_.get_velocity(interp_t);
+  if (V_WT[2] > 0) {
+    wrench[2] = -yaw_mu_ * fz_;
+  } else if (V_WT[2] < 0) {
+    wrench[2] = yaw_mu_ * fz_;
+  }
+
+  if (V_WT[3] > vel_thres_) {
+    wrench[3] = -mu_ * fz_;
+  } else if (V_WT[3] < -vel_thres_) {
+    wrench[3] = mu_ * fz_;
+  }
+
+  if (V_WT[4] > vel_thres_) {
+    wrench[4] = -mu_ * fz_;
+  } else if (V_WT[4] < -vel_thres_) {
+    wrench[4] = mu_ * fz_;
+  }
+  trq_d = -J.transpose() * wrench;
+
+  // HACK
+  for (int i = 0; i < 6; i++) {
+    msg->X_WT_int[i] = wrench[i];
+  }
 }
 
 }  // namespace jjz

@@ -83,6 +83,9 @@ class MoveTool : public FSMState {
   void set_nominal_q(const VectorX<double>& q_norm) { q_norm_ = q_norm; }
   void set_tool_gain(const Vector6<double>& gain) { gain_T_ = gain; }
 
+  const RigidBodyTree<double>& get_robot() const { return robot_; }
+  const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
+
  private:
   const RigidBodyTree<double>& robot_;
   const RigidBodyFrame<double> frame_T_;
@@ -92,56 +95,6 @@ class MoveTool : public FSMState {
   Vector6<double> gain_T_{Vector6<double>::Constant(1)};
   VectorX<double> q_norm_;
   double last_time_;
-};
-
-class MoveToolFollowTraj : public MoveTool {
- public:
-  MoveToolFollowTraj(
-      const std::string& name, const RigidBodyTree<double>* robot,
-      const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
-      const manipulation::PiecewiseCartesianTrajectory<double>& traj);
-
-  void set_X_WT_traj(
-      const manipulation::PiecewiseCartesianTrajectory<double>& traj) {
-    X_WT_traj_ = traj;
-  }
-
-  void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
-  bool IsDone(const IiwaState& state) const override;
-  Isometry3<double> ComputeDesiredToolInWorld(
-      const IiwaState& state) const override;
-
-  bool is_force_servo() const { return is_force_servo_; }
-  const Isometry3<double>& get_pose_int() const { return pose_err_I_; }
-
-  void reset_pose_integrator() { pose_err_I_.setIdentity(); }
-
-  void set_force_servo(bool flag) { is_force_servo_ = flag; }
-  void set_f_W_d(const Vector3<double>& f) { f_W_d_ = f; }
-  void set_f_W_dead_zone(const Vector3<double>& zone) { f_W_dead_zone_ = zone; }
-  void set_ki_force(const Vector3<double>& gain) { ki_.tail<3>() = gain; }
-  void set_position_int_max_range(const Vector3<double>& range) {
-    pos_I_range_ = range;
-  }
-
-  const Vector3<double>& get_f_W_d() const { return f_W_d_; }
-  const Vector3<double>& get_f_W_dead_zone() const { return f_W_dead_zone_; }
-  const Vector3<double>& get_position_int_range() const { return pos_I_range_; }
-
- private:
-  bool has_touched(const IiwaState& state) const;
-
-  manipulation::PiecewiseCartesianTrajectory<double> X_WT_traj_;
-
-  // pose integrator
-  Isometry3<double> pose_err_I_{Isometry3<double>::Identity()};
-  bool is_force_servo_{false};
-
-  // Params.
-  Vector3<double> f_W_d_{Vector3<double>::Zero()};
-  Vector3<double> f_W_dead_zone_{Vector3<double>::Constant(INFINITY)};
-  Vector3<double> pos_I_range_{Vector3<double>::Zero()};
-  Vector6<double> ki_{Vector6<double>::Zero()};
 };
 
 class MoveToolStraightUntilTouch : public MoveTool {
@@ -190,6 +143,38 @@ class HoldPositionAndApplyForce : public FSMState {
   KinematicsCache<double> cache_;
 };
 
+class MoveToolFollowTraj : public MoveTool {
+ public:
+  MoveToolFollowTraj(
+      const std::string& name, const RigidBodyTree<double>* robot,
+      const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
+      const manipulation::PiecewiseCartesianTrajectory<double>& traj);
+
+  void set_X_WT_traj(
+      const manipulation::PiecewiseCartesianTrajectory<double>& traj) {
+    X_WT_traj_ = traj;
+  }
+
+  bool IsDone(const IiwaState& state) const override;
+  Isometry3<double> ComputeDesiredToolInWorld(
+      const IiwaState& state) const override;
+  void Control(const IiwaState& state, Eigen::Ref<VectorX<double>> q_d,
+      Eigen::Ref<VectorX<double>> trq_d, lcmt_jjz_controller* msg) const override;
+
+  //const Vector6<double>& get_desired_ext_wrench() const { return ext_wrench_d_; };
+  //void set_desired_ext_wrench(const Vector6<double>& ext_wrench) { ext_wrench_d_ = ext_wrench; }
+  void set_mu(double mu) { mu_ = mu; }
+  void set_yaw_mu(double mu) { yaw_mu_ = mu; }
+  void set_fz(double fz) { fz_ = fz; }
+
+ private:
+  manipulation::PiecewiseCartesianTrajectory<double> X_WT_traj_;
+  // Vector6<double> ext_wrench_d_{Vector6<double>::Zero()};
+  double vel_thres_{1e-3};
+  double mu_{0};
+  double yaw_mu_{0};
+  double fz_{10};
+};
 
 }  // namespace jjz
 }  // namespace examples

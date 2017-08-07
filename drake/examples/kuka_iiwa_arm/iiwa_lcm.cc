@@ -263,7 +263,7 @@ void IiwaStatusSender::OutputStatus(
     for (int i = 0; i < num_joints_; ++i) {
       status.joint_torque_measured[i] = torque->GetAtIndex(i);
       status.joint_torque_external[i] =
-          status.joint_torque_measured[i] - inv_dyn_trq_[i];
+          -status.joint_torque_measured[i] + inv_dyn_trq_[i];
     }
   }
 }
