@@ -1,0 +1,29 @@
+package drake;
+
+struct lcmt_jjz_controller {
+  // state's time
+  int64_t utime;
+  int64_t wall_time;
+  double wall_dt;
+
+  double dt;
+
+  // Measured.
+  double q[7];
+  double v[7];
+  double X_WT[7];
+  double V_WT[6];
+  double ext_wrench[6];  // tau, f.
+
+  // Desired.
+  // xyz wxyz
+  double X_WT_d[7];
+  double X_WT_int[7];
+
+  // wx wy wz, xd yd zd
+  double V_WT_d[6];
+
+  // IK's internal state.
+  double X_WT_ik[7];
+  double q_ik[7];
+}
