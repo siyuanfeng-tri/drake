@@ -13,17 +13,19 @@ int main() {
   RigidBodyTree<double> tree;
   drake::parsers::urdf::AddModelInstanceFromUrdfFile(
       kPath, drake::multibody::joints::kFixed, nullptr, &tree);
-  drake::examples::jjz::JjzController controller(tree);
+
+  RigidBodyFrame<double> tool_frame("tool", tree.FindBody(jjz::kEEName), jjz::X_ET);
+
+  drake::jjz::JjzController controller(tree, tool_frame);
 
   controller.Start();
 
-  drake::examples::jjz::IiwaState state(&controller.get_robot(),
-                                        &controller.get_tool_frame());
-  drake::examples::jjz::PrimitiveOutput output;
+  drake::jjz::IiwaState state(&controller.get_robot(),
+                              &controller.get_tool_frame());
+  drake::jjz::PrimitiveOutput output;
 
   double last_time = -1;
   int script_idx = 0;
-
   while (true) {
     // Measured state.
     controller.GetState(&state);
@@ -34,7 +36,7 @@ int main() {
     controller.GetPrimitiveOutput(&output);
 
     // Check status, and swap new plan when the old one is done.
-    if (output.status == drake::examples::jjz::PrimitiveOutput::DONE) {
+    if (output.status == drake::jjz::PrimitiveOutput::DONE) {
       switch (script_idx) {
         case 0: {
           VectorX<double> q = controller.get_robot().getZeroConfiguration();
@@ -53,6 +55,7 @@ int main() {
           break;
         }
 
+        /*
         case 2: {
           Isometry3<double> X_WT0 = output.X_WT_cmd;
           Isometry3<double> X_WT1 =
@@ -71,6 +74,7 @@ int main() {
           script_idx++;
           break;
         }
+        */
       }
     }
 

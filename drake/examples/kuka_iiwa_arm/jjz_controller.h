@@ -4,7 +4,6 @@
 #include "drake/examples/kuka_iiwa_arm/jjz_primitives.h"
 
 namespace drake {
-namespace examples {
 namespace jjz {
 
 class JjzController {
@@ -13,8 +12,8 @@ class JjzController {
   static const std::string kLcmCommandChannel;
   static const std::string kLcmJjzControllerDebug;
 
-  JjzController(const RigidBodyTree<double>& robot)
-      : robot_(robot), frame_T_("tool", robot_.FindBody(kEEName), X_ET) {
+  JjzController(const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_T)
+      : robot_(robot), frame_T_(frame_T) {
     lcm::Subscription* sub =
         lcm_.subscribe(kLcmStatusChannel, &JjzController::HandleStatus, this);
     // THIS IS VERY IMPORTANT!!
@@ -122,5 +121,4 @@ class JjzController {
 };
 
 }  // namespace jjz
-}  // namespace examples
 }  // namespace drake

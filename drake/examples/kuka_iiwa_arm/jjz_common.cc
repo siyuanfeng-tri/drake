@@ -8,15 +8,12 @@
 #include "drake/util/drakeUtil.h"
 
 namespace drake {
-namespace examples {
 namespace jjz {
 
-const Matrix3<double> R_ET(
-    AngleAxis<double>(M_PI, Vector3<double>::UnitY()).toRotationMatrix());
-// 0.055 is to the rubber plate.
 const Isometry3<double> X_ET(
-    Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.055)) *
-    Isometry3<double>(R_ET));
+    Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.16)) *
+    AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
+    AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
 const Isometry3<double> X_WG(
     Eigen::Translation<double, 3>(Vector3<double>(0.6, 0.2, 0.)) *
     AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
@@ -374,5 +371,4 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
 }
 
 }  // namespace jjz
-}  // namespace examples
 }  // namespace drake

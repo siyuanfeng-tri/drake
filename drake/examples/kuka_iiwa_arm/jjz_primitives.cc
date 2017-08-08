@@ -3,7 +3,6 @@
 #include "drake/util/drakeUtil.h"
 
 namespace drake {
-namespace examples {
 namespace jjz {
 
 ///////////////////////////////////////////////////////////
@@ -205,5 +204,4 @@ void MoveToolFollowTraj::DoControl(const IiwaState& state,
 }
 
 }  // namespace jjz
-}  // namespace examples
 }  // namespace drake

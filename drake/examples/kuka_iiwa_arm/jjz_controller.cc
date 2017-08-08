@@ -31,7 +31,6 @@
 #include "drake/examples/kuka_iiwa_arm/jjz_primitives.h"
 
 namespace drake {
-namespace examples {
 namespace jjz {
 
 const std::string JjzController::kLcmStatusChannel = "IIWA_STATUS";
@@ -165,5 +164,4 @@ void JjzController::ControlLoop() {
 }
 
 }  // namespace jjz
-}  // namespace examples
 }  // namespace drake

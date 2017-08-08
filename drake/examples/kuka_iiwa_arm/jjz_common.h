@@ -7,7 +7,6 @@
 #include "drake/multibody/rigid_body_tree.h"
 
 namespace drake {
-namespace examples {
 namespace jjz {
 
 extern const Matrix3<double> R_ET;
@@ -87,5 +86,4 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
                                  std::string load_file_name = "");
 
 }  // namespace jjz
-}  // namespace examples
 }  // namespace drake

@@ -9,7 +9,6 @@
 #include "drake/manipulation/util/trajectory_utils.h"
 
 namespace drake {
-namespace examples {
 namespace jjz {
 
 struct PrimitiveOutput {
@@ -215,5 +214,4 @@ class MoveToolFollowTraj : public MoveTool {
 };
 
 }  // namespace jjz
-}  // namespace examples
 }  // namespace drake
