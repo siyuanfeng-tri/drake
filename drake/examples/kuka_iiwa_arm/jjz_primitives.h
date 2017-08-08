@@ -13,22 +13,20 @@ namespace examples {
 namespace jjz {
 
 struct PrimitiveOutput {
-  enum Status {
-    EXECUTING = 0,
-    DONE = 1,
-    ERR = 2
-  };
-  int64_t timestamp;
-  Status status;
+  enum Status { UNINIT = 0, EXECUTING = 1, DONE = 2, ERR = 3 };
+  int64_t timestamp{-1};
+  Status status{UNINIT};
   VectorX<double> q_cmd;
   VectorX<double> trq_cmd;
-  Isometry3<double> X_WT_cmd;
+  Isometry3<double> X_WT_cmd{Isometry3<double>::Identity()};
 };
 
 class MotionPrimitive {
  public:
   MotionPrimitive(const std::string& name) : name_(name) {}
-  virtual ~MotionPrimitive() { std::cout << "[" << get_name() << "] exiting.\n"; }
+  virtual ~MotionPrimitive() {
+    std::cout << "[" << get_name() << "] exiting.\n";
+  }
 
   const std::string& get_name() const { return name_; }
   double get_start_time() const { return start_time_; }
@@ -48,11 +46,15 @@ class MotionPrimitive {
   }
 
   void Control(const IiwaState& state, PrimitiveOutput* output,
-      lcmt_jjz_controller* msg) const {
+               lcmt_jjz_controller* msg) const {
+    // Set default values.
+    const int dim = get_dimension();
     output->status = PrimitiveOutput::EXECUTING;
-    // TODO: HACK!!!
-    output->q_cmd = VectorX<double>::Zero(7);
-    output->trq_cmd = VectorX<double>::Zero(7);
+    output->q_cmd.resize(dim);
+    output->trq_cmd.resize(dim);
+    output->q_cmd.setZero();
+    output->trq_cmd.setZero();
+
     DoControl(state, output, msg);
   }
 
@@ -60,10 +62,12 @@ class MotionPrimitive {
 
   virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
 
+  virtual int get_dimension() const = 0;
+
  protected:
   virtual void DoInitialize(const IiwaState& state) {}
   virtual void DoControl(const IiwaState& state, PrimitiveOutput* output,
-      lcmt_jjz_controller* msg) const {}
+                         lcmt_jjz_controller* msg) const {}
 
  private:
   std::string name_;
@@ -76,7 +80,12 @@ class MoveJoint : public MotionPrimitive {
   MoveJoint(const std::string& name, const VectorX<double>& q0,
             const VectorX<double>& q1, double duration);
 
-  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
+  void DoControl(const IiwaState& state, PrimitiveOutput* output,
+                 lcmt_jjz_controller* msg) const override;
+
+  int get_dimension() const override {
+    return traj_.rows() * traj_.cols();
+  }
 
  private:
   PiecewisePolynomial<double> traj_;
@@ -87,9 +96,7 @@ class MoveTool : public MotionPrimitive {
   MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
            const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0);
 
-  void DoInitialize(const IiwaState& state) override;
   void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
-  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
   virtual Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const = 0;
@@ -103,6 +110,15 @@ class MoveTool : public MotionPrimitive {
 
   const RigidBodyTree<double>& get_robot() const { return robot_; }
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
+
+  int get_dimension() const final {
+    return robot_.get_num_positions();
+  }
+
+ protected:
+  void DoInitialize(const IiwaState& state) override;
+  void DoControl(const IiwaState& state, PrimitiveOutput* output,
+                 lcmt_jjz_controller* msg) const override;
 
  private:
   const RigidBodyTree<double>& robot_;
@@ -118,10 +134,11 @@ class MoveTool : public MotionPrimitive {
 class MoveToolStraightUntilTouch : public MoveTool {
  public:
   MoveToolStraightUntilTouch(const std::string& name,
-      const RigidBodyTree<double>* robot, const RigidBodyFrame<double>* frame_T,
-      const VectorX<double>& q0, const Vector3<double>& dir, double vel);
+                             const RigidBodyTree<double>* robot,
+                             const RigidBodyFrame<double>* frame_T,
+                             const VectorX<double>& q0,
+                             const Vector3<double>& dir, double vel);
 
-  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
   Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const override;
 
@@ -129,6 +146,9 @@ class MoveToolStraightUntilTouch : public MoveTool {
   void set_f_ext_thresh(double thresh) { f_ext_thresh_ = thresh; }
 
  private:
+  void DoControl(const IiwaState& state, PrimitiveOutput* output,
+                 lcmt_jjz_controller* msg) const override;
+
   Isometry3<double> X_WT0_;
   Vector3<double> dir_;
   double vel_;
@@ -139,18 +159,24 @@ class MoveToolStraightUntilTouch : public MoveTool {
 class HoldPositionAndApplyForce : public MotionPrimitive {
  public:
   HoldPositionAndApplyForce(const std::string& name,
-      const RigidBodyTree<double>* robot, const RigidBodyFrame<double>* frame_T);
+                            const RigidBodyTree<double>* robot,
+                            const RigidBodyFrame<double>* frame_T);
 
   void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
-  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
-  const Vector6<double>& get_desired_ext_wrench() const { return ext_wrench_d_; }
+  const Vector6<double>& get_desired_ext_wrench() const {
+    return ext_wrench_d_;
+  }
   void set_desired_ext_wrench(const Vector6<double>& w) { ext_wrench_d_ = w; }
 
- private:
-  void DoInitialize(const IiwaState& state) override {
-    q0_ = state.get_q();
+  int get_dimension() const final {
+    return robot_.get_num_positions();
   }
+
+ private:
+  void DoInitialize(const IiwaState& state) override { q0_ = state.get_q(); }
+  void DoControl(const IiwaState& state, PrimitiveOutput* output,
+                 lcmt_jjz_controller* msg) const override;
 
   VectorX<double> q0_;
 
@@ -174,17 +200,16 @@ class MoveToolFollowTraj : public MoveTool {
 
   Isometry3<double> ComputeDesiredToolInWorld(
       const IiwaState& state) const override;
-  void DoControl(const IiwaState& state, PrimitiveOutput* output, lcmt_jjz_controller* msg) const override;
 
-  //const Vector6<double>& get_desired_ext_wrench() const { return ext_wrench_d_; };
-  //void set_desired_ext_wrench(const Vector6<double>& ext_wrench) { ext_wrench_d_ = ext_wrench; }
   void set_mu(double mu) { mu_ = mu; }
   void set_yaw_mu(double mu) { yaw_mu_ = mu; }
   void set_fz(double fz) { fz_ = fz; }
 
  private:
+  void DoControl(const IiwaState& state, PrimitiveOutput* output,
+                 lcmt_jjz_controller* msg) const override;
+
   manipulation::PiecewiseCartesianTrajectory<double> X_WT_traj_;
-  // Vector6<double> ext_wrench_d_{Vector6<double>::Zero()};
   double vel_thres_{1e-3};
   double mu_{0};
   double yaw_mu_{0};

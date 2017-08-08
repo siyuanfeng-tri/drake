@@ -68,7 +68,7 @@ bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   //         = -J^T * F
   // I think the measured trq_ext is the flip side.
   ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(ext_trq_);
-  //ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(-ext_trq_);
+  // ext_wrench_ = J_.transpose().colPivHouseholderQr().solve(-ext_trq_);
 
   X_WT_ = iiwa_->CalcFramePoseInWorldFrame(cache_, *frame_T_);
   V_WT_ = iiwa_->CalcFrameSpatialVelocityInWorldFrame(cache_, *frame_T_);

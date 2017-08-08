@@ -14,8 +14,7 @@ class JjzController {
   static const std::string kLcmJjzControllerDebug;
 
   JjzController(const RigidBodyTree<double>& robot)
-      : robot_(robot),
-        frame_T_("tool", robot_.FindBody(kEEName), X_ET) {
+      : robot_(robot), frame_T_("tool", robot_.FindBody(kEEName), X_ET) {
     lcm::Subscription* sub =
         lcm_.subscribe(kLcmStatusChannel, &JjzController::HandleStatus, this);
     // THIS IS VERY IMPORTANT!!
@@ -31,6 +30,7 @@ class JjzController {
       return;
     }
     run_flag_ = true;
+    iiwa_status_.utime = -1;
     control_thread_ = std::thread(&JjzController::ControlLoop, this);
   }
 
@@ -41,12 +41,13 @@ class JjzController {
 
   void GetState(IiwaState* state) const {
     DRAKE_DEMAND(run_flag_);
+
     lcmt_iiwa_status stats;
-    while(true) {
-      stats = CopyStateMsg();
+    while (true) {
+      GetStateMsg(&stats);
       if (stats.utime == -1) {
         std::cout << "hasn't got a valid state yet.\n";
-        usleep(1e5);
+        usleep(1e4);
       } else {
         break;
       }
@@ -57,6 +58,8 @@ class JjzController {
   void MoveJ(const VectorX<double>& q_des, double duration);
 
   void GetPrimitiveOutput(PrimitiveOutput* output) const {
+    DRAKE_DEMAND(run_flag_);
+
     std::lock_guard<std::mutex> guard(motion_lock_);
     *output = primitive_output_;
   }
@@ -65,6 +68,7 @@ class JjzController {
   void SwapPlan(std::unique_ptr<MotionPrimitive> new_plan) {
     std::lock_guard<std::mutex> guard(motion_lock_);
     primitive_ = std::move(new_plan);
+    primitive_output_.status = PrimitiveOutput::UNINIT;
   }
 
   void ControlLoop();
@@ -79,9 +83,9 @@ class JjzController {
     iiwa_status_ = msg;
   }
 
-  lcmt_iiwa_status CopyStateMsg() const {
+  void GetStateMsg(lcmt_iiwa_status* msg) const {
     std::lock_guard<std::mutex> guard(state_lock_);
-    return iiwa_status_;
+    *msg = iiwa_status_;
   }
 
   lcm::LCM lcm_;

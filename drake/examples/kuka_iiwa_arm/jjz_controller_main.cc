@@ -13,16 +13,22 @@ int main() {
 
   controller.Start();
 
-  drake::examples::jjz::IiwaState state(&controller.get_robot(), &controller.get_tool_frame());
+  drake::examples::jjz::IiwaState state(&controller.get_robot(),
+                                        &controller.get_tool_frame());
   drake::examples::jjz::PrimitiveOutput output;
 
-  std::vector<drake::VectorX<double>> qs(2, controller.get_robot().getZeroConfiguration());
+  std::vector<drake::VectorX<double>> qs(
+      2, controller.get_robot().getZeroConfiguration());
   qs[1](3) = -M_PI / 4;
   int idx = 1;
+  double last_time = -1;
 
   while (true) {
     // Measured state.
     controller.GetState(&state);
+    if (state.get_time() == last_time)
+      continue;
+    last_time = state.get_time();
 
     // Controller's output, contains status flag.
     controller.GetPrimitiveOutput(&output);
@@ -34,7 +40,6 @@ int main() {
     }
 
     // Sleep 100ms.
-    usleep(1e5);
+    // usleep(1e5);
   }
 }
-
