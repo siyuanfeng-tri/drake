@@ -105,6 +105,7 @@ drake_cc_library(
         "jjz_common.h",
         "jjz_primitives.h",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//drake/common:common",
         "//drake/lcmtypes:iiwa",
@@ -120,6 +121,7 @@ drake_cc_library(
     name = "jjz_controller",
     srcs = ["jjz_controller.cc"],
     hdrs = ["jjz_controller.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":iiwa_common",
         ":jjz",

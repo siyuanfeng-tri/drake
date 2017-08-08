@@ -2,6 +2,10 @@
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 
+#include "drake/manipulation/util/trajectory_utils.h"
+
+using namespace drake;
+
 int main() {
   const std::string kPath =
       "drake/manipulation/models/iiwa_description/urdf/"
@@ -17,17 +21,13 @@ int main() {
                                         &controller.get_tool_frame());
   drake::examples::jjz::PrimitiveOutput output;
 
-  std::vector<drake::VectorX<double>> qs(
-      2, controller.get_robot().getZeroConfiguration());
-  qs[1](3) = -M_PI / 4;
-  int idx = 1;
   double last_time = -1;
+  int script_idx = 0;
 
   while (true) {
     // Measured state.
     controller.GetState(&state);
-    if (state.get_time() == last_time)
-      continue;
+    if (state.get_time() == last_time) continue;
     last_time = state.get_time();
 
     // Controller's output, contains status flag.
@@ -35,8 +35,43 @@ int main() {
 
     // Check status, and swap new plan when the old one is done.
     if (output.status == drake::examples::jjz::PrimitiveOutput::DONE) {
-      controller.MoveJ(qs[idx++], 2);
-      idx = idx % 2;
+      switch (script_idx) {
+        case 0: {
+          VectorX<double> q = controller.get_robot().getZeroConfiguration();
+          q[1] = 45. / 180. * M_PI;
+          q[3] = -90. / 180. * M_PI;
+          q[5] = 45. / 180. * M_PI;
+          controller.MoveJ(q, 2);
+          script_idx++;
+          break;
+        }
+
+        case 1: {
+          controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
+                                            10);
+          script_idx++;
+          break;
+        }
+
+        case 2: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, -0.3, 0)) *
+              X_WT0;
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive holds
+          // for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double> traj =
+              manipulation::PiecewiseCartesianTrajectory<double>::
+                  MakeCubicLinearWithEndLinearVelocity({0.5, 3}, {X_WT0, X_WT1},
+                                                       Vector3<double>::Zero(),
+                                                       Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 10, 1, 0);
+          script_idx++;
+          break;
+        }
+      }
     }
 
     // Sleep 100ms.

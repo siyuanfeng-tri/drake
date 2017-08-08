@@ -79,6 +79,7 @@ void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
 void MoveTool::DoControl(const IiwaState& state, PrimitiveOutput* output,
                          lcmt_jjz_controller* msg) const {
   output->q_cmd = cache_.getQ();
+  output->X_WT_cmd = robot_.CalcFramePoseInWorldFrame(cache_, frame_T_);
   eigenVectorToCArray(output->q_cmd, msg->q_ik);
 }
 
@@ -126,14 +127,17 @@ void HoldPositionAndApplyForce::Update(const IiwaState& state,
 void HoldPositionAndApplyForce::DoControl(const IiwaState& state,
                                           PrimitiveOutput* output,
                                           lcmt_jjz_controller* msg) const {
-  MatrixX<double> J =
-      robot_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
   output->q_cmd = q0_;
-  // q_d = cache_.getQ();
+  KinematicsCache<double> tmp = robot_.CreateKinematicsCache();
+  tmp.initialize(q0_);
+  robot_.doKinematics(tmp);
+  output->X_WT_cmd = robot_.CalcFramePoseInWorldFrame(tmp, frame_T_);
 
   // ext_trq = trq_measured - trq_id
   //         = M * qdd + h - J^T * F - (M * qdd + h)
   //         = -J^T * F
+  MatrixX<double> J =
+      robot_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
   output->trq_cmd = -J.transpose() * ext_wrench_d_;
 
   // Debug

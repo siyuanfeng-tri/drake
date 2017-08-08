@@ -14,10 +14,11 @@ namespace jjz {
 
 struct PrimitiveOutput {
   enum Status { UNINIT = 0, EXECUTING = 1, DONE = 2, ERR = 3 };
-  int64_t timestamp{-1};
   Status status{UNINIT};
   VectorX<double> q_cmd;
   VectorX<double> trq_cmd;
+  // This is only set with all cartesian mode primitives. MoveJ has this set to
+  // I.
   Isometry3<double> X_WT_cmd{Isometry3<double>::Identity()};
 };
 
@@ -55,6 +56,8 @@ class MotionPrimitive {
     output->q_cmd.setZero();
     output->trq_cmd.setZero();
 
+    output->X_WT_cmd.setIdentity();
+
     DoControl(state, output, msg);
   }
 
@@ -83,9 +86,7 @@ class MoveJoint : public MotionPrimitive {
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
 
-  int get_dimension() const override {
-    return traj_.rows() * traj_.cols();
-  }
+  int get_dimension() const override { return traj_.rows() * traj_.cols(); }
 
  private:
   PiecewisePolynomial<double> traj_;
@@ -111,9 +112,7 @@ class MoveTool : public MotionPrimitive {
   const RigidBodyTree<double>& get_robot() const { return robot_; }
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
 
-  int get_dimension() const final {
-    return robot_.get_num_positions();
-  }
+  int get_dimension() const final { return robot_.get_num_positions(); }
 
  protected:
   void DoInitialize(const IiwaState& state) override;
@@ -169,9 +168,7 @@ class HoldPositionAndApplyForce : public MotionPrimitive {
   }
   void set_desired_ext_wrench(const Vector6<double>& w) { ext_wrench_d_ = w; }
 
-  int get_dimension() const final {
-    return robot_.get_num_positions();
-  }
+  int get_dimension() const final { return robot_.get_num_positions(); }
 
  private:
   void DoInitialize(const IiwaState& state) override { q0_ = state.get_q(); }
@@ -210,6 +207,7 @@ class MoveToolFollowTraj : public MoveTool {
                  lcmt_jjz_controller* msg) const override;
 
   manipulation::PiecewiseCartesianTrajectory<double> X_WT_traj_;
+
   double vel_thres_{1e-3};
   double mu_{0};
   double yaw_mu_{0};

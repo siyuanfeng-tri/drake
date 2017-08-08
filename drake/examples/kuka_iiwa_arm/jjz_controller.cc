@@ -47,6 +47,33 @@ void JjzController::MoveJ(const VectorX<double>& q_des, double duration) {
   SwapPlan(std::move(new_plan));
 }
 
+void JjzController::MoveStraightUntilTouch(const Vector3<double>& dir_W,
+                                           double vel, double force_thresh) {
+  PrimitiveOutput cur_output;
+  GetPrimitiveOutput(&cur_output);
+
+  auto new_plan = new MoveToolStraightUntilTouch(
+      "MoveStraightUntilTouch", &get_robot(), &get_tool_frame(),
+      cur_output.q_cmd, dir_W, vel);
+  new_plan->set_f_ext_thresh(force_thresh);
+  SwapPlan(std::unique_ptr<MotionPrimitive>(new_plan));
+}
+
+void JjzController::MoveToolFollowTraj(
+    const manipulation::PiecewiseCartesianTrajectory<double>& traj, double Fz,
+    double mu, double yaw_mu) {
+  PrimitiveOutput cur_output;
+  GetPrimitiveOutput(&cur_output);
+
+  auto new_plan =
+      new class MoveToolFollowTraj("MoveToolFollowTraj", &get_robot(),
+                                   &get_tool_frame(), cur_output.q_cmd, traj);
+  new_plan->set_fz(Fz);
+  new_plan->set_mu(mu);
+  new_plan->set_yaw_mu(yaw_mu);
+  SwapPlan(std::unique_ptr<MotionPrimitive>(new_plan));
+}
+
 void JjzController::ControlLoop() {
   // We can directly read iiwa_status_ because write only happens in
   // HandleStatus, which is only triggered by calling lcm_.handle,
@@ -64,10 +91,8 @@ void JjzController::ControlLoop() {
     lcm_err = lcm_.handleTimeout(100);
     // > 0 got a message, = 0 timed out, < 0
     if (lcm_err > 0) {
-      if (iiwa_status_.utime != -1)
-        valid_msg_ctr++;
-      if (valid_msg_ctr > 4)
-        break;
+      if (iiwa_status_.utime != -1) valid_msg_ctr++;
+      if (valid_msg_ctr > 4) break;
     }
   } while (lcm_err <= 0);
   std::cout << "got first msg\n";

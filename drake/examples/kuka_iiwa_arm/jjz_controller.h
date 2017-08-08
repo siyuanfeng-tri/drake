@@ -24,6 +24,9 @@ class JjzController {
   const RigidBodyTree<double>& get_robot() const { return robot_; }
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
 
+  // Starts the controller thread, needs to be called before GetState,
+  // GetPrimitiveOutput,
+  // or exectuing any motions.
   void Start() {
     if (run_flag_) {
       std::cout << "Controller thread already running\n";
@@ -55,14 +58,29 @@ class JjzController {
     state->UpdateState(stats);
   }
 
-  void MoveJ(const VectorX<double>& q_des, double duration);
-
   void GetPrimitiveOutput(PrimitiveOutput* output) const {
     DRAKE_DEMAND(run_flag_);
 
     std::lock_guard<std::mutex> guard(motion_lock_);
     *output = primitive_output_;
   }
+
+  void MoveJ(const VectorX<double>& q_des, double duration);
+
+  void MoveStraightUntilTouch(const Vector3<double>& dir_W, double vel,
+                              double force_thresh);
+
+  // Fz is in world frame.
+  // If you don't want to deal with any of the force crap, just set
+  // them all the zero. If you don't want to compensate for friction, set mus to
+  // zero.
+  //
+  // Note: the timing in traj should be relative, i.e time range = [0, 2], not
+  // absolute
+  // clock.
+  void MoveToolFollowTraj(
+      const manipulation::PiecewiseCartesianTrajectory<double>& traj, double Fz,
+      double mu, double yaw_mu);
 
  private:
   void SwapPlan(std::unique_ptr<MotionPrimitive> new_plan) {
