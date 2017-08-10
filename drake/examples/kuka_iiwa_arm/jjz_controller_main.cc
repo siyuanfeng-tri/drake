@@ -49,14 +49,12 @@ int main() {
           break;
         }
         case 0: {
-          controller.OpenGripper();
-          usleep(1e6);
+          controller.OpenGripperAndSleep(1);
           script_idx++;
           break;
         }
         case 1: {
-          controller.CloseGripper();
-          usleep(1e6);
+          controller.CloseGripperAndSleep(1);
           script_idx++;
           break;
         }

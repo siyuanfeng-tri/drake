@@ -81,11 +81,11 @@ void JjzController::GetIiwaState(IiwaState* state) const {
 
   lcmt_iiwa_status stats;
   while (true) {
-    GetIiwaStateMsg(&stats);
-    if (stats.utime == -1) {
-      std::cout << "hasn't got a valid state yet.\n";
-      usleep(1e4);
+    std::lock_guard<std::mutex> guard(state_lock_);
+    if (iiwa_msg_ctr_ == 0) {
+      std::cout << "hasn't got a valid iiwa state yet.\n";
     } else {
+      stats = iiwa_status_;
       break;
     }
   }
@@ -97,11 +97,11 @@ void JjzController::GetWsgState(WsgState* state) const {
 
   lcmt_schunk_wsg_status stats;
   while (true) {
-    GetWsgStateMsg(&stats);
-    if (stats.utime == -1) {
+    std::lock_guard<std::mutex> guard(state_lock_);
+    if (wsg_msg_ctr_ == 0) {
       std::cout << "hasn't got a valid wsg state yet.\n";
-      usleep(1e4);
     } else {
+      stats = wsg_status_;
       break;
     }
   }
@@ -116,18 +116,6 @@ void JjzController::SetGripperPositionAndForce(double position, double force) {
   lcm_.publish(kLcmWsgCommandChannel, &cmd);
 }
 
-int JjzController::SetGripperPositionAndForceTillDoneOrTimeOut(
-    double position, double force, double position_thresh, double timeout) {
-  SetGripperPositionAndForce(position, force);
-  double t0 = get_system_time();
-  WsgState state;
-  do {
-    GetWsgState(&state);
-    if (std::fabs(state.get_position() - position) < position_thresh) return 0;
-  } while (get_system_time() - t0 <= timeout);
-  return -1;
-}
-
 void JjzController::ControlLoop() {
   // We can directly read iiwa_status_ because write only happens in
   // HandleIiwaStatus, which is only triggered by calling lcm_.handle,
@@ -139,17 +127,11 @@ void JjzController::ControlLoop() {
 
   // VERY IMPORTANT HACK, To make sure that no stale messages are in the
   // queue.
-  int valid_msg_ctr = 0;
   int lcm_err;
-  do {
+  while (iiwa_msg_ctr_ < 4) {
     lcm_err = lcm_.handleTimeout(100);
-    // > 0 got a message, = 0 timed out, < 0
-    if (lcm_err > 0) {
-      if (iiwa_status_.utime != -1) valid_msg_ctr++;
-      if (valid_msg_ctr > 4) break;
-    }
-  } while (lcm_err <= 0);
-  std::cout << "got first msg\n";
+  }
+  std::cout << "got first iiwa msg\n";
 
   ////////////////////////////////////////////////////////
   // cmd related
