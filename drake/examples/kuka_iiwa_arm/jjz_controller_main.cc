@@ -27,6 +27,18 @@ int main() {
 
   double last_time = -1;
   int script_idx = 0;
+
+  VectorX<double> q0 = tree.getZeroConfiguration();
+  q0[1] = 45. / 180. * M_PI;
+  q0[3] = -90. / 180. * M_PI;
+  q0[5] = -45. / 180. * M_PI;
+
+  RigidBodyFrame<double> camera_frame("camera", tree.FindBody(jjz::kEEName),
+                                      Isometry3<double>::Identity());
+  std::vector<VectorX<double>> cali_q = jjz::ComputeCalibrationConfigurations(
+      tree, camera_frame, q0, Vector3<double>(0, 0, 0.5),
+      0.0, 0.0, 3, 3);
+
   while (true) {
     // Measured state.
     controller.GetIiwaState(&state);
@@ -39,6 +51,19 @@ int main() {
     // Check status, and swap new plan when the old one is done.
     if (output.status == drake::jjz::PrimitiveOutput::DONE) {
       switch (script_idx) {
+        case 0: {
+          controller.MoveJ(q0, 2);
+          script_idx++;
+          break;
+        }
+        case 1: {
+          if (!cali_q.empty()) {
+            controller.MoveJ(cali_q.back(), 2);
+            cali_q.pop_back();
+          }
+          break;
+        }
+        /*
         case 2: {
           VectorX<double> q = controller.get_robot().getZeroConfiguration();
           q[1] = 45. / 180. * M_PI;
@@ -59,7 +84,6 @@ int main() {
           break;
         }
 
-          /*
         case 1: {
           controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
                                             10);

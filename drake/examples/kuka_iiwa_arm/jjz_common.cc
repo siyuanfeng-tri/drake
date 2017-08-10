@@ -370,5 +370,51 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
   return traj;
 }
 
+Matrix3<double> FlatYAxisFrame(const Vector3<double>& z) {
+  const Vector3<double> py_z = z.normalized();
+  const Vector3<double> py_z_proj = Vector3<double>(z(0), z(1), 0).normalized();
+  const Vector3<double> py_y = py_z_proj.cross(Vector3<double>::UnitZ()).normalized();
+  const Vector3<double> py_x = py_y.cross(py_z).normalized();
+  Matrix3<double> rot;
+  rot.col(0) = py_x;
+  rot.col(1) = py_y;
+  rot.col(2) = py_z;
+  return rot;
+}
+
+std::vector<VectorX<double>> ComputeCalibrationConfigurations(
+    const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
+    const VectorX<double>& q0, const Vector3<double>& p_WP,
+    double width, double height, int num_width_pt, int num_height_pt) {
+  KinematicsCache<double> cache = robot.CreateKinematicsCache();
+  cache.initialize(q0);
+  robot.doKinematics(cache);
+
+  const Isometry3<double> X_WC0 = robot.CalcFramePoseInWorldFrame(cache, frame_C);
+  const Vector3<double> C0_to_P = p_WP - X_WC0.translation();
+  const double pyramid_height = C0_to_P.norm();
+
+  Isometry3<double> X_WP = Isometry3<double>::Identity();
+  X_WP.linear() = FlatYAxisFrame(C0_to_P);
+  X_WP.translation() = p_WP;
+
+  double dw = width / (num_width_pt - 1);
+  double dh = height / (num_height_pt - 1);
+
+  std::vector<VectorX<double>> ret;
+  for (int i = 0; i < num_width_pt; i++) {
+    for (int j = 0; j < num_height_pt; j++) {
+      Vector3<double> p_PC(-height / 2. + j * dh, -width / 2. + i * dw, -pyramid_height);
+      Isometry3<double> X_WC = Isometry3<double>::Identity();
+      X_WC.translation() = X_WP * p_PC;
+      X_WC.linear() = FlatYAxisFrame(p_WP - X_WC.translation());
+
+      ret.push_back(PointIk(X_WC, frame_C, (RigidBodyTree<double>*)&robot));
+    }
+  }
+
+  return ret;
+}
+
 }  // namespace jjz
 }  // namespace drake
