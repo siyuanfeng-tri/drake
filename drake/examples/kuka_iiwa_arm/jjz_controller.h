@@ -81,9 +81,22 @@ class JjzController {
       const manipulation::PiecewiseCartesianTrajectory<double>& traj, double Fz,
       double mu, double yaw_mu);
 
+  void CloseGripper() {
+    std::cout << "Close gripper\n";
+    SetGripperPositionAndForce(0, 40);
+  }
+
+  void OpenGripper() {
+    std::cout << "Open gripper\n";
+    SetGripperPositionAndForce(110, 40);
+  }
+
   void SetGripperPositionAndForce(double position, double force);
-  void CloseGripper() { SetGripperPositionAndForce(0, 10); }
-  void OpenGripper() { SetGripperPositionAndForce(110, 0); }
+
+  // 0 is done, -1 is time out.
+  int SetGripperPositionAndForceTillDoneOrTimeOut(double position, double force,
+                                                  double position_thresh,
+                                                  double timeou);
 
  private:
   void SwapPlan(std::unique_ptr<MotionPrimitive> new_plan) {

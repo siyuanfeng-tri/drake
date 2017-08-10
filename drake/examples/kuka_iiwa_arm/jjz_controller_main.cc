@@ -39,7 +39,7 @@ int main() {
     // Check status, and swap new plan when the old one is done.
     if (output.status == drake::jjz::PrimitiveOutput::DONE) {
       switch (script_idx) {
-        case 0: {
+        case 2: {
           VectorX<double> q = controller.get_robot().getZeroConfiguration();
           q[1] = 45. / 180. * M_PI;
           q[3] = -90. / 180. * M_PI;
@@ -48,7 +48,20 @@ int main() {
           script_idx++;
           break;
         }
+        case 0: {
+          controller.OpenGripper();
+          usleep(1e6);
+          script_idx++;
+          break;
+        }
+        case 1: {
+          controller.CloseGripper();
+          usleep(1e6);
+          script_idx++;
+          break;
+        }
 
+          /*
         case 1: {
           controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
                                             10);
@@ -56,7 +69,6 @@ int main() {
           break;
         }
 
-          /*
           case 2: {
             Isometry3<double> X_WT0 = output.X_WT_cmd;
             Isometry3<double> X_WT1 =

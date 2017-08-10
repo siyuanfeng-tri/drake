@@ -116,6 +116,18 @@ void JjzController::SetGripperPositionAndForce(double position, double force) {
   lcm_.publish(kLcmWsgCommandChannel, &cmd);
 }
 
+int JjzController::SetGripperPositionAndForceTillDoneOrTimeOut(
+    double position, double force, double position_thresh, double timeout) {
+  SetGripperPositionAndForce(position, force);
+  double t0 = get_system_time();
+  WsgState state;
+  do {
+    GetWsgState(&state);
+    if (std::fabs(state.get_position() - position) < position_thresh) return 0;
+  } while (get_system_time() - t0 <= timeout);
+  return -1;
+}
+
 void JjzController::ControlLoop() {
   // We can directly read iiwa_status_ because write only happens in
   // HandleIiwaStatus, which is only triggered by calling lcm_.handle,
@@ -172,11 +184,12 @@ void JjzController::ControlLoop() {
         std::cout << "LCM recv timed out in control loop 10ms.\n";
       } else if (lcm_err < 0) {
         std::cout << "LCM recv error.\n";
+      } else {
+        // Update state.
+        if (state.UpdateState(iiwa_status_)) break;
       }
     } while (lcm_err <= 0);
 
-    // Update state.
-    DRAKE_DEMAND(state.UpdateState(iiwa_status_));
     lcmt_jjz_controller ctrl_debug{};
     FillDebugMessage(state, &ctrl_debug);
 
