@@ -13,6 +13,7 @@
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/lcmt_jjz_controller.hpp"
+#include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_tree.h"
@@ -33,9 +34,11 @@
 namespace drake {
 namespace jjz {
 
-const std::string JjzController::kLcmStatusChannel = "IIWA_STATUS";
-const std::string JjzController::kLcmCommandChannel = "IIWA_COMMAND";
+const std::string JjzController::kLcmIiwaStatusChannel = "IIWA_STATUS";
+const std::string JjzController::kLcmIiwaCommandChannel = "IIWA_COMMAND";
 const std::string JjzController::kLcmJjzControllerDebug = "CTRL_DEBUG";
+const std::string JjzController::kLcmWsgStatusChannel = "SCHUNK_WSG_STATUS";
+const std::string JjzController::kLcmWsgCommandChannel = "SCHUNK_WSG_COMMAND";
 
 void JjzController::MoveJ(const VectorX<double>& q_des, double duration) {
   PrimitiveOutput cur_output;
@@ -73,9 +76,49 @@ void JjzController::MoveToolFollowTraj(
   SwapPlan(std::unique_ptr<MotionPrimitive>(new_plan));
 }
 
+void JjzController::GetIiwaState(IiwaState* state) const {
+  DRAKE_DEMAND(run_flag_);
+
+  lcmt_iiwa_status stats;
+  while (true) {
+    GetIiwaStateMsg(&stats);
+    if (stats.utime == -1) {
+      std::cout << "hasn't got a valid state yet.\n";
+      usleep(1e4);
+    } else {
+      break;
+    }
+  }
+  state->UpdateState(stats);
+}
+
+void JjzController::GetWsgState(WsgState* state) const {
+  DRAKE_DEMAND(run_flag_);
+
+  lcmt_schunk_wsg_status stats;
+  while (true) {
+    GetWsgStateMsg(&stats);
+    if (stats.utime == -1) {
+      std::cout << "hasn't got a valid wsg state yet.\n";
+      usleep(1e4);
+    } else {
+      break;
+    }
+  }
+  state->UpdateState(stats);
+}
+
+void JjzController::SetGripperPositionAndForce(double position, double force) {
+  lcmt_schunk_wsg_command cmd{};
+  // TODO set timestamp.
+  cmd.target_position_mm = position;
+  cmd.force = force;
+  lcm_.publish(kLcmWsgCommandChannel, &cmd);
+}
+
 void JjzController::ControlLoop() {
   // We can directly read iiwa_status_ because write only happens in
-  // HandleStatus, which is only triggered by calling lcm_.handle,
+  // HandleIiwaStatus, which is only triggered by calling lcm_.handle,
   // which is only called from this func (thus, in the same thread).
 
   ////////////////////////////////////////////////////////
@@ -156,7 +199,7 @@ void JjzController::ControlLoop() {
       iiwa_command.joint_position[i] = q_cmd[i];
       iiwa_command.joint_torque[i] = trq_cmd[i];
     }
-    lcm_.publish(kLcmCommandChannel, &iiwa_command);
+    lcm_.publish(kLcmIiwaCommandChannel, &iiwa_command);
 
     // send debug msg.
     lcm_.publish(kLcmJjzControllerDebug, &ctrl_debug);

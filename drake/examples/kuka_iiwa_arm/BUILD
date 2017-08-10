@@ -110,6 +110,7 @@ drake_cc_library(
         "//drake/common:common",
         "//drake/lcmtypes:iiwa",
         "//drake/lcmtypes:jjz_controller",
+        "//drake/lcmtypes:schunk",
         "//drake/examples/PlanarPushing:planar_pushing",
         "//drake/manipulation/planner:jacobian_ik",
         "//drake/manipulation/util:trajectory_utils",

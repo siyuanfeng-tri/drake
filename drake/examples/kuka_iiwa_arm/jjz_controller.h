@@ -8,22 +8,31 @@ namespace jjz {
 
 class JjzController {
  public:
-  static const std::string kLcmStatusChannel;
-  static const std::string kLcmCommandChannel;
+  static const std::string kLcmIiwaStatusChannel;
+  static const std::string kLcmIiwaCommandChannel;
   static const std::string kLcmJjzControllerDebug;
+  static const std::string kLcmWsgStatusChannel;
+  static const std::string kLcmWsgCommandChannel;
 
-  JjzController(const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_T)
+  JjzController(const RigidBodyTree<double>& robot,
+                const RigidBodyFrame<double>& frame_T)
       : robot_(robot), frame_T_(frame_T) {
-    lcm::Subscription* sub =
-        lcm_.subscribe(kLcmStatusChannel, &JjzController::HandleStatus, this);
+    // Iiwa status.
+    lcm::Subscription* sub = lcm_.subscribe(
+        kLcmIiwaStatusChannel, &JjzController::HandleIiwaStatus, this);
     // THIS IS VERY IMPORTANT!!
+    sub->setQueueCapacity(1);
+
+    // Gripper status.
+    sub = lcm_.subscribe(kLcmWsgStatusChannel, &JjzController::HandleWsgStatus,
+                         this);
     sub->setQueueCapacity(1);
   }
 
   const RigidBodyTree<double>& get_robot() const { return robot_; }
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
 
-  // Starts the controller thread, needs to be called before GetState,
+  // Starts the controller thread, needs to be called before GetIiwaState,
   // GetPrimitiveOutput,
   // or exectuing any motions.
   void Start() {
@@ -33,6 +42,7 @@ class JjzController {
     }
     run_flag_ = true;
     iiwa_status_.utime = -1;
+    wsg_status_.utime = -1;
     control_thread_ = std::thread(&JjzController::ControlLoop, this);
   }
 
@@ -41,21 +51,11 @@ class JjzController {
     control_thread_.join();
   }
 
-  void GetState(IiwaState* state) const {
-    DRAKE_DEMAND(run_flag_);
+  // This blocks until there is at least 1 valid status message from iiwa.
+  void GetIiwaState(IiwaState* state) const;
 
-    lcmt_iiwa_status stats;
-    while (true) {
-      GetStateMsg(&stats);
-      if (stats.utime == -1) {
-        std::cout << "hasn't got a valid state yet.\n";
-        usleep(1e4);
-      } else {
-        break;
-      }
-    }
-    state->UpdateState(stats);
-  }
+  // This blocks until there is at least 1 valid status message from iiwa.
+  void GetWsgState(WsgState* state) const;
 
   void GetPrimitiveOutput(PrimitiveOutput* output) const {
     DRAKE_DEMAND(run_flag_);
@@ -81,6 +81,10 @@ class JjzController {
       const manipulation::PiecewiseCartesianTrajectory<double>& traj, double Fz,
       double mu, double yaw_mu);
 
+  void SetGripperPositionAndForce(double position, double force);
+  void CloseGripper() { SetGripperPositionAndForce(0, 10); }
+  void OpenGripper() { SetGripperPositionAndForce(110, 0); }
+
  private:
   void SwapPlan(std::unique_ptr<MotionPrimitive> new_plan) {
     std::lock_guard<std::mutex> guard(motion_lock_);
@@ -90,19 +94,34 @@ class JjzController {
 
   void ControlLoop();
 
-  void HandleStatus(const lcm::ReceiveBuffer*, const std::string&,
-                    const lcmt_iiwa_status* status) {
-    SetStateMsg(*status);
+  void HandleIiwaStatus(const lcm::ReceiveBuffer*, const std::string&,
+                        const lcmt_iiwa_status* status) {
+    SetIiwaStateMsg(*status);
   }
 
-  void SetStateMsg(const lcmt_iiwa_status& msg) {
+  void HandleWsgStatus(const lcm::ReceiveBuffer*, const std::string&,
+                       const lcmt_schunk_wsg_status* status) {
+    SetWsgStateMsg(*status);
+  }
+
+  void SetIiwaStateMsg(const lcmt_iiwa_status& msg) {
     std::lock_guard<std::mutex> guard(state_lock_);
     iiwa_status_ = msg;
   }
 
-  void GetStateMsg(lcmt_iiwa_status* msg) const {
+  void GetIiwaStateMsg(lcmt_iiwa_status* msg) const {
     std::lock_guard<std::mutex> guard(state_lock_);
     *msg = iiwa_status_;
+  }
+
+  void SetWsgStateMsg(const lcmt_schunk_wsg_status& msg) {
+    std::lock_guard<std::mutex> guard(state_lock_);
+    wsg_status_ = msg;
+  }
+
+  void GetWsgStateMsg(lcmt_schunk_wsg_status* msg) const {
+    std::lock_guard<std::mutex> guard(state_lock_);
+    *msg = wsg_status_;
   }
 
   lcm::LCM lcm_;
@@ -111,6 +130,7 @@ class JjzController {
 
   mutable std::mutex state_lock_;
   lcmt_iiwa_status iiwa_status_{};
+  lcmt_schunk_wsg_status wsg_status_{};
 
   mutable std::mutex motion_lock_;
   std::unique_ptr<MotionPrimitive> primitive_;

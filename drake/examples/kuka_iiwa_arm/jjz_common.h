@@ -3,6 +3,7 @@
 #include "drake/common/eigen_types.h"
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/lcmt_jjz_controller.hpp"
+#include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/manipulation/util/trajectory_utils.h"
 #include "drake/multibody/rigid_body_tree.h"
 
@@ -58,6 +59,26 @@ class IiwaState {
   Vector6<double> ext_wrench_;
 
   bool init_{false};
+};
+
+class WsgState {
+ public:
+  static constexpr double kUninitTime = -1.0;
+
+  void UpdateState(const lcmt_schunk_wsg_status& msg) {
+    time_ = static_cast<double>(msg.utime) / 1e6;
+    position_ = static_cast<double>(msg.actual_position_mm) / 1000.;
+    force_ = msg.actual_force;
+  }
+
+  double get_time() const { return time_; }
+  double get_position() const { return position_; }
+  double get_force() const { return force_; }
+
+ private:
+  double time_{kUninitTime};
+  double position_{0};
+  double force_{0};
 };
 
 void FillDebugMessage(const IiwaState& state, lcmt_jjz_controller* msg);
