@@ -96,19 +96,36 @@ const T& clamp(const T& val, const T& lo, const T& hi) {
 }
 
 Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose);
+
+// Solves the IK, s.t. FK(ret, frame_T) = X_WT.
 VectorX<double> PointIk(const Isometry3<double>& X_WT,
                         const RigidBodyFrame<double>& frame_T,
+                        const VectorX<double>& q_ini,
                         RigidBodyTree<double>* robot);
 
+// When at the solution, @p frame_C's origin in world would be at
+// @p camera_in_world, and @p frame_C's z axis would be pointing at
+// @p target_in_world.
 VectorX<double> GazeIk(const Vector3<double>& target_in_world,
                        const Vector3<double>& camera_in_world,
                        const RigidBodyFrame<double>& frame_C,
+                       const VectorX<double>& q_ini,
                        RigidBodyTree<double>* robot);
+
+// When at the solution, @p frame_C's z axis would be pointing at
+// @p target_in_world, and of opposite direction of
+// @p target_to_camera_in_world, and the distance between @p frame_C's origin
+// and @p target_in_world is larger than min_dist.
+VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
+                        const Vector3<double>& target_to_camera_in_world,
+                        double min_dist, const RigidBodyFrame<double>& frame_C,
+                        const VectorX<double>& q_ini,
+                        RigidBodyTree<double>* robot);
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WG,
-    double width, double height, int num_width_pt, int num_height_pt);
+    const VectorX<double>& q0, const Vector3<double>& p_WG, double width,
+    double height, int num_width_pt, int num_height_pt);
 
 // Returns a trajectory of T in W frame.
 manipulation::PiecewiseCartesianTrajectory<double>

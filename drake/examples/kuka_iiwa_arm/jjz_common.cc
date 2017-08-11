@@ -104,6 +104,7 @@ Eigen::Matrix<double, 7, 1> pose_to_vec(const Isometry3<double>& pose) {
 
 VectorX<double> PointIk(const Isometry3<double>& X_WT,
                         const RigidBodyFrame<double>& frame_T,
+                        const VectorX<double>& q_ini,
                         RigidBodyTree<double>* robot) {
   std::cout << "PointIk: X_WT:\n" << X_WT.matrix() << "\n\n";
 
@@ -132,10 +133,6 @@ VectorX<double> PointIk(const Isometry3<double>& X_WT,
 
   VectorX<double> q_res = VectorX<double>::Zero(7);
   VectorX<double> zero = VectorX<double>::Zero(7);
-  VectorX<double> q_ini = zero;
-  q_ini[1] = 45. * M_PI / 180;
-  q_ini[3] = -90. * M_PI / 180;
-  q_ini[5] = 45. * M_PI / 180;
 
   int info;
   std::vector<std::string> infeasible_constraints;
@@ -370,10 +367,11 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
   return traj;
 }
 
-Matrix3<double> FlatYAxisFrame(const Vector3<double>& z) {
+static Matrix3<double> FlatYAxisFrame(const Vector3<double>& z) {
   const Vector3<double> py_z = z.normalized();
   const Vector3<double> py_z_proj = Vector3<double>(z(0), z(1), 0).normalized();
-  const Vector3<double> py_y = py_z_proj.cross(Vector3<double>::UnitZ()).normalized();
+  const Vector3<double> py_y =
+      py_z_proj.cross(Vector3<double>::UnitZ()).normalized();
   const Vector3<double> py_x = py_y.cross(py_z).normalized();
   Matrix3<double> rot;
   rot.col(0) = py_x;
@@ -385,6 +383,7 @@ Matrix3<double> FlatYAxisFrame(const Vector3<double>& z) {
 VectorX<double> GazeIk(const Vector3<double>& target_in_world,
                        const Vector3<double>& camera_in_world,
                        const RigidBodyFrame<double>& frame_C,
+                       const VectorX<double>& q_ini,
                        RigidBodyTree<double>* robot) {
   std::vector<RigidBodyConstraint*> constraint_array;
 
@@ -397,33 +396,76 @@ VectorX<double> GazeIk(const Vector3<double>& target_in_world,
   const Vector3<double> gaze_ray_dir_in_body = X_BC.linear().col(2);
   const Vector3<double> gaze_ray_origin_in_body = X_BC.translation();
 
-  WorldGazeTargetConstraint con(
-      robot, body_idx,
-      gaze_ray_dir_in_body,
-      target_in_world,
-      gaze_ray_origin_in_body,
-      0.01, Vector2<double>::Zero());
+  WorldGazeTargetConstraint con(robot, body_idx, gaze_ray_dir_in_body,
+                                target_in_world, gaze_ray_origin_in_body, 0.01,
+                                Vector2<double>::Zero());
 
   constraint_array.push_back(&con);
 
   // Camera position constraint.
-  Vector3<double> p_WB = (Eigen::Translation<double, 3>(camera_in_world) * X_BC.inverse()).translation();
+  Vector3<double> p_WB =
+      (Eigen::Translation<double, 3>(camera_in_world) * X_BC.inverse())
+          .translation();
   Vector3<double> pos_tol(0.001, 0.001, 0.001);
   Vector3<double> pos_lb = p_WB - pos_tol;
   Vector3<double> pos_ub = p_WB + pos_tol;
 
-  WorldPositionConstraint pos_con(
-      robot, body_idx, Vector3<double>::Zero(),
-      pos_lb, pos_ub, Vector2<double>::Zero());
+  WorldPositionConstraint pos_con(robot, body_idx, Vector3<double>::Zero(),
+                                  pos_lb, pos_ub, Vector2<double>::Zero());
 
   constraint_array.push_back(&pos_con);
 
   VectorX<double> q_res = VectorX<double>::Zero(7);
   VectorX<double> zero = VectorX<double>::Zero(7);
-  VectorX<double> q_ini = zero;
-  q_ini[1] = 45. * M_PI / 180;
-  q_ini[3] = -90. * M_PI / 180;
-  q_ini[5] = 45. * M_PI / 180;
+
+  int info;
+  std::vector<std::string> infeasible_constraints;
+  inverseKin(robot, q_ini, zero, constraint_array.size(),
+             constraint_array.data(), ikoptions, &q_res, &info,
+             &infeasible_constraints);
+
+  DRAKE_DEMAND(info == 1);
+  return q_res;
+}
+
+VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
+                        const Vector3<double>& target_to_camera_in_world,
+                        double min_dist, const RigidBodyFrame<double>& frame_C,
+                        const VectorX<double>& q_ini,
+                        RigidBodyTree<double>* robot) {
+  std::vector<RigidBodyConstraint*> constraint_array;
+
+  IKoptions ikoptions(robot);
+
+  const Isometry3<double>& X_BC = frame_C.get_transform_to_body();
+  const int body_idx = frame_C.get_rigid_body().get_body_index();
+
+  // Gaze dir constraint.
+  const Vector3<double> gaze_ray_dir_in_body = X_BC.linear().col(2);
+  const Vector3<double> gaze_ray_origin_in_body = X_BC.translation();
+
+  WorldGazeTargetConstraint con(robot, body_idx, gaze_ray_dir_in_body,
+                                target_in_world, gaze_ray_origin_in_body, 0.01,
+                                Vector2<double>::Zero());
+
+  constraint_array.push_back(&con);
+
+  // Camera position constraint.
+  Isometry3<double> X_WTgt = Isometry3<double>::Identity();
+  X_WTgt.translation() = target_in_world;
+  X_WTgt.linear() = FlatYAxisFrame(target_to_camera_in_world);
+
+  Vector3<double> pos_lb(0, 0, min_dist);
+  Vector3<double> pos_ub(0, 0, std::numeric_limits<double>::infinity());
+
+  WorldPositionInFrameConstraint pos_con(robot, body_idx, X_BC.translation(),
+                                         X_WTgt.matrix(), pos_lb, pos_ub,
+                                         Vector2<double>::Zero());
+
+  constraint_array.push_back(&pos_con);
+
+  VectorX<double> q_res = VectorX<double>::Zero(7);
+  VectorX<double> zero = VectorX<double>::Zero(7);
 
   int info;
   std::vector<std::string> infeasible_constraints;
@@ -437,13 +479,14 @@ VectorX<double> GazeIk(const Vector3<double>& target_in_world,
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WP,
-    double width, double height, int num_width_pt, int num_height_pt) {
+    const VectorX<double>& q0, const Vector3<double>& p_WP, double width,
+    double height, int num_width_pt, int num_height_pt) {
   KinematicsCache<double> cache = robot.CreateKinematicsCache();
   cache.initialize(q0);
   robot.doKinematics(cache);
 
-  const Isometry3<double> X_WC0 = robot.CalcFramePoseInWorldFrame(cache, frame_C);
+  const Isometry3<double> X_WC0 =
+      robot.CalcFramePoseInWorldFrame(cache, frame_C);
   const Vector3<double> C0_to_P = p_WP - X_WC0.translation();
   const double pyramid_height = C0_to_P.norm();
 
@@ -457,10 +500,14 @@ std::vector<VectorX<double>> ComputeCalibrationConfigurations(
   std::vector<VectorX<double>> ret;
   for (int i = 0; i < num_width_pt; i++) {
     for (int j = 0; j < num_height_pt; j++) {
-      Vector3<double> p_PC(-height / 2. + j * dh, -width / 2. + i * dw, -pyramid_height);
-      p_PC = p_PC.normalized() * pyramid_height;
+      Vector3<double> p_PC(-height / 2. + j * dh, -width / 2. + i * dw,
+                           -pyramid_height);
+      p_PC = p_PC.normalized();  // * pyramid_height;
       Vector3<double> p_WC = X_WP * p_PC;
-      ret.push_back(GazeIk(p_WP, p_WC, frame_C, (RigidBodyTree<double>*)&robot));
+      // ret.push_back(GazeIk(p_WP, p_WC, frame_C, q0,
+      // (RigidBodyTree<double>*)&robot));
+      ret.push_back(GazeIk2(p_WP, p_WC - p_WP, 0.9, frame_C, q0,
+                            (RigidBodyTree<double>*)&robot));
     }
   }
 

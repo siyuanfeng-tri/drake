@@ -6,7 +6,7 @@
 
 using namespace drake;
 
-int main() {
+int main(int argc, char** argv) {
   const std::string kPath =
       "drake/manipulation/models/iiwa_description/urdf/"
       "iiwa14_polytope_collision.urdf";
@@ -42,8 +42,8 @@ int main() {
   RigidBodyFrame<double> camera_frame("camera", tree.FindBody(jjz::kEEName),
                                       Isometry3<double>::Identity());
   std::vector<VectorX<double>> cali_q = jjz::ComputeCalibrationConfigurations(
-      tree, camera_frame, q0, Vector3<double>(0.65, 0, -0.1),
-      0.2, 0.2, 3, 3);
+      tree, camera_frame, q0, Vector3<double>(0.65, 0, -0.1), atof(argv[1]),
+      atof(argv[2]), 2, 2);
 
   while (true) {
     // Measured state.
@@ -71,54 +71,55 @@ int main() {
           }
           break;
         }
-        /*
-        case 2: {
-          VectorX<double> q = controller.get_robot().getZeroConfiguration();
-          q[1] = 45. / 180. * M_PI;
-          q[3] = -90. / 180. * M_PI;
-          q[5] = 45. / 180. * M_PI;
-          controller.MoveJ(q, 2);
-          script_idx++;
-          break;
-        }
-        case 0: {
-          controller.OpenGripperAndSleep(1);
-          script_idx++;
-          break;
-        }
-        case 1: {
-          controller.CloseGripperAndSleep(1);
-          script_idx++;
-          break;
-        }
-
-        case 1: {
-          controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
-                                            10);
-          script_idx++;
-          break;
-        }
-
+          /*
           case 2: {
-            Isometry3<double> X_WT0 = output.X_WT_cmd;
-            Isometry3<double> X_WT1 =
-                Eigen::Translation<double, 3>(Vector3<double>(0, -0.3, 0)) *
-                X_WT0;
-
-            // I picked timing from 0.5 ~ 3 second, so that the primitive holds
-            // for 0.5s first to let all transient stuff stable down.
-            manipulation::PiecewiseCartesianTrajectory<double> traj =
-                manipulation::PiecewiseCartesianTrajectory<double>::
-                    MakeCubicLinearWithEndLinearVelocity({0.5, 3}, {X_WT0,
-          X_WT1},
-                                                         Vector3<double>::Zero(),
-                                                         Vector3<double>::Zero());
-
-            controller.MoveToolFollowTraj(traj, 10, 1, 0);
+            VectorX<double> q = controller.get_robot().getZeroConfiguration();
+            q[1] = 45. / 180. * M_PI;
+            q[3] = -90. / 180. * M_PI;
+            q[5] = 45. / 180. * M_PI;
+            controller.MoveJ(q, 2);
             script_idx++;
             break;
           }
-          */
+          case 0: {
+            controller.OpenGripperAndSleep(1);
+            script_idx++;
+            break;
+          }
+          case 1: {
+            controller.CloseGripperAndSleep(1);
+            script_idx++;
+            break;
+          }
+
+          case 1: {
+            controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
+                                              10);
+            script_idx++;
+            break;
+          }
+
+            case 2: {
+              Isometry3<double> X_WT0 = output.X_WT_cmd;
+              Isometry3<double> X_WT1 =
+                  Eigen::Translation<double, 3>(Vector3<double>(0, -0.3, 0)) *
+                  X_WT0;
+
+              // I picked timing from 0.5 ~ 3 second, so that the primitive
+          holds
+              // for 0.5s first to let all transient stuff stable down.
+              manipulation::PiecewiseCartesianTrajectory<double> traj =
+                  manipulation::PiecewiseCartesianTrajectory<double>::
+                      MakeCubicLinearWithEndLinearVelocity({0.5, 3}, {X_WT0,
+            X_WT1},
+                                                           Vector3<double>::Zero(),
+                                                           Vector3<double>::Zero());
+
+              controller.MoveToolFollowTraj(traj, 10, 1, 0);
+              script_idx++;
+              break;
+            }
+            */
       }
     }
 
