@@ -29,14 +29,20 @@ int main() {
   int script_idx = 0;
 
   VectorX<double> q0 = tree.getZeroConfiguration();
+  /*
   q0[1] = 45. / 180. * M_PI;
   q0[3] = -90. / 180. * M_PI;
   q0[5] = -45. / 180. * M_PI;
+  */
+  q0[1] = -11;
+  q0[3] = -69;
+  q0[5] = 109;
+  q0 = q0 / 180. * M_PI;
 
   RigidBodyFrame<double> camera_frame("camera", tree.FindBody(jjz::kEEName),
                                       Isometry3<double>::Identity());
   std::vector<VectorX<double>> cali_q = jjz::ComputeCalibrationConfigurations(
-      tree, camera_frame, q0, Vector3<double>(1.5, -0.3, 0.2),
+      tree, camera_frame, q0, Vector3<double>(0.65, 0, -0.1),
       0.2, 0.2, 3, 3);
 
   while (true) {
