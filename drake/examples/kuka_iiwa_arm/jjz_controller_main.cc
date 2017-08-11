@@ -28,22 +28,30 @@ int main(int argc, char** argv) {
   double last_time = -1;
   int script_idx = 0;
 
-  VectorX<double> q0 = tree.getZeroConfiguration();
   /*
-  q0[1] = 45. / 180. * M_PI;
-  q0[3] = -90. / 180. * M_PI;
-  q0[5] = -45. / 180. * M_PI;
-  */
+  // Calibration q
+  VectorX<double> q0 = tree.getZeroConfiguration();
   q0[1] = -11;
   q0[3] = -69;
   q0[5] = 109;
+  */
+
+  // pushing
+  VectorX<double> q0 = tree.getZeroConfiguration();
+  q0[1] = 62;
+  q0[3] = -63;
+  q0[5] = 54;
+  q0[6] = 22;
+
   q0 = q0 / 180. * M_PI;
 
+  /*
   RigidBodyFrame<double> camera_frame("camera", tree.FindBody(jjz::kEEName),
                                       Isometry3<double>::Identity());
   std::vector<VectorX<double>> cali_q = jjz::ComputeCalibrationConfigurations(
       tree, camera_frame, q0, Vector3<double>(0.65, 0, -0.1), atof(argv[1]),
       atof(argv[2]), 2, 2);
+  */
 
   while (true) {
     // Measured state.
@@ -58,19 +66,161 @@ int main(int argc, char** argv) {
     if (output.status == drake::jjz::PrimitiveOutput::DONE) {
       switch (script_idx) {
         case 0: {
+          controller.OpenGripperAndSleep(1);
           controller.MoveJ(q0, 2);
           script_idx++;
           break;
         }
+
         case 1: {
-          if (!cali_q.empty()) {
-            std::cout << "executing: " << cali_q.back().transpose() << "\n";
-            getchar();
-            controller.MoveJ(cali_q.back(), 2);
-            cali_q.pop_back();
-          }
+          controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
+                                            20);
+          script_idx++;
           break;
         }
+        case 2: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, -0.1, 0)) *
+              X_WT0;
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+        case 3: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.1)) *
+              X_WT0;
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+        case 4: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, -0.15, 0.0)) *
+              X_WT0;
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+        case 5: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              X_WT0 * AngleAxis<double>(0.6, Vector3<double>::UnitX());
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+        case 6: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, 0.02, -0.12)) *
+              X_WT0;
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+        case 7: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, 0.03, 0)) *
+              X_WT0 * AngleAxis<double>(0.3, Vector3<double>::UnitX());
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+        case 8: {
+          controller.CloseGripperAndSleep(1.5);
+          script_idx++;
+          break;
+        }
+        case 9: {
+          Isometry3<double> X_WT0 = output.X_WT_cmd;
+          Isometry3<double> X_WT1 =
+              Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.2)) *
+              X_WT0;
+
+          // I picked timing from 0.5 ~ 3 second, so that the primitive
+          // holds for 0.5s first to let all transient stuff stable down.
+          manipulation::PiecewiseCartesianTrajectory<double>
+              traj = manipulation::PiecewiseCartesianTrajectory<double>::
+              MakeCubicLinearWithEndLinearVelocity(
+                  {0.5, 3}, {X_WT0, X_WT1}, Vector3<double>::Zero(),
+                  Vector3<double>::Zero());
+
+          controller.MoveToolFollowTraj(traj, 0, 0, 0);
+          script_idx++;
+          break;
+        }
+
+          /*
+          case 1: {
+            if (!cali_q.empty()) {
+              std::cout << "executing: " << cali_q.back().transpose() << "\n";
+              getchar();
+              controller.MoveJ(cali_q.back(), 2);
+              cali_q.pop_back();
+            }
+            break;
+          }
+          */
+
           /*
           case 2: {
             VectorX<double> q = controller.get_robot().getZeroConfiguration();
@@ -92,33 +242,7 @@ int main(int argc, char** argv) {
             break;
           }
 
-          case 1: {
-            controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
-                                              10);
-            script_idx++;
-            break;
-          }
 
-            case 2: {
-              Isometry3<double> X_WT0 = output.X_WT_cmd;
-              Isometry3<double> X_WT1 =
-                  Eigen::Translation<double, 3>(Vector3<double>(0, -0.3, 0)) *
-                  X_WT0;
-
-              // I picked timing from 0.5 ~ 3 second, so that the primitive
-          holds
-              // for 0.5s first to let all transient stuff stable down.
-              manipulation::PiecewiseCartesianTrajectory<double> traj =
-                  manipulation::PiecewiseCartesianTrajectory<double>::
-                      MakeCubicLinearWithEndLinearVelocity({0.5, 3}, {X_WT0,
-            X_WT1},
-                                                           Vector3<double>::Zero(),
-                                                           Vector3<double>::Zero());
-
-              controller.MoveToolFollowTraj(traj, 10, 1, 0);
-              script_idx++;
-              break;
-            }
             */
       }
     }

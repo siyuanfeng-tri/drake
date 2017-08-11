@@ -91,7 +91,7 @@ class JjzController {
 
   void OpenGripperAndSleep(double sec = 0) {
     std::cout << "[Open gripper]\n";
-    SetGripperPositionAndForce(110, 40);
+    SetGripperPositionAndForce(105, 40);
     if (sec <= 0) return;
     usleep(sec * 1e6);
   }
