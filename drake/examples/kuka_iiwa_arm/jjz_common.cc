@@ -12,7 +12,7 @@ namespace jjz {
 
 const Isometry3<double> X_ET(
     Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.16)) *
-    AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
+    //AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
     AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
 const Isometry3<double> X_WG(
     Eigen::Translation<double, 3>(Vector3<double>(0.6, 0.2, 0.)) *
@@ -382,6 +382,59 @@ Matrix3<double> FlatYAxisFrame(const Vector3<double>& z) {
   return rot;
 }
 
+VectorX<double> GazeIk(const Vector3<double>& target_in_world,
+                       const Vector3<double>& camera_in_world,
+                       const RigidBodyFrame<double>& frame_C,
+                       RigidBodyTree<double>* robot) {
+  std::vector<RigidBodyConstraint*> constraint_array;
+
+  IKoptions ikoptions(robot);
+
+  const Isometry3<double>& X_BC = frame_C.get_transform_to_body();
+  const int body_idx = frame_C.get_rigid_body().get_body_index();
+
+  // Gaze dir constraint.
+  const Vector3<double> gaze_ray_dir_in_body = X_BC.linear().col(2);
+  const Vector3<double> gaze_ray_origin_in_body = X_BC.translation();
+
+  WorldGazeTargetConstraint con(
+      robot, body_idx,
+      gaze_ray_dir_in_body,
+      target_in_world,
+      gaze_ray_origin_in_body,
+      0.01, Vector2<double>::Zero());
+
+  constraint_array.push_back(&con);
+
+  // Camera position constraint.
+  Vector3<double> p_WB = (Eigen::Translation<double, 3>(camera_in_world) * X_BC.inverse()).translation();
+  Vector3<double> pos_tol(0.001, 0.001, 0.001);
+  Vector3<double> pos_lb = p_WB - pos_tol;
+  Vector3<double> pos_ub = p_WB + pos_tol;
+
+  WorldPositionConstraint pos_con(
+      robot, body_idx, Vector3<double>::Zero(),
+      pos_lb, pos_ub, Vector2<double>::Zero());
+
+  constraint_array.push_back(&pos_con);
+
+  VectorX<double> q_res = VectorX<double>::Zero(7);
+  VectorX<double> zero = VectorX<double>::Zero(7);
+  VectorX<double> q_ini = zero;
+  q_ini[1] = 45. * M_PI / 180;
+  q_ini[3] = -90. * M_PI / 180;
+  q_ini[5] = 45. * M_PI / 180;
+
+  int info;
+  std::vector<std::string> infeasible_constraints;
+  inverseKin(robot, q_ini, zero, constraint_array.size(),
+             constraint_array.data(), ikoptions, &q_res, &info,
+             &infeasible_constraints);
+
+  DRAKE_DEMAND(info == 1);
+  return q_res;
+}
+
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
     const VectorX<double>& q0, const Vector3<double>& p_WP,
@@ -408,8 +461,8 @@ std::vector<VectorX<double>> ComputeCalibrationConfigurations(
       Isometry3<double> X_WC = Isometry3<double>::Identity();
       X_WC.translation() = X_WP * p_PC;
       X_WC.linear() = FlatYAxisFrame(p_WP - X_WC.translation());
-
-      ret.push_back(PointIk(X_WC, frame_C, (RigidBodyTree<double>*)&robot));
+      ret.push_back(GazeIk(p_WP, X_WC.translation(), frame_C, (RigidBodyTree<double>*)&robot));
+      // ret.push_back(PointIk(X_WC, frame_C, (RigidBodyTree<double>*)&robot));
     }
   }
 

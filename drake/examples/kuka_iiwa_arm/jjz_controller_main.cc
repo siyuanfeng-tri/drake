@@ -36,8 +36,8 @@ int main() {
   RigidBodyFrame<double> camera_frame("camera", tree.FindBody(jjz::kEEName),
                                       Isometry3<double>::Identity());
   std::vector<VectorX<double>> cali_q = jjz::ComputeCalibrationConfigurations(
-      tree, camera_frame, q0, Vector3<double>(0, 0, 0.5),
-      0.0, 0.0, 3, 3);
+      tree, camera_frame, q0, Vector3<double>(1.5, -0.3, 0.2),
+      0.2, 0.2, 3, 3);
 
   while (true) {
     // Measured state.
@@ -58,6 +58,8 @@ int main() {
         }
         case 1: {
           if (!cali_q.empty()) {
+            std::cout << "executing: " << cali_q.back().transpose() << "\n";
+            getchar();
             controller.MoveJ(cali_q.back(), 2);
             cali_q.pop_back();
           }

@@ -100,6 +100,11 @@ VectorX<double> PointIk(const Isometry3<double>& X_WT,
                         const RigidBodyFrame<double>& frame_T,
                         RigidBodyTree<double>* robot);
 
+VectorX<double> GazeIk(const Vector3<double>& target_in_world,
+                       const Vector3<double>& camera_in_world,
+                       const RigidBodyFrame<double>& frame_C,
+                       RigidBodyTree<double>* robot);
+
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
     const VectorX<double>& q0, const Vector3<double>& p_WG,
