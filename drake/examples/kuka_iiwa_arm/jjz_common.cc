@@ -12,7 +12,7 @@ namespace jjz {
 
 const Isometry3<double> X_ET(
     Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.16)) *
-    //AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
+    AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
     AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
 const Isometry3<double> X_WG(
     Eigen::Translation<double, 3>(Vector3<double>(0.6, 0.2, 0.)) *
@@ -458,11 +458,9 @@ std::vector<VectorX<double>> ComputeCalibrationConfigurations(
   for (int i = 0; i < num_width_pt; i++) {
     for (int j = 0; j < num_height_pt; j++) {
       Vector3<double> p_PC(-height / 2. + j * dh, -width / 2. + i * dw, -pyramid_height);
-      Isometry3<double> X_WC = Isometry3<double>::Identity();
-      X_WC.translation() = X_WP * p_PC;
-      X_WC.linear() = FlatYAxisFrame(p_WP - X_WC.translation());
-      ret.push_back(GazeIk(p_WP, X_WC.translation(), frame_C, (RigidBodyTree<double>*)&robot));
-      // ret.push_back(PointIk(X_WC, frame_C, (RigidBodyTree<double>*)&robot));
+      p_PC = p_PC.normalized() * pyramid_height;
+      Vector3<double> p_WC = X_WP * p_PC;
+      ret.push_back(GazeIk(p_WP, p_WC, frame_C, (RigidBodyTree<double>*)&robot));
     }
   }
 
