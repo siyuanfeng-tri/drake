@@ -5,11 +5,24 @@
 namespace drake {
 namespace jjz {
 
+MotionPrimitive::MotionPrimitive(const std::string& name,
+                                 const RigidBodyTree<double>* robot)
+    : robot_(*robot), name_(name) {
+  // HACK, these are iiwa specific.
+  v_upper_.resize(7);
+  v_upper_ << 85, 85, 100, 75, 130, 135, 135;
+  v_upper_ = v_upper_ * M_PI / 180.;
+  v_lower_ = -v_upper_;
+}
+
 ///////////////////////////////////////////////////////////
-MoveJoint::MoveJoint(const std::string& name, const VectorX<double>& q0,
-                     const VectorX<double>& q1, double duration)
-    : MotionPrimitive(name) {
+MoveJoint::MoveJoint(const std::string& name,
+                     const RigidBodyTree<double>* robot,
+                     const VectorX<double>& q0, const VectorX<double>& q1,
+                     double duration)
+    : MotionPrimitive(name, robot) {
   DRAKE_DEMAND(q0.size() == q1.size());
+  DRAKE_DEMAND(q0.size() == get_robot().get_num_positions());
   std::vector<double> times = {0, duration};
   std::vector<MatrixX<double>> knots = {q0, q1};
   MatrixX<double> zero = MatrixX<double>::Zero(q0.size(), 1);
@@ -31,14 +44,16 @@ void MoveJoint::DoControl(const IiwaState& state, PrimitiveOutput* output,
 MoveTool::MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
                    const RigidBodyFrame<double>* frame_T,
                    const VectorX<double>& q0)
-    : MotionPrimitive(name),
-      robot_(*robot),
+    : MotionPrimitive(name, robot),
       frame_T_(*frame_T),
-      cache_(robot_.CreateKinematicsCache()),
+      cache_(robot->CreateKinematicsCache()),
       jaco_planner_(robot),
-      q_norm_(robot_.getZeroConfiguration()) {
+      q_norm_(robot->getZeroConfiguration()) {
   cache_.initialize(q0);
-  robot_.doKinematics(cache_);
+  get_robot().doKinematics(cache_);
+
+  jaco_planner_.SetJointSpeedLimit(get_velocity_upper_limit(),
+                                   get_velocity_lower_limit());
 }
 
 void MoveTool::DoInitialize(const IiwaState& state) {
@@ -47,7 +62,8 @@ void MoveTool::DoInitialize(const IiwaState& state) {
 
 void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
   Isometry3<double> X_WT_d = ComputeDesiredToolInWorld(state);
-  Isometry3<double> X_WT = robot_.CalcFramePoseInWorldFrame(cache_, frame_T_);
+  Isometry3<double> X_WT =
+      get_robot().CalcFramePoseInWorldFrame(cache_, frame_T_);
 
   const double dt = state.get_time() - last_time_;
   last_time_ = state.get_time();
@@ -72,13 +88,13 @@ void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
 
   // Integrate ik's fake state.
   cache_.initialize(cache_.getQ() + v * dt);
-  robot_.doKinematics(cache_);
+  get_robot().doKinematics(cache_);
 }
 
 void MoveTool::DoControl(const IiwaState& state, PrimitiveOutput* output,
                          lcmt_jjz_controller* msg) const {
   output->q_cmd = cache_.getQ();
-  output->X_WT_cmd = robot_.CalcFramePoseInWorldFrame(cache_, frame_T_);
+  output->X_WT_cmd = get_robot().CalcFramePoseInWorldFrame(cache_, frame_T_);
   eigenVectorToCArray(output->q_cmd, msg->q_ik);
 }
 
@@ -112,31 +128,36 @@ void MoveToolStraightUntilTouch::DoControl(const IiwaState& state,
 HoldPositionAndApplyForce::HoldPositionAndApplyForce(
     const std::string& name, const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T)
-    : MotionPrimitive(name),
-      robot_(*robot),
+    : MotionPrimitive(name, robot),
       frame_T_(*frame_T),
-      cache_(robot_.CreateKinematicsCache()) {}
+      cache_(robot->CreateKinematicsCache()) {}
 
 void HoldPositionAndApplyForce::Update(const IiwaState& state,
                                        lcmt_jjz_controller* msg) {
   cache_.initialize(state.get_q(), state.get_v());
-  robot_.doKinematics(cache_);
+  get_robot().doKinematics(cache_);
+}
+
+void HoldPositionAndApplyForce::DoInitialize(const IiwaState& state) {
+  q0_ = state.get_q();
+  KinematicsCache<double> tmp = get_robot().CreateKinematicsCache();
+  tmp.initialize(q0_);
+  get_robot().doKinematics(tmp);
+  X_WT0_ = get_robot().CalcFramePoseInWorldFrame(tmp, frame_T_);
 }
 
 void HoldPositionAndApplyForce::DoControl(const IiwaState& state,
                                           PrimitiveOutput* output,
                                           lcmt_jjz_controller* msg) const {
+  const RigidBodyTree<double>& robot = get_robot();
   output->q_cmd = q0_;
-  KinematicsCache<double> tmp = robot_.CreateKinematicsCache();
-  tmp.initialize(q0_);
-  robot_.doKinematics(tmp);
-  output->X_WT_cmd = robot_.CalcFramePoseInWorldFrame(tmp, frame_T_);
+  output->X_WT_cmd = X_WT0_;
 
   // ext_trq = trq_measured - trq_id
   //         = M * qdd + h - J^T * F - (M * qdd + h)
   //         = -J^T * F
   MatrixX<double> J =
-      robot_.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
+      robot.CalcFrameSpatialVelocityJacobianInWorldFrame(cache_, frame_T_);
   output->trq_cmd = -J.transpose() * ext_wrench_d_;
 
   // Debug

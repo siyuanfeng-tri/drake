@@ -40,6 +40,9 @@ class JacobianIk {
             const VectorX<double>& q_nominal,
             std::vector<VectorX<double>>* q_sol) const;
 
+  void SetJointSpeedLimit(const VectorX<double>& v_upper,
+                          const VectorX<double>& v_lower);
+
   /**
    * @param cache0 Captures the current state of the robot.
    * @param V_WE Desired end effector (frame E) velocity in the world frame.
@@ -47,11 +50,10 @@ class JacobianIk {
    * @param gain_E Gain on V_WE_E specified in the end effector frame.
    * @return Resulting generalized velocity.
    */
-  VectorX<double> ComputeDofVelocity(const KinematicsCache<double>& cache0,
-      const RigidBodyFrame<double>& frame_E,
-      const Vector6<double>& V_WE,
-      const VectorX<double>& q_nominal,
-      double dt,
+  VectorX<double> ComputeDofVelocity(
+      const KinematicsCache<double>& cache0,
+      const RigidBodyFrame<double>& frame_E, const Vector6<double>& V_WE,
+      const VectorX<double>& q_nominal, double dt,
       const Vector6<double>& gain_E = Vector6<double>::Constant(1)) const;
 
   /**
@@ -62,6 +64,9 @@ class JacobianIk {
   void SetSamplingDt(double dt) { sampling_dt_ = dt; }
 
   double GetSamplingDt() const { return sampling_dt_; }
+
+  const VectorX<double>& get_velocity_upper_limit() const { return v_upper_; }
+  const VectorX<double>& get_velocity_lower_limit() const { return v_lower_; }
 
  private:
   void Setup();

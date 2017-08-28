@@ -23,7 +23,8 @@ struct PrimitiveOutput {
 
 class MotionPrimitive {
  public:
-  MotionPrimitive(const std::string& name) : name_(name) {}
+  MotionPrimitive(const std::string& name, const RigidBodyTree<double>* robot);
+
   virtual ~MotionPrimitive() {
     std::cout << "[" << get_name() << "] exiting.\n";
   }
@@ -48,7 +49,7 @@ class MotionPrimitive {
   void Control(const IiwaState& state, PrimitiveOutput* output,
                lcmt_jjz_controller* msg) const {
     // Set default values.
-    const int dim = get_dimension();
+    const int dim = robot_.get_num_positions();
     output->status = PrimitiveOutput::EXECUTING;
     output->q_cmd.resize(dim);
     output->trq_cmd.resize(dim);
@@ -60,11 +61,14 @@ class MotionPrimitive {
     DoControl(state, output, msg);
   }
 
+  const RigidBodyTree<double>& get_robot() const { return robot_; }
+
   void set_name(const std::string& name) { name_ = name; }
 
   virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
 
-  virtual int get_dimension() const = 0;
+  const VectorX<double>& get_velocity_upper_limit() const { return v_upper_; }
+  const VectorX<double>& get_velocity_lower_limit() const { return v_lower_; }
 
  protected:
   virtual void DoInitialize(const IiwaState& state) {}
@@ -72,6 +76,10 @@ class MotionPrimitive {
                          lcmt_jjz_controller* msg) const {}
 
  private:
+  const RigidBodyTree<double>& robot_;
+  VectorX<double> v_upper_;
+  VectorX<double> v_lower_;
+
   std::string name_;
   double start_time_{0};
   bool init_{false};
@@ -79,13 +87,12 @@ class MotionPrimitive {
 
 class MoveJoint : public MotionPrimitive {
  public:
-  MoveJoint(const std::string& name, const VectorX<double>& q0,
-            const VectorX<double>& q1, double duration);
+  MoveJoint(const std::string& name, const RigidBodyTree<double>* robot,
+            const VectorX<double>& q0, const VectorX<double>& q1,
+            double duration);
 
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
-
-  int get_dimension() const override { return traj_.rows() * traj_.cols(); }
 
  private:
   PiecewisePolynomial<double> traj_;
@@ -102,16 +109,13 @@ class MoveTool : public MotionPrimitive {
       const IiwaState& state) const = 0;
 
   Isometry3<double> get_X_WT_ik() const {
-    return robot_.CalcFramePoseInWorldFrame(cache_, frame_T_);
+    return get_robot().CalcFramePoseInWorldFrame(cache_, frame_T_);
   }
 
   void set_nominal_q(const VectorX<double>& q_norm) { q_norm_ = q_norm; }
   void set_tool_gain(const Vector6<double>& gain) { gain_T_ = gain; }
 
-  const RigidBodyTree<double>& get_robot() const { return robot_; }
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
-
-  int get_dimension() const final { return robot_.get_num_positions(); }
 
  protected:
   void DoInitialize(const IiwaState& state) override;
@@ -119,7 +123,6 @@ class MoveTool : public MotionPrimitive {
                  lcmt_jjz_controller* msg) const override;
 
  private:
-  const RigidBodyTree<double>& robot_;
   const RigidBodyFrame<double> frame_T_;
   KinematicsCache<double> cache_;
   manipulation::planner::JacobianIk jaco_planner_;
@@ -167,17 +170,14 @@ class HoldPositionAndApplyForce : public MotionPrimitive {
   }
   void set_desired_ext_wrench(const Vector6<double>& w) { ext_wrench_d_ = w; }
 
-  int get_dimension() const final { return robot_.get_num_positions(); }
-
  private:
-  void DoInitialize(const IiwaState& state) override { q0_ = state.get_q(); }
+  void DoInitialize(const IiwaState& state) override;
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
 
   VectorX<double> q0_;
-
+  Isometry3<double> X_WT0_;
   Vector6<double> ext_wrench_d_{Vector6<double>::Zero()};
-  const RigidBodyTree<double>& robot_;
   const RigidBodyFrame<double> frame_T_;
   KinematicsCache<double> cache_;
 };

@@ -45,7 +45,7 @@ void JjzController::MoveJ(const VectorX<double>& q_des, double duration) {
   GetPrimitiveOutput(&cur_output);
 
   std::unique_ptr<MotionPrimitive> new_plan(
-      new MoveJoint("MoveJ", cur_output.q_cmd, q_des, duration));
+      new MoveJoint("MoveJ", &get_robot(), cur_output.q_cmd, q_des, duration));
   SwapPlan(std::move(new_plan));
 }
 
@@ -152,7 +152,7 @@ void JjzController::ControlLoop() {
 
   // Make initial plan to go to q1.
   auto plan = std::unique_ptr<MotionPrimitive>(
-      new MoveJoint("hold_q", state.get_q(), state.get_q(), 0.1));
+      new MoveJoint("hold_q", &robot_, state.get_q(), state.get_q(), 0.1));
   SwapPlan(std::move(plan));
 
   ////////////////////////////////////////////////////////

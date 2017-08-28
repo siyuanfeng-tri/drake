@@ -42,8 +42,15 @@ void JacobianIk::Setup() {
   zero_ = VectorX<double>::Zero(robot_->get_num_velocities());
 }
 
-JacobianIk::JacobianIk(const RigidBodyTree<double>* robot)
-    : robot_{robot} {
+void JacobianIk::SetJointSpeedLimit(const VectorX<double>& v_upper,
+                                    const VectorX<double>& v_lower) {
+  DRAKE_DEMAND(v_upper.size() == v_lower.size());
+  DRAKE_DEMAND(v_lower.size() == v_lower_.size());
+  v_lower_ = v_lower;
+  v_upper_ = v_upper;
+}
+
+JacobianIk::JacobianIk(const RigidBodyTree<double>* robot) : robot_{robot} {
   Setup();
 }
 
@@ -64,8 +71,7 @@ JacobianIk::JacobianIk(const std::string& model_path,
 
 VectorX<double> JacobianIk::ComputeDofVelocity(
     const KinematicsCache<double>& cache0,
-    const RigidBodyFrame<double>& frame_E,
-    const Vector6<double>& V_WE,
+    const RigidBodyFrame<double>& frame_E, const Vector6<double>& V_WE,
     const VectorX<double>& q_nominal, double dt,
     const Vector6<double>& gain_E) const {
   DRAKE_DEMAND(q_nominal.size() == robot_->get_num_positions());
@@ -77,21 +83,18 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   solvers::VectorXDecisionVariable v =
       prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
 
-  // Add ee vel constraint
-  // prog.AddL2NormCost(J, V_WE, v).constraint().get();
-
-  Isometry3<double> X_WE =
-      robot_->CalcFramePoseInWorldFrame(cache0, frame_E);
+  // Add ee vel constraint.
+  Isometry3<double> X_WE = robot_->CalcFramePoseInWorldFrame(cache0, frame_E);
 
   Matrix6<double> R_EW = Matrix6<double>::Zero();
   R_EW.block<3, 3>(0, 0) = X_WE.linear().transpose();
   R_EW.block<3, 3>(3, 3) = R_EW.block<3, 3>(0, 0);
 
+  // Rotate the velocity into E frame.
   MatrixX<double> J_WE_E =
-      R_EW * robot_->CalcFrameSpatialVelocityJacobianInWorldFrame(
-          cache0, frame_E);
+      R_EW *
+      robot_->CalcFrameSpatialVelocityJacobianInWorldFrame(cache0, frame_E);
 
-  // THIS is a pure hack. Relax the rot constraint in body y.
   for (int i = 0; i < 6; i++) {
     J_WE_E.row(i) = gain_E(i) * J_WE_E.row(i);
   }
@@ -105,7 +108,6 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   prog.AddQuadraticCost(1e-3 * identity_ * dt * dt,
                         1e-3 * (cache0.getQ() - q_nominal) * dt,
                         1e-3 * (cache0.getQ() - q_nominal).squaredNorm(), v);
-  // prog.AddQuadraticCost(identity_ * 1e-5, zero_, v);
 
   // Add v constraint
   prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
@@ -117,21 +119,6 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   solvers::SolutionResult result = solver_.Solve(prog);
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
   ret = prog.GetSolutionVectorValues();
-
-  ////////////////
-  /*
-  // Constrain end effector speed to be J * ret.
-  prog.AddLinearEqualityConstraint(J, J * ret, v);
-
-  // Changed the cost to go towards the zero configuration.
-  cost->UpdateCoefficients(identity_ * dt * dt,
-                           (cache0.getQ() - q_nominal) * dt,
-                           (cache0.getQ() - q_nominal).squaredNorm());
-
-  result = solver_.Solve(prog);
-  DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
-  ret = prog.GetSolutionVectorValues();
-  */
 
   return ret;
 }
