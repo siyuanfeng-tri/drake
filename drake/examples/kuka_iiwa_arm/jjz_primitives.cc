@@ -6,8 +6,9 @@ namespace drake {
 namespace jjz {
 
 MotionPrimitive::MotionPrimitive(const std::string& name,
-                                 const RigidBodyTree<double>* robot)
-    : robot_(*robot), name_(name) {
+                                 const RigidBodyTree<double>* robot,
+                                 MotionPrimitive::Type type)
+    : robot_(*robot), name_(name), type_(type) {
   // HACK, these are iiwa specific.
   v_upper_.resize(7);
   v_upper_ << 85, 85, 100, 75, 130, 135, 135;
@@ -20,7 +21,7 @@ MoveJoint::MoveJoint(const std::string& name,
                      const RigidBodyTree<double>* robot,
                      const VectorX<double>& q0, const VectorX<double>& q1,
                      double duration)
-    : MotionPrimitive(name, robot) {
+    : MotionPrimitive(name, robot, MotionPrimitive::MOVE_J) {
   DRAKE_DEMAND(q0.size() == q1.size());
   DRAKE_DEMAND(q0.size() == get_robot().get_num_positions());
   std::vector<double> times = {0, duration};
@@ -43,8 +44,9 @@ void MoveJoint::DoControl(const IiwaState& state, PrimitiveOutput* output,
 ///////////////////////////////////////////////////////////
 MoveTool::MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
                    const RigidBodyFrame<double>* frame_T,
-                   const VectorX<double>& q0)
-    : MotionPrimitive(name, robot),
+                   const VectorX<double>& q0,
+                   MotionPrimitive::Type type)
+    : MotionPrimitive(name, robot, type),
       frame_T_(*frame_T),
       cache_(robot->CreateKinematicsCache()),
       jaco_planner_(robot),
@@ -96,6 +98,13 @@ void MoveTool::DoControl(const IiwaState& state, PrimitiveOutput* output,
   output->q_cmd = cache_.getQ();
   output->X_WT_cmd = get_robot().CalcFramePoseInWorldFrame(cache_, frame_T_);
   eigenVectorToCArray(output->q_cmd, msg->q_ik);
+
+  static int flag = 0;
+  if (flag < 10) {
+    std::cout << "first tick: " << output->q_cmd.transpose() << "\n";
+    //std::cout << output->X_WT_cmd.matrix() << "\n\n";
+    flag++;
+  }
 }
 
 ///////////////////////////////////////////////////////////
@@ -103,7 +112,7 @@ MoveToolStraightUntilTouch::MoveToolStraightUntilTouch(
     const std::string& name, const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
     const Vector3<double>& dir, double vel)
-    : MoveTool(name, robot, frame_T, q0), dir_{dir}, vel_{vel} {
+    : MoveTool(name, robot, frame_T, q0, MotionPrimitive::MOVE_TOOL_STRAIGHT_UNTIL_TOUCH), dir_{dir}, vel_{vel} {
   dir_.normalize();
   X_WT0_ = get_X_WT_ik();
 }
@@ -128,7 +137,7 @@ void MoveToolStraightUntilTouch::DoControl(const IiwaState& state,
 HoldPositionAndApplyForce::HoldPositionAndApplyForce(
     const std::string& name, const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T)
-    : MotionPrimitive(name, robot),
+    : MotionPrimitive(name, robot, HOLD_J_AND_APPLY_FORCE),
       frame_T_(*frame_T),
       cache_(robot->CreateKinematicsCache()) {}
 
@@ -169,7 +178,7 @@ MoveToolFollowTraj::MoveToolFollowTraj(
     const std::string& name, const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
     const manipulation::PiecewiseCartesianTrajectory<double>& traj)
-    : MoveTool(name, robot, frame_T, q0), X_WT_traj_(traj) {}
+    : MoveTool(name, robot, frame_T, q0, MOVE_TOOL), X_WT_traj_(traj) {}
 
 Isometry3<double> MoveToolFollowTraj::ComputeDesiredToolInWorld(
     const IiwaState& state) const {

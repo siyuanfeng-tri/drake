@@ -57,6 +57,7 @@ void JjzController::MoveStraightUntilTouch(const Vector3<double>& dir_W,
   auto new_plan = new MoveToolStraightUntilTouch(
       "MoveStraightUntilTouch", &get_robot(), &get_tool_frame(),
       cur_output.q_cmd, dir_W, vel);
+  std::cout << "last commanded: " << cur_output.q_cmd.transpose() << "\n";
   new_plan->set_f_ext_thresh(force_thresh);
   SwapPlan(std::unique_ptr<MotionPrimitive>(new_plan));
 }
@@ -187,6 +188,8 @@ void JjzController::ControlLoop() {
       q_cmd = primitive_output_.q_cmd;
       trq_cmd = primitive_output_.trq_cmd;
     }
+    printf("%g: ", state.get_time());
+    std::cout << q_cmd.transpose() << "\n";
 
     // send command
     iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);

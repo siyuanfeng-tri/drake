@@ -23,7 +23,16 @@ struct PrimitiveOutput {
 
 class MotionPrimitive {
  public:
-  MotionPrimitive(const std::string& name, const RigidBodyTree<double>* robot);
+  enum Type {
+    UNKNOWN = -1,
+    MOVE_J = 0,
+    MOVE_TOOL,
+    MOVE_TOOL_STRAIGHT_UNTIL_TOUCH,
+    HOLD_J_AND_APPLY_FORCE
+  };
+
+  MotionPrimitive(const std::string& name, const RigidBodyTree<double>* robot,
+      Type type);
 
   virtual ~MotionPrimitive() {
     std::cout << "[" << get_name() << "] exiting.\n";
@@ -74,6 +83,7 @@ class MotionPrimitive {
   virtual void DoInitialize(const IiwaState& state) {}
   virtual void DoControl(const IiwaState& state, PrimitiveOutput* output,
                          lcmt_jjz_controller* msg) const {}
+  Type get_type() const { return type_; }
 
  private:
   const RigidBodyTree<double>& robot_;
@@ -81,6 +91,7 @@ class MotionPrimitive {
   VectorX<double> v_lower_;
 
   std::string name_;
+  const Type type_;
   double start_time_{0};
   bool init_{false};
 };
@@ -100,9 +111,6 @@ class MoveJoint : public MotionPrimitive {
 
 class MoveTool : public MotionPrimitive {
  public:
-  MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
-           const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0);
-
   void Update(const IiwaState& state, lcmt_jjz_controller* msg) override;
 
   virtual Isometry3<double> ComputeDesiredToolInWorld(
@@ -118,6 +126,10 @@ class MoveTool : public MotionPrimitive {
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
 
  protected:
+  MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
+           const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
+           MotionPrimitive::Type type);
+
   void DoInitialize(const IiwaState& state) override;
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
