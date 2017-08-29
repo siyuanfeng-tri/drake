@@ -36,6 +36,7 @@ void JacobianIk::Setup() {
   q_upper_ = robot_->joint_limit_max;
   v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -2);
   v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 2);
+  unconstrained_dof_v_limit_ = VectorX<double>::Constant(1, 0.1);
 
   identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
                                         robot_->get_num_positions());
@@ -109,8 +110,18 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
                         1e-3 * (cache0.getQ() - q_nominal) * dt,
                         1e-3 * (cache0.getQ() - q_nominal).squaredNorm(), v);
 
+  Eigen::JacobiSVD<MatrixX<double>> svd(J_WE_E, Eigen::ComputeFullV);
+
+  // prog.AddL2NormCost(1e-2 * identity_, zero_, v).constraint().get();
+
   // Add v constraint
   prog.AddBoundingBoxConstraint(v_lower_, v_upper_, v);
+
+  // Add constrained the unconstrained dof's velocity to be small, which is used
+  // to fullfil the regularization cost.
+  prog.AddLinearConstraint(svd.matrixV().col(6).transpose(),
+                           -unconstrained_dof_v_limit_,
+                           unconstrained_dof_v_limit_, v);
 
   // Add q upper and lower joint limit.
   prog.AddLinearConstraint(identity_ * dt, q_lower_ - cache0.getQ(),

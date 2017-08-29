@@ -78,6 +78,7 @@ class JacobianIk {
   VectorX<double> q_upper_;
   VectorX<double> v_lower_;
   VectorX<double> v_upper_;
+  VectorX<double> unconstrained_dof_v_limit_;
   MatrixX<double> identity_;
   VectorX<double> zero_;
 

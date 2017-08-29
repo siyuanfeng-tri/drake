@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
 
         case 1: {
           controller.MoveStraightUntilTouch(Vector3<double>(0, 0, -1), 0.03,
-                                            200);
+                                            20);
           script_idx++;
           break;
         }

@@ -32,7 +32,7 @@ class MotionPrimitive {
   };
 
   MotionPrimitive(const std::string& name, const RigidBodyTree<double>* robot,
-      Type type);
+                  Type type);
 
   virtual ~MotionPrimitive() {
     std::cout << "[" << get_name() << "] exiting.\n";
@@ -107,6 +107,7 @@ class MoveJoint : public MotionPrimitive {
 
  private:
   PiecewisePolynomial<double> traj_;
+  PiecewisePolynomial<double> trajd_;
 };
 
 class MoveTool : public MotionPrimitive {

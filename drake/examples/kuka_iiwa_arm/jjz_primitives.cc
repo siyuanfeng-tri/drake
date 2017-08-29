@@ -28,6 +28,7 @@ MoveJoint::MoveJoint(const std::string& name,
   std::vector<MatrixX<double>> knots = {q0, q1};
   MatrixX<double> zero = MatrixX<double>::Zero(q0.size(), 1);
   traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  trajd_ = traj_.derivative();
 }
 
 void MoveJoint::DoControl(const IiwaState& state, PrimitiveOutput* output,
@@ -35,6 +36,9 @@ void MoveJoint::DoControl(const IiwaState& state, PrimitiveOutput* output,
   const double interp_time = get_in_state_time(state);
   output->q_cmd = traj_.value(interp_time);
   eigenVectorToCArray(output->q_cmd, msg->q_ik);
+
+  VectorX<double> v = trajd_.value(interp_time);
+  eigenVectorToCArray(v, msg->v_ik);
 
   if (get_in_state_time(state) > (traj_.getEndTime() + 0.5)) {
     output->status = PrimitiveOutput::DONE;
@@ -44,8 +48,7 @@ void MoveJoint::DoControl(const IiwaState& state, PrimitiveOutput* output,
 ///////////////////////////////////////////////////////////
 MoveTool::MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
                    const RigidBodyFrame<double>* frame_T,
-                   const VectorX<double>& q0,
-                   MotionPrimitive::Type type)
+                   const VectorX<double>& q0, MotionPrimitive::Type type)
     : MotionPrimitive(name, robot, type),
       frame_T_(*frame_T),
       cache_(robot->CreateKinematicsCache()),
@@ -86,6 +89,7 @@ void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
   eigenVectorToCArray(tmp_pose, msg->X_WT_ik);
 
   eigenVectorToCArray(cache_.getQ(), msg->q_ik);
+  eigenVectorToCArray(v, msg->v_ik);
   eigenVectorToCArray(V_WT_d, msg->V_WT_d);
 
   // Integrate ik's fake state.
@@ -98,13 +102,6 @@ void MoveTool::DoControl(const IiwaState& state, PrimitiveOutput* output,
   output->q_cmd = cache_.getQ();
   output->X_WT_cmd = get_robot().CalcFramePoseInWorldFrame(cache_, frame_T_);
   eigenVectorToCArray(output->q_cmd, msg->q_ik);
-
-  static int flag = 0;
-  if (flag < 10) {
-    std::cout << "first tick: " << output->q_cmd.transpose() << "\n";
-    //std::cout << output->X_WT_cmd.matrix() << "\n\n";
-    flag++;
-  }
 }
 
 ///////////////////////////////////////////////////////////
@@ -112,7 +109,10 @@ MoveToolStraightUntilTouch::MoveToolStraightUntilTouch(
     const std::string& name, const RigidBodyTree<double>* robot,
     const RigidBodyFrame<double>* frame_T, const VectorX<double>& q0,
     const Vector3<double>& dir, double vel)
-    : MoveTool(name, robot, frame_T, q0, MotionPrimitive::MOVE_TOOL_STRAIGHT_UNTIL_TOUCH), dir_{dir}, vel_{vel} {
+    : MoveTool(name, robot, frame_T, q0,
+               MotionPrimitive::MOVE_TOOL_STRAIGHT_UNTIL_TOUCH),
+      dir_{dir},
+      vel_{vel} {
   dir_.normalize();
   X_WT0_ = get_X_WT_ik();
 }
