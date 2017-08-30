@@ -7,21 +7,27 @@
 using namespace drake;
 
 int main(int argc, char** argv) {
-  std::vector<MatrixX<double>> q(2);
-  std::vector<double> t = {0, 0.2};
-  q[0] = Vector2<double>(1, 2);
-  q[1] = Vector2<double>(3, 4);
+  /*
+  std::vector<MatrixX<double>> q(3);
+  std::vector<double> t = {0, 0.2, 0.4};
+  q[0] = Vector1<double>(1);
+  q[1] = Vector1<double>(3);
+  q[2] = Vector1<double>(5);
 
-  PiecewisePolynomial<double> traj = drake::jjz::RetimeTraj(q,
-      Vector2<double>::Zero(), Vector2<double>::Zero(),
-      Vector2<double>::Zero(), Vector2<double>::Zero(),
-      Vector2<double>::Zero(), Vector2<double>::Zero());
+  PiecewisePolynomial<double> traj = drake::jjz::RetimeTraj2(q,
+      Vector1<double>::Zero(), Vector1<double>::Zero(),
+      Vector1<double>::Zero(), Vector1<double>::Zero(),
+      Vector1<double>::Zero(), Vector1<double>::Zero());
 
-  std::cout << traj.isApprox(
+  PiecewisePolynomial<double> expected =
       PiecewisePolynomial<double>::Cubic(
-          t, q, Vector2<double>::Zero(), Vector2<double>::Zero()), 1e-12);
+          t, q, Vector1<double>::Zero(), Vector1<double>::Zero());
+
+  std::cout << traj.getPolynomial(0, 0, 0) << "\n";
+  std::cout << expected.getPolynomial(0, 0, 0) << "\n";
 
   exit(-1);
+  */
 
   const std::string kPath =
       "drake/manipulation/models/iiwa_description/urdf/"

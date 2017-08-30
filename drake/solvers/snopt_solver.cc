@@ -553,6 +553,7 @@ SolutionResult SnoptSolver::Solve(MathematicalProgram& prog) const {
   prog.SetSolverId(id());
 
   // todo: extract the other useful quantities, too.
+  std::cout << "info: " << info << "\n";
 
   if (info >= 1 && info <= 6) {
     return SolutionResult::kSolutionFound;
