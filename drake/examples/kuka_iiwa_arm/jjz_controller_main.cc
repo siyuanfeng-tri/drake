@@ -7,6 +7,22 @@
 using namespace drake;
 
 int main(int argc, char** argv) {
+  std::vector<MatrixX<double>> q(2);
+  std::vector<double> t = {0, 0.2};
+  q[0] = Vector2<double>(1, 2);
+  q[1] = Vector2<double>(3, 4);
+
+  PiecewisePolynomial<double> traj = drake::jjz::RetimeTraj(q,
+      Vector2<double>::Zero(), Vector2<double>::Zero(),
+      Vector2<double>::Zero(), Vector2<double>::Zero(),
+      Vector2<double>::Zero(), Vector2<double>::Zero());
+
+  std::cout << traj.isApprox(
+      PiecewisePolynomial<double>::Cubic(
+          t, q, Vector2<double>::Zero(), Vector2<double>::Zero()), 1e-12);
+
+  exit(-1);
+
   const std::string kPath =
       "drake/manipulation/models/iiwa_description/urdf/"
       "iiwa14_polytope_collision.urdf";

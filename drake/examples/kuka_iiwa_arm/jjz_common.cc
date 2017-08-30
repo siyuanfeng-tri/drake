@@ -7,6 +7,9 @@
 #include "drake/examples/PlanarPushing/pushing_multi_actions.h"
 #include "drake/util/drakeUtil.h"
 
+#include "drake/solvers/gurobi_solver.h"
+#include "drake/solvers/mathematical_program.h"
+
 namespace drake {
 namespace jjz {
 
@@ -512,6 +515,116 @@ std::vector<VectorX<double>> ComputeCalibrationConfigurations(
   }
 
   return ret;
+}
+
+std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> resize_var(int num_seg, int rows, int cols) {
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> ret(num_seg);
+  for (int t = 0; t < num_seg; t++) {
+    ret[t].resize(rows);
+    for (int r = 0; r < rows; r++) {
+      ret[t][r].resize(cols);
+    }
+  }
+  return ret;
+}
+
+PiecewisePolynomial<double> RetimeTraj(const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_upper, const MatrixX<double>& v_lower,
+    const MatrixX<double>& vd_upper, const MatrixX<double>& vd_lower) {
+  const int num_segments = q.size() - 1;
+  const int num_rows = q.front().rows();
+  const int num_cols = q.front().cols();
+
+  solvers::MathematicalProgram prog;
+  std::vector<solvers::VectorDecisionVariable<1>> t3(num_segments);
+  std::vector<solvers::VectorDecisionVariable<1>> t2(num_segments);
+  std::vector<solvers::VectorDecisionVariable<1>> t1(num_segments);
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c3 = resize_var(num_segments, num_rows, num_cols);
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c2 = c3;
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c1 = c3;
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c0 = c3;
+
+  for (int t = 0; t < num_segments; t++) {
+    t3[t] = prog.NewContinuousVariables<1, 1>(1, 1, "t3" + std::to_string(t));
+    t2[t] = prog.NewContinuousVariables<1, 1>(1, 1, "t2" + std::to_string(t));
+    t1[t] = prog.NewContinuousVariables<1, 1>(1, 1, "t1" + std::to_string(t));
+
+    prog.AddConstraint(t1[t](0) * t1[t](0) == t2[t](0));
+    prog.AddConstraint(t1[t](0) * t2[t](0) == t3[t](0));
+    prog.AddConstraint(t1[t](0) >= 0.2);
+
+    for (int r = 0; r < num_rows; r++) {
+      for (int c = 0; c < num_cols; c++) {
+        c3[t][r][c] = prog.NewContinuousVariables(1, "c3[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+        c2[t][r][c] = prog.NewContinuousVariables(1, "c2[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+        c1[t][r][c] = prog.NewContinuousVariables(1, "c1[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+        c0[t][r][c] = prog.NewContinuousVariables(1, "c0[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+
+        // q(0)
+        prog.AddLinearEqualityConstraint(c0[t][r][c](0) == q[t](r, c));
+
+        if (t == 0) {
+          prog.AddLinearEqualityConstraint(c1[t][r][c](0) == v0(r, c));
+        } else {
+          // v(0) continuous
+          prog.AddLinearEqualityConstraint(
+              c1[t][r][c](0) ==
+              3 * c3[t - 1][r][c](0) * t2[t - 1](0) +
+              2 * c2[t - 1][r][c](0) * t1[t - 1](0) +
+              c1[t - 1][r][c](0));
+          // vd(0) continuous
+          prog.AddLinearEqualityConstraint(
+              c2[t][r][c](0) ==
+              3 * c3[t - 1][r][c](0) * t1[t - 1](0) +
+              c2[t - 1][r][c](0));
+        }
+
+        if (t == num_segments - 1) {
+          prog.AddLinearEqualityConstraint(
+              q[t + 1](r, c) ==
+              c3[t][r][c](0) * t3[t](0) +
+              c2[t][r][c](0) * t2[t](0) +
+              c1[t][r][c](0) * t1[t](0) +
+              c0[t][r][c](0));
+          prog.AddLinearEqualityConstraint(
+              v1(r, c) ==
+              3 * c3[t][r][c](0) * t2[t](0) +
+              2 * c2[t][r][c](0) * t1[t](0) +
+              c1[t][r][c](0));
+        }
+      }
+    }
+  }
+
+  // Add cost.
+  symbolic::Expression cost = t1[0](0);
+  for (int t = 1; t < num_segments; t++) {
+    cost = cost + t1[t](0);
+  }
+  prog.AddLinearCost(cost);
+
+  drake::solvers::GurobiSolver solver;
+  solvers::SolutionResult result = solver.Solve(prog);
+  DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
+
+  std::vector<PiecewisePolynomial<double>::PolynomialMatrix> polynomials(num_segments - 1);
+  std::vector<double> times(num_segments, 0);
+  for (int t = 0; t < num_segments; t++) {
+    for (int r = 0; r < num_rows; r++) {
+      for (int c = 0; c < num_cols; c++) {
+        Vector4<double> coeff;
+        coeff << prog.GetSolution(c0[t][r][c]),
+                 prog.GetSolution(c1[t][r][c]),
+                 prog.GetSolution(c2[t][r][c]),
+                 prog.GetSolution(c3[t][r][c]);
+        polynomials[t](r, c) = PiecewisePolynomial<double>::PolynomialType(Vector4<double>(coeff));
+      }
+    }
+    times[t + 1] = times[t] + prog.GetSolution(t1[t])(0);
+  }
+
+  return PiecewisePolynomial<double>(polynomials, times);
 }
 
 }  // namespace jjz
