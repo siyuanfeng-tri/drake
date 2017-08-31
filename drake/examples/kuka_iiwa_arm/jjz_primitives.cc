@@ -30,8 +30,8 @@ MoveJoint::MoveJoint(const std::string& name,
   //traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
   traj_ = drake::jjz::RetimeTraj(knots,
       VectorX<double>::Zero(q0.size()), VectorX<double>::Zero(q0.size()),
-      get_velocity_upper_limit(), get_velocity_lower_limit(),
-      VectorX<double>::Constant(q0.size(), 10), VectorX<double>::Constant(q0.size(), -10));
+      get_velocity_lower_limit(), get_velocity_upper_limit(),
+      VectorX<double>::Constant(q0.size(), -20), VectorX<double>::Constant(q0.size(), 20));
   trajd_ = traj_.derivative();
 }
 
