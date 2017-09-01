@@ -6,55 +6,7 @@
 
 using namespace drake;
 
-void test() {
-  int T = 2;
-  std::vector<MatrixX<double>> q(T);
-
-  VectorX<double> v_upper(7);
-  VectorX<double> v_lower(7);
-
-  v_upper << 85, 85, 100, 75, 130, 135, 135;
-  v_upper = v_upper * M_PI / 180.;
-  v_lower = -v_upper;
-
-  for (int i = 0; i < 100; i++) {
-    for (int t = 0; t < T; t++) {
-      q[t] = M_PI * MatrixX<double>::Random(7, 1);
-    }
-
-    std::cout << "*** it: " << i << "\n";
-    drake::jjz::RetimeTraj(q,
-        VectorX<double>::Zero(7), VectorX<double>::Zero(7),
-        v_lower, v_upper,
-        VectorX<double>::Constant(7, -20.), VectorX<double>::Constant(7, 20.));
-  }
-}
-
 int main(int argc, char** argv) {
-  test();
-
-  /*
-  std::vector<MatrixX<double>> q(3);
-  std::vector<double> t = {0, 0.2, 0.4};
-  q[0] = Vector1<double>(1);
-  q[1] = Vector1<double>(10);
-  q[2] = Vector1<double>(33);
-
-  PiecewisePolynomial<double> traj = drake::jjz::RetimeTraj(q,
-      Vector1<double>::Zero(), Vector1<double>::Zero(),
-      Vector1<double>(-1e0), Vector1<double>(1e0),
-      Vector1<double>(-1e1), Vector1<double>(1e1));
-
-  PiecewisePolynomial<double> expected =
-      PiecewisePolynomial<double>::Cubic(
-          t, q, Vector1<double>::Zero(), Vector1<double>::Zero());
-
-  std::cout << traj.getPolynomial(0, 0, 0) << "\n";
-  std::cout << expected.getPolynomial(0, 0, 0) << "\n";
-
-  exit(-1);
-  */
-
   const std::string kPath =
       "drake/manipulation/models/iiwa_description/urdf/"
       "iiwa14_polytope_collision.urdf";

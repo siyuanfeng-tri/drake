@@ -529,7 +529,7 @@ static std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>>
 }
 
 // Assuming 3rd order
-static bool CheckVelocityAndAccConstraints(const Polynomial<double>& poly, double time,
+static bool CheckVelocityAndAccConstraints3(const Polynomial<double>& poly, double time,
     double v_lower, double v_upper, double vd_lower, double vd_upper) {
   Polynomial<double> v = poly.Derivative();
   Polynomial<double> vd = v.Derivative();
@@ -549,9 +549,7 @@ static bool CheckVelocityAndAccConstraints(const Polynomial<double>& poly, doubl
   }
   VectorX<double> coeffs = poly.GetCoefficients();
   double extrema_t = -coeffs(2) / (3. * coeffs(3));
-  DRAKE_DEMAND(std::abs(extrema_t - time / 2) < 1e-10);
   if (extrema_t > 0 && extrema_t < time) {
-    std::cout << "v ex " << v.EvaluateUnivariate(extrema_t) << "\n";
     if (v.EvaluateUnivariate(extrema_t) < v_lower ||
         v.EvaluateUnivariate(extrema_t) > v_upper) {
       return false;
@@ -561,7 +559,26 @@ static bool CheckVelocityAndAccConstraints(const Polynomial<double>& poly, doubl
   return true;
 }
 
-static PiecewisePolynomial<double> GuessTrajTime(const std::vector<MatrixX<double>>& q,
+static bool CheckTrajVelAndAccConstraints(
+    const PiecewisePolynomial<double>& traj,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  int num_rows = v_lower.rows();
+  int num_cols = v_lower.cols();
+  for (int t = 0; t < traj.getNumberOfSegments(); t++) {
+    for (int r = 0; r < num_rows; r++) {
+      for (int c = 0; c < num_cols; c++) {
+        if (!CheckVelocityAndAccConstraints3(traj.getPolynomial(t, r, c), traj.getDuration(t), v_lower(r, c), v_upper(r, c), vd_lower(r, c), vd_upper(r, c))) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+static PiecewisePolynomial<double> GuessTrajTime3(const std::vector<MatrixX<double>>& q,
     const MatrixX<double>& v0, const MatrixX<double>& v1,
     const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
     const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
@@ -584,7 +601,7 @@ static PiecewisePolynomial<double> GuessTrajTime(const std::vector<MatrixX<doubl
       bool ok = true;
       for (int r = 0; r < num_rows; r++) {
         for (int c = 0; c < num_cols; c++) {
-          ok &= CheckVelocityAndAccConstraints(traj.getPolynomial(t, r, c), dt[t], v_lower(r, c), v_upper(r, c), vd_lower(r, c), vd_upper(r, c));
+          ok &= CheckVelocityAndAccConstraints3(traj.getPolynomial(t, r, c), dt[t], v_lower(r, c), v_upper(r, c), vd_lower(r, c), vd_upper(r, c));
         }
       }
       if (!ok) {
@@ -605,7 +622,55 @@ static PiecewisePolynomial<double> GuessTrajTime(const std::vector<MatrixX<doubl
   return traj;
 }
 
-PiecewisePolynomial<double> RetimeTraj(const std::vector<MatrixX<double>>& q,
+static PiecewisePolynomial<double> LineSearchSingleCubicSpline(
+    const std::vector<MatrixX<double>>& q, double min_time, double max_time,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  DRAKE_DEMAND(q.size() == 2);
+
+  double mid_time = (min_time + max_time) / 2.;
+  std::vector<double> times = {0, mid_time};
+  PiecewisePolynomial<double> traj = PiecewisePolynomial<double>::Cubic(times, q, v0, v1);
+
+  if (CheckTrajVelAndAccConstraints(traj, v_lower, v_upper, vd_lower, vd_upper)) {
+    if (std::fabs(mid_time - min_time) < 1e-2) {
+      return traj;
+    } else {
+      return LineSearchSingleCubicSpline(q, min_time, mid_time, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+    }
+  } else {
+    return LineSearchSingleCubicSpline(q, mid_time, max_time, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  }
+}
+
+PiecewisePolynomial<double> LineSearchSingleCubicSpline(
+    const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  DRAKE_DEMAND(q.size() == 2);
+
+  PiecewisePolynomial<double> max_time_traj = GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+
+  return LineSearchSingleCubicSpline(q, 0, max_time_traj.getEndTime(), v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+}
+
+PiecewisePolynomial<double> RetimeTrajCubic(
+    const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  if (q.size() == 2) {
+    return LineSearchSingleCubicSpline(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  } else {
+    return GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  }
+}
+
+
+
+PiecewisePolynomial<double> RetimeTrajCubicDOESNTWORK(const std::vector<MatrixX<double>>& q,
     const MatrixX<double>& v0, const MatrixX<double>& v1,
     const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
     const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
@@ -613,7 +678,7 @@ PiecewisePolynomial<double> RetimeTraj(const std::vector<MatrixX<double>>& q,
   const int num_rows = q.front().rows();
   const int num_cols = q.front().cols();
 
-  const PiecewisePolynomial<double> initial_guess = GuessTrajTime(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  const PiecewisePolynomial<double> initial_guess = GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
   VectorX<double> guess_coeffs;
 
   solvers::MathematicalProgram prog;
