@@ -479,8 +479,8 @@ VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WP, double width,
-    double height, int num_width_pt, int num_height_pt) {
+    const VectorX<double>& q0, const Vector3<double>& p_WP, double min_dist, 
+    double width, double height, int num_width_pt, int num_height_pt) {
   KinematicsCache<double> cache = robot.CreateKinematicsCache();
   cache.initialize(q0);
   robot.doKinematics(cache);
@@ -506,7 +506,7 @@ std::vector<VectorX<double>> ComputeCalibrationConfigurations(
       Vector3<double> p_WC = X_WP * p_PC;
       // ret.push_back(GazeIk(p_WP, p_WC, frame_C, q0,
       // (RigidBodyTree<double>*)&robot));
-      ret.push_back(GazeIk2(p_WP, p_WC - p_WP, 0.9, frame_C, q0,
+      ret.push_back(GazeIk2(p_WP, p_WC - p_WP, min_dist, frame_C, q0,
                             (RigidBodyTree<double>*)&robot));
     }
   }

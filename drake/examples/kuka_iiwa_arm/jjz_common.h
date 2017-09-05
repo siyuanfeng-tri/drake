@@ -124,8 +124,8 @@ VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WG, double width,
-    double height, int num_width_pt, int num_height_pt);
+    const VectorX<double>& q0, const Vector3<double>& p_WG, double min_dist, 
+    double width, double height, int num_width_pt, int num_height_pt);
 
 // Returns a trajectory of T in W frame.
 manipulation::PiecewiseCartesianTrajectory<double>
