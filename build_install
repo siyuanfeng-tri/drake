@@ -1,0 +1,1 @@
+bazel run --config snopt --config gurobi --copt -g :install ~/drake_bazel_build
