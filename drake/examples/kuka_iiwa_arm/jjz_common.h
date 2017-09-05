@@ -133,5 +133,10 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
                                  const Isometry3<double>& X_WG, double duration,
                                  std::string load_file_name = "");
 
+PiecewisePolynomial<double> RetimeTrajCubic(const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper);
+
 }  // namespace jjz
 }  // namespace drake

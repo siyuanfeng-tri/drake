@@ -27,7 +27,11 @@ MoveJoint::MoveJoint(const std::string& name,
   std::vector<double> times = {0, duration};
   std::vector<MatrixX<double>> knots = {q0, q1};
   MatrixX<double> zero = MatrixX<double>::Zero(q0.size(), 1);
-  traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  //traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  traj_ = drake::jjz::RetimeTrajCubic(knots,
+      VectorX<double>::Zero(q0.size()), VectorX<double>::Zero(q0.size()),
+      get_velocity_lower_limit(), get_velocity_upper_limit(),
+      VectorX<double>::Constant(q0.size(), -20), VectorX<double>::Constant(q0.size(), 20));
   trajd_ = traj_.derivative();
 }
 

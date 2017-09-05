@@ -934,6 +934,17 @@ class MathematicalProgram {
   Binding<LinearConstraint> AddConstraint(
       const Binding<LinearConstraint>& binding);
 
+  // ??? how the fuck does .cc 379 work then???
+  Binding<Constraint> AddQuadraticConstraint(
+      const Eigen::Ref<const Eigen::MatrixXd>& Q,
+      const Eigen::Ref<const Eigen::VectorXd>& b,
+      double lb, double ub,
+      const VariableRefList& vars) {
+    return AddConstraint<QuadraticConstraint>(
+        std::make_shared<QuadraticConstraint>(Q, b, lb, ub),
+        vars);
+  }
+
   /**
    * Adds linear constraints referencing potentially a subset
    * of the decision variables (defined in the vars parameter).

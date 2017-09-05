@@ -7,6 +7,9 @@
 #include "drake/examples/PlanarPushing/pushing_multi_actions.h"
 #include "drake/util/drakeUtil.h"
 
+#include "drake/solvers/gurobi_solver.h"
+#include "drake/solvers/mathematical_program.h"
+
 namespace drake {
 namespace jjz {
 
@@ -512,6 +515,469 @@ std::vector<VectorX<double>> ComputeCalibrationConfigurations(
   }
 
   return ret;
+}
+
+static std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> resize_var(int num_seg, int rows, int cols) {
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> ret(num_seg);
+  for (int t = 0; t < num_seg; t++) {
+    ret[t].resize(rows);
+    for (int r = 0; r < rows; r++) {
+      ret[t][r].resize(cols);
+    }
+  }
+  return ret;
+}
+
+// Assuming 3rd order
+static bool CheckVelocityAndAccConstraints3(const Polynomial<double>& poly, double time,
+    double v_lower, double v_upper, double vd_lower, double vd_upper) {
+  Polynomial<double> v = poly.Derivative();
+  Polynomial<double> vd = v.Derivative();
+
+  DRAKE_DEMAND(poly.GetDegree() == 3);
+
+  // Check vd.
+  if (vd.EvaluateUnivariate(0) < vd_lower || vd.EvaluateUnivariate(0) > vd_upper ||
+      vd.EvaluateUnivariate(time) < vd_lower || vd.EvaluateUnivariate(time) > vd_upper) {
+    return false;
+  }
+
+  // Check v.
+  if (v.EvaluateUnivariate(0) < v_lower || v.EvaluateUnivariate(0) > v_upper ||
+      v.EvaluateUnivariate(time) < v_lower || v.EvaluateUnivariate(time) > v_upper) {
+    return false;
+  }
+  VectorX<double> coeffs = poly.GetCoefficients();
+  double extrema_t = -coeffs(2) / (3. * coeffs(3));
+  if (extrema_t > 0 && extrema_t < time) {
+    if (v.EvaluateUnivariate(extrema_t) < v_lower ||
+        v.EvaluateUnivariate(extrema_t) > v_upper) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool CheckTrajVelAndAccConstraints(
+    const PiecewisePolynomial<double>& traj,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  int num_rows = v_lower.rows();
+  int num_cols = v_lower.cols();
+  for (int t = 0; t < traj.getNumberOfSegments(); t++) {
+    for (int r = 0; r < num_rows; r++) {
+      for (int c = 0; c < num_cols; c++) {
+        if (!CheckVelocityAndAccConstraints3(traj.getPolynomial(t, r, c), traj.getDuration(t), v_lower(r, c), v_upper(r, c), vd_lower(r, c), vd_upper(r, c))) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+static PiecewisePolynomial<double> GuessTrajTime3(const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  std::vector<double> times(q.size(), 0);
+  std::vector<double> dt(q.size() - 1, 1);
+
+  for (size_t t = 1; t < q.size(); t++) {
+    times[t] = times[t - 1] + dt[t - 1];
+  }
+
+  PiecewisePolynomial<double> traj = PiecewisePolynomial<double>::Cubic(times, q, v0, v1);
+
+  // Check constraints, and adjust dt.
+  int num_rows = v0.rows();
+  int num_cols = v0.cols();
+
+  while (true) {
+    bool all_ok = true;
+    for (size_t t = 0; t < q.size() - 1; t++) {
+      bool ok = true;
+      for (int r = 0; r < num_rows; r++) {
+        for (int c = 0; c < num_cols; c++) {
+          ok &= CheckVelocityAndAccConstraints3(traj.getPolynomial(t, r, c), dt[t], v_lower(r, c), v_upper(r, c), vd_lower(r, c), vd_upper(r, c));
+        }
+      }
+      if (!ok) {
+        dt[t] = 1.5 * dt[t];
+        all_ok = false;
+      }
+    }
+
+    if (all_ok)
+      break;
+
+    for (size_t t = 1; t < q.size(); t++) {
+      times[t] = times[t - 1] + dt[t - 1];
+    }
+    traj = PiecewisePolynomial<double>::Cubic(times, q, v0, v1);
+  }
+
+  return traj;
+}
+
+static PiecewisePolynomial<double> LineSearchSingleCubicSpline(
+    const std::vector<MatrixX<double>>& q, double min_time, double max_time,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  DRAKE_DEMAND(q.size() == 2);
+
+  double mid_time = (min_time + max_time) / 2.;
+  std::vector<double> times = {0, mid_time};
+  PiecewisePolynomial<double> traj = PiecewisePolynomial<double>::Cubic(times, q, v0, v1);
+
+  if (CheckTrajVelAndAccConstraints(traj, v_lower, v_upper, vd_lower, vd_upper)) {
+    if (std::fabs(mid_time - min_time) < 1e-2) {
+      return traj;
+    } else {
+      return LineSearchSingleCubicSpline(q, min_time, mid_time, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+    }
+  } else {
+    return LineSearchSingleCubicSpline(q, mid_time, max_time, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  }
+}
+
+PiecewisePolynomial<double> LineSearchSingleCubicSpline(
+    const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  DRAKE_DEMAND(q.size() == 2);
+
+  PiecewisePolynomial<double> max_time_traj = GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+
+  return LineSearchSingleCubicSpline(q, 0, max_time_traj.getEndTime(), v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+}
+
+PiecewisePolynomial<double> RetimeTrajCubic(
+    const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  if (q.size() == 2) {
+    return LineSearchSingleCubicSpline(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  } else {
+    return GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  }
+}
+
+
+
+PiecewisePolynomial<double> RetimeTrajCubicDOESNTWORK(const std::vector<MatrixX<double>>& q,
+    const MatrixX<double>& v0, const MatrixX<double>& v1,
+    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
+    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper) {
+  const int num_segments = q.size() - 1;
+  const int num_rows = q.front().rows();
+  const int num_cols = q.front().cols();
+
+  const PiecewisePolynomial<double> initial_guess = GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  VectorX<double> guess_coeffs;
+
+  solvers::MathematicalProgram prog;
+  std::vector<solvers::VectorDecisionVariable<1>> t3(num_segments);
+  std::vector<solvers::VectorDecisionVariable<1>> t2(num_segments);
+  std::vector<solvers::VectorDecisionVariable<1>> t1(num_segments);
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c3 = resize_var(num_segments, num_rows, num_cols);
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c2 = c3;
+  std::vector<std::vector<std::vector<solvers::VectorDecisionVariable<1>>>> c1 = c3;
+
+  for (int t = 0; t < num_segments; t++) {
+    const double t_i = initial_guess.getDuration(t);
+
+    t3[t] = prog.NewContinuousVariables<1, 1>(1, 1, "t3[" + std::to_string(t) + "]");
+    t2[t] = prog.NewContinuousVariables<1, 1>(1, 1, "t2[" + std::to_string(t) + "]");
+    t1[t] = prog.NewContinuousVariables<1, 1>(1, 1, "t1[" + std::to_string(t) + "]");
+
+    prog.SetInitialGuess(t1[t], Vector1<double>(t_i));
+    prog.SetInitialGuess(t2[t], Vector1<double>(std::pow(t_i, 2)));
+    prog.SetInitialGuess(t3[t], Vector1<double>(std::pow(t_i, 3)));
+
+    std::cout << "** initial guess(" << t << "): " << initial_guess.getDuration(t) << "\n";
+
+    // t1[t](0) * t1[t](0) == t2[t](0)
+    {
+      MatrixX<double> Q = MatrixX<double>::Zero(2, 2);
+      VectorX<double> b = VectorX<double>::Zero(2);
+      Q(0, 0) = 2;
+      b(1) = -1;
+      prog.AddQuadraticConstraint(Q, b, 0, 0, {t1[t], t2[t]});
+    }
+    // t1[t](0) * t2[t](0) == t3[t](0)
+    {
+      MatrixX<double> Q = MatrixX<double>::Zero(3, 3);
+      VectorX<double> b = VectorX<double>::Zero(3);
+      Q(0, 1) = 1;
+      Q(1, 0) = 1;
+      b(2) = -1;
+      prog.AddQuadraticConstraint(Q, b, 0, 0, {t1[t], t2[t], t3[t]});
+    }
+
+    prog.AddLinearConstraint(t1[t](0) >= 0.2);
+    prog.AddLinearConstraint(t2[t](0) >= 0.04);
+    prog.AddLinearConstraint(t3[t](0) >= 0.008);
+
+    for (int r = 0; r < num_rows; r++) {
+      for (int c = 0; c < num_cols; c++) {
+        c3[t][r][c] = prog.NewContinuousVariables(1, "c3[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+        c2[t][r][c] = prog.NewContinuousVariables(1, "c2[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+        c1[t][r][c] = prog.NewContinuousVariables(1, "c1[" + std::to_string(t) + "](" + std::to_string(r) + "," + std::to_string(c) + ")");
+
+        guess_coeffs = initial_guess.getPolynomial(t, r, c).GetCoefficients();
+        const double c1_i = guess_coeffs(1);
+        const double c2_i = guess_coeffs(2);
+        const double c3_i = guess_coeffs(3);
+        prog.SetInitialGuess(c1[t][r][c], Vector1<double>(c1_i));
+        prog.SetInitialGuess(c2[t][r][c], Vector1<double>(c2_i));
+        prog.SetInitialGuess(c3[t][r][c], Vector1<double>(c3_i));
+
+        // q(1)
+        /*
+           q[t + 1](r, c) ==
+           c3[t][r][c](0) * t3[t](0) +
+           c2[t][r][c](0) * t2[t](0) +
+           c1[t][r][c](0) * t1[t](0) +
+           c0[t][r][c](0));
+        */
+        {
+          MatrixX<double> Q = MatrixX<double>::Zero(6, 6);
+          VectorX<double> b = VectorX<double>::Zero(6);
+          Q(2, 5) = 1;
+          Q(1, 4) = 1;
+          Q(0, 3) = 1;
+          Q(5, 2) = 1;
+          Q(4, 1) = 1;
+          Q(3, 0) = 1;
+          prog.AddQuadraticConstraint(Q, b,
+              q[t + 1](r, c) - q[t](r, c), q[t + 1](r, c) - q[t](r, c),
+              {c1[t][r][c],
+               c2[t][r][c],
+               c3[t][r][c],
+               t1[t],
+               t2[t],
+               t3[t]});
+        }
+
+        if (t == 0) {
+          // First knot.
+          prog.AddLinearEqualityConstraint(c1[t][r][c](0) == v0(r, c));
+        } else {
+          // Interior
+          // v(0) continuous
+          /*
+             c1[t][r][c](0) ==
+             3 * c3[t - 1][r][c](0) * t2[t - 1](0) +
+             2 * c2[t - 1][r][c](0) * t1[t - 1](0) +
+             c1[t - 1][r][c](0));
+          */
+          {
+            MatrixX<double> Q = MatrixX<double>::Zero(6, 6);
+            VectorX<double> b = VectorX<double>::Zero(6);
+            Q(2, 4) = 2;
+            Q(3, 5) = 3;
+            Q(4, 2) = 2;
+            Q(5, 3) = 3;
+            b(0) = -1;
+            b(1) = 1;
+            prog.AddQuadraticConstraint(Q, b, 0, 0,
+                {c1[t][r][c],
+                 c1[t - 1][r][c],
+                 c2[t - 1][r][c],
+                 c3[t - 1][r][c],
+                 t1[t - 1],
+                 t2[t - 1]});
+          }
+
+          // vd(0) continuous
+          /*
+              c2[t][r][c](0) ==
+              3 * c3[t - 1][r][c](0) * t1[t - 1](0) +
+              c2[t - 1][r][c](0));
+          */
+          {
+            MatrixX<double> Q = MatrixX<double>::Zero(4, 4);
+            VectorX<double> b = VectorX<double>::Zero(4);
+            Q(2, 3) = 3;
+            Q(3, 2) = 3;
+            b(0) = -1;
+            b(1) = 1;
+            prog.AddQuadraticConstraint(Q, b, 0, 0,
+                {c2[t][r][c],
+                 c2[t - 1][r][c],
+                 c3[t - 1][r][c],
+                 t1[t - 1]});
+          }
+        }
+
+        if (t == num_segments - 1) {
+          // Last knot.
+          /*
+              v1(r, c) ==
+              3 * c3[t][r][c](0) * t2[t](0) +
+              2 * c2[t][r][c](0) * t1[t](0) +
+              c1[t][r][c](0));
+          */
+          {
+            MatrixX<double> Q = MatrixX<double>::Zero(5, 5);
+            VectorX<double> b = VectorX<double>::Zero(5);
+            Q(2, 4) = 3;
+            Q(1, 3) = 2;
+            Q(4, 2) = 3;
+            Q(3, 1) = 2;
+            b(0) = 1;
+            auto con = prog.AddQuadraticConstraint(Q, b,
+                v1(r, c), v1(r, c),
+                {c1[t][r][c],
+                 c2[t][r][c],
+                 c3[t][r][c],
+                 t1[t],
+                 t2[t]});
+            VectorX<double> x(5);
+            x << c1_i, c2_i, c3_i, t_i, t_i * t_i;
+            DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+          }
+        }
+
+        // v bounds.
+        {
+          MatrixX<double> Q = MatrixX<double>::Zero(5, 5);
+          VectorX<double> b = VectorX<double>::Zero(5);
+          Q(2, 4) = 3;
+          Q(1, 3) = 2;
+          Q(4, 2) = 3;
+          Q(3, 1) = 2;
+          b(0) = 1;
+          auto con = prog.AddQuadraticConstraint(Q, b,
+              v_lower(r, c), v_upper(r, c),
+              {c1[t][r][c],
+               c2[t][r][c],
+               c3[t][r][c],
+               t1[t],
+               t2[t]});
+          VectorX<double> x(5);
+          x << c1_i, c2_i, c3_i, t_i, t_i * t_i;
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+        {
+          auto con = prog.AddLinearConstraint(v_lower(r, c) <= c1[t][r][c](0));
+          VectorX<double> x = Vector1<double>(c1_i);
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+        {
+          auto con = prog.AddLinearConstraint(v_upper(r, c) >= c1[t][r][c](0));
+          VectorX<double> x = Vector1<double>(c1_i);
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+
+        {
+          MatrixX<double> Q = MatrixX<double>::Zero(3, 3);
+          VectorX<double> b = VectorX<double>::Zero(3);
+          Q(1, 1) = -2;
+          Q(0, 2) = 6;
+          b(2) = -3 * v_upper(r, c);
+          auto con = prog.AddQuadraticConstraint(Q, b,
+              -INFINITY, 0,
+              {c1[t][r][c],
+               c2[t][r][c],
+               c3[t][r][c]});
+          VectorX<double> x(3);
+          x << c1_i, c2_i, c3_i;
+          std::cout << "x " << x.transpose() << ", u: " << v_upper(r, c) << " haha: " << 0.5 * x.transpose() * Q * x + x.dot(b) << "\n";
+          std::cout << "v " << 0.5 * x.transpose() * Q * x / (3. * c3_i) << "\n";
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+
+          b(2) = -3 * v_lower(r, c);
+          auto con1 = prog.AddQuadraticConstraint(Q, b,
+              0, INFINITY,
+              {c1[t][r][c],
+               c2[t][r][c],
+               c3[t][r][c]});
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+        /*
+        */
+
+        // vd bounds.
+        {
+          MatrixX<double> Q = MatrixX<double>::Zero(3, 3);
+          VectorX<double> b = VectorX<double>::Zero(3);
+          Q(1, 2) = 6;
+          Q(2, 1) = 6;
+          b(0) = 2;
+          auto con = prog.AddQuadraticConstraint(Q, b,
+              vd_lower(r, c), vd_upper(r, c),
+              {c2[t][r][c],
+               c3[t][r][c],
+               t1[t]});
+          VectorX<double> x(3);
+          x << c2_i, c3_i, t_i;
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+
+        {
+          auto con = prog.AddLinearConstraint(vd_lower(r, c) <= 2 * c2[t][r][c](0));
+          VectorX<double> x = Vector1<double>(c2_i);
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+
+        {
+          auto con = prog.AddLinearConstraint(vd_upper(r, c) >= 2 * c2[t][r][c](0));
+          VectorX<double> x = Vector1<double>(c2_i);
+          DRAKE_DEMAND(con.constraint()->CheckSatisfied(x));
+        }
+      }
+    }
+  }
+
+  // Add cost.
+  symbolic::Expression cost = t1[0](0);
+  for (int t = 1; t < num_segments; t++) {
+    cost = cost + t1[t](0);
+  }
+  prog.AddLinearCost(cost);
+
+  //solvers::GurobiSolver solver;
+  //solvers::SolutionResult result = solver.Solve(prog);
+  solvers::SolutionResult result = prog.Solve();
+  prog.PrintSolution();
+  DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
+
+  std::vector<PiecewisePolynomial<double>::PolynomialMatrix> polynomials(num_segments);
+  std::vector<double> times(num_segments + 1, 0);
+  for (int t = 0; t < num_segments; t++) {
+    for (int r = 0; r < num_rows; r++) {
+      for (int c = 0; c < num_cols; c++) {
+        Vector4<double> coeff;
+        coeff << q[t](r, c),
+                 prog.GetSolution(c1[t][r][c]),
+                 prog.GetSolution(c2[t][r][c]),
+                 prog.GetSolution(c3[t][r][c]);
+        /*
+        std::cout << "V0: " << prog.GetSolution(c1[t][r][c]) << "\n";
+        std::cout << "V1: " << 3 * prog.GetSolution(c3[t][r][c]) *
+                                   prog.GetSolution(t2[t]) +
+                                   2 * prog.GetSolution(c2[t][r][c]) *
+                                        prog.GetSolution(t1[t]) +
+                                        prog.GetSolution(c1[t][r][c]) << "\n";
+        std::cout << "VD0: " << 2 * prog.GetSolution(c2[t][r][c]) << "\n";
+        std::cout << "VD1: " << 6 * prog.GetSolution(c3[t][r][c]) * prog.GetSolution(t1[t])(0) + 2 * prog.GetSolution(c2[t][r][c]) << "\n";
+        */
+
+        polynomials[t].resize(num_rows, num_cols);
+        polynomials[t](r, c) = PiecewisePolynomial<double>::PolynomialType(coeff);
+      }
+    }
+    times[t + 1] = times[t] + prog.GetSolution(t1[t])(0);
+  }
+
+  return PiecewisePolynomial<double>(polynomials, times);
 }
 
 }  // namespace jjz
