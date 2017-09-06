@@ -27,7 +27,17 @@ MoveJoint::MoveJoint(const std::string& name,
   std::vector<double> times = {0, duration};
   std::vector<MatrixX<double>> knots = {q0, q1};
   MatrixX<double> zero = MatrixX<double>::Zero(q0.size(), 1);
-  //traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  trajd_ = traj_.derivative();
+}
+
+MoveJoint::MoveJoint(const std::string& name,
+                     const RigidBodyTree<double>* robot,
+                     const VectorX<double>& q0, const VectorX<double>& q1)
+    : MotionPrimitive(name, robot, MotionPrimitive::MOVE_J) {
+  DRAKE_DEMAND(q0.size() == q1.size());
+  DRAKE_DEMAND(q0.size() == get_robot().get_num_positions());
+  std::vector<MatrixX<double>> knots = {q0, q1};
   traj_ = drake::jjz::RetimeTrajCubic(knots,
       VectorX<double>::Zero(q0.size()), VectorX<double>::Zero(q0.size()),
       get_velocity_lower_limit(), get_velocity_upper_limit(),

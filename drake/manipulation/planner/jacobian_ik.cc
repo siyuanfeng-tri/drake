@@ -83,6 +83,8 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   solvers::MathematicalProgram prog;
   solvers::VectorXDecisionVariable v =
       prog.NewContinuousVariables(robot_->get_num_velocities(), "v");
+  solvers::VectorXDecisionVariable alpha =
+      prog.NewContinuousVariables(1, "alpha");
 
   // Add ee vel constraint.
   Isometry3<double> X_WE = robot_->CalcFramePoseInWorldFrame(cache0, frame_E);
@@ -103,7 +105,16 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
   Vector6<double> V_WE_E = R_EW * V_WE;
   V_WE_E = (V_WE_E.array() * gain_E.array()).matrix();
 
-  prog.AddL2NormCost(J_WE_E, V_WE_E, v).constraint().get();
+  Vector6<double> V_WE_E_dir = V_WE_E.normalized();
+  double V_WE_E_mag = V_WE_E.norm();
+
+  MatrixX<double> A(6, J_WE_E.cols() + 1);
+  A.topLeftCorner(6, J_WE_E.cols()) = J_WE_E;
+  A.topRightCorner(6, 1) = -V_WE_E_dir;
+  prog.AddLinearEqualityConstraint(A, Vector6<double>::Zero(), {v, alpha});
+  prog.AddQuadraticErrorCost(Vector1<double>(1), Vector1<double>(V_WE_E_mag), alpha);
+
+  // prog.AddL2NormCost(J_WE_E, V_WE_E, v).constraint().get();
 
   // Add a small regularization
   prog.AddQuadraticCost(1e-3 * identity_ * dt * dt,
@@ -129,7 +140,7 @@ VectorX<double> JacobianIk::ComputeDofVelocity(
 
   solvers::SolutionResult result = solver_.Solve(prog);
   DRAKE_DEMAND(result == solvers::SolutionResult::kSolutionFound);
-  ret = prog.GetSolutionVectorValues();
+  ret = prog.GetSolution(v);
 
   return ret;
 }

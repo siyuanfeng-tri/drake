@@ -656,7 +656,7 @@ PiecewisePolynomial<double> LineSearchSingleCubicSpline(
 
   PiecewisePolynomial<double> max_time_traj = GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
 
-  return LineSearchSingleCubicSpline(q, 0, max_time_traj.getEndTime(), v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  return LineSearchSingleCubicSpline(q, 0.1, max_time_traj.getEndTime(), v0, v1, v_lower, v_upper, vd_lower, vd_upper);
 }
 
 PiecewisePolynomial<double> RetimeTrajCubic(

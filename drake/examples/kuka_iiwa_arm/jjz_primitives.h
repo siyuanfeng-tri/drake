@@ -98,9 +98,15 @@ class MotionPrimitive {
 
 class MoveJoint : public MotionPrimitive {
  public:
+  // Traj is exactly duration long.
   MoveJoint(const std::string& name, const RigidBodyTree<double>* robot,
             const VectorX<double>& q0, const VectorX<double>& q1,
             double duration);
+
+  // Traj duration will be determined by a line search, which would
+  // satisfy the velocity and acceleration constraints.
+  MoveJoint(const std::string& name, const RigidBodyTree<double>* robot,
+            const VectorX<double>& q0, const VectorX<double>& q1);
 
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
