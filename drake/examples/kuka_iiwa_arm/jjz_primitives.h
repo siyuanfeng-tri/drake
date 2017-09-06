@@ -141,11 +141,16 @@ class MoveTool : public MotionPrimitive {
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
 
+  const manipulation::planner::JacobianIk& get_planner() const { return jaco_planner_; }
+  const KinematicsCache<double>& get_cache() const { return cache_; }
+  const RigidBodyFrame<double>& get_frame_T() const { return frame_T_; }
+
  private:
   const RigidBodyFrame<double> frame_T_;
   KinematicsCache<double> cache_;
   manipulation::planner::JacobianIk jaco_planner_;
 
+  Vector6<double> X_WT_diff_{Vector6<double>::Zero()};
   Vector6<double> gain_T_{Vector6<double>::Constant(1)};
   VectorX<double> q_norm_;
   double last_time_;

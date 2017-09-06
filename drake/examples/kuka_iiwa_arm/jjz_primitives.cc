@@ -242,7 +242,20 @@ void MoveToolFollowTraj::DoControl(const IiwaState& state,
   }
 
   const double duration = X_WT_traj_.get_position_trajectory().get_end_time();
+
+  /*
   if (get_in_state_time(state) > (duration + 0.5)) {
+    output->status = PrimitiveOutput::DONE;
+  }
+  */
+
+  Isometry3<double> X_WT_ik = get_robot().CalcFramePoseInWorldFrame(get_cache(), get_frame_T());
+  Isometry3<double> X_WT_d = ComputeDesiredToolInWorld(state);
+
+  Vector6<double> X_WT_diff =
+      get_planner().ComputePoseDiffInWorldFrame(X_WT_ik, X_WT_d);
+  if (get_in_state_time(state) > (duration + 0.5) &&
+      X_WT_diff.norm() < 1e-3) {
     output->status = PrimitiveOutput::DONE;
   }
 }

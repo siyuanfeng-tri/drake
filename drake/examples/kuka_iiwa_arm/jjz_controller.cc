@@ -49,6 +49,15 @@ void JjzController::MoveJ(const VectorX<double>& q_des, double duration) {
   SwapPlan(std::move(new_plan));
 }
 
+void JjzController::MoveJ(const VectorX<double>& q_des) {
+  PrimitiveOutput cur_output;
+  GetPrimitiveOutput(&cur_output);
+
+  std::unique_ptr<MotionPrimitive> new_plan(
+      new MoveJoint("MoveJ", &get_robot(), cur_output.q_cmd, q_des));
+  SwapPlan(std::move(new_plan));
+}
+
 void JjzController::MoveStraightUntilTouch(const Vector3<double>& dir_W,
                                            double vel, double force_thresh) {
   PrimitiveOutput cur_output;

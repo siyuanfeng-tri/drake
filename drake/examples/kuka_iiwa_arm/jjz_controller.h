@@ -67,6 +67,8 @@ class JjzController {
 
   void MoveJ(const VectorX<double>& q_des, double duration);
 
+  void MoveJ(const VectorX<double>& q_des);
+
   void MoveStraightUntilTouch(const Vector3<double>& dir_W, double vel,
                               double force_thresh);
 
