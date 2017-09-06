@@ -41,7 +41,8 @@ MoveJoint::MoveJoint(const std::string& name,
   traj_ = drake::jjz::RetimeTrajCubic(knots,
       VectorX<double>::Zero(q0.size()), VectorX<double>::Zero(q0.size()),
       get_velocity_lower_limit(), get_velocity_upper_limit(),
-      VectorX<double>::Constant(q0.size(), -20), VectorX<double>::Constant(q0.size(), 20));
+      VectorX<double>::Constant(q0.size(), -40),
+      VectorX<double>::Constant(q0.size(), 40));
   trajd_ = traj_.derivative();
 }
 
@@ -254,8 +255,9 @@ void MoveToolFollowTraj::DoControl(const IiwaState& state,
 
   Vector6<double> X_WT_diff =
       get_planner().ComputePoseDiffInWorldFrame(X_WT_ik, X_WT_d);
-  if (get_in_state_time(state) > (duration + 0.5) &&
-      X_WT_diff.norm() < 1e-3) {
+  if ((get_in_state_time(state) > (duration + 0.5) &&
+       X_WT_diff.norm() < 1e-3) ||
+       get_in_state_time(state) > 4 * duration) {
     output->status = PrimitiveOutput::DONE;
   }
 }
