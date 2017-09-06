@@ -66,6 +66,8 @@ class JjzController {
   }
 
   void MoveJ(const VectorX<double>& q_des, double duration);
+  void MoveJ(const std::vector<VectorX<double>>& q_des,
+             const std::vector<double>& duration);
 
   void MoveJ(const VectorX<double>& q_des);
 

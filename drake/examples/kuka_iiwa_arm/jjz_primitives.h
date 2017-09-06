@@ -103,6 +103,11 @@ class MoveJoint : public MotionPrimitive {
             const VectorX<double>& q0, const VectorX<double>& q1,
             double duration);
 
+  MoveJoint(const std::string& name, const RigidBodyTree<double>* robot,
+            const VectorX<double>& q0,
+            const std::vector<VectorX<double>>& q_des,
+            const std::vector<double>& duration);
+
   // Traj duration will be determined by a line search, which would
   // satisfy the velocity and acceleration constraints.
   MoveJoint(const std::string& name, const RigidBodyTree<double>* robot,
@@ -141,7 +146,9 @@ class MoveTool : public MotionPrimitive {
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
 
-  const manipulation::planner::JacobianIk& get_planner() const { return jaco_planner_; }
+  const manipulation::planner::JacobianIk& get_planner() const {
+    return jaco_planner_;
+  }
   const KinematicsCache<double>& get_cache() const { return cache_; }
   const RigidBodyFrame<double>& get_frame_T() const { return frame_T_; }
 

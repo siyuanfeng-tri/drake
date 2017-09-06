@@ -124,7 +124,7 @@ VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WG, double min_dist, 
+    const VectorX<double>& q0, const Vector3<double>& p_WG, double min_dist,
     double width, double height, int num_width_pt, int num_height_pt);
 
 // Returns a trajectory of T in W frame.
@@ -133,10 +133,11 @@ PlanPlanarPushingTrajMultiAction(const Vector3<double>& x_GQ,
                                  const Isometry3<double>& X_WG, double duration,
                                  std::string load_file_name = "");
 
-PiecewisePolynomial<double> RetimeTrajCubic(const std::vector<MatrixX<double>>& q,
-    const MatrixX<double>& v0, const MatrixX<double>& v1,
-    const MatrixX<double>& v_lower, const MatrixX<double>& v_upper,
-    const MatrixX<double>& vd_lower, const MatrixX<double>& vd_upper);
+PiecewisePolynomial<double> RetimeTrajCubic(
+    const std::vector<MatrixX<double>>& q, const MatrixX<double>& v0,
+    const MatrixX<double>& v1, const MatrixX<double>& v_lower,
+    const MatrixX<double>& v_upper, const MatrixX<double>& vd_lower,
+    const MatrixX<double>& vd_upper);
 
 }  // namespace jjz
 }  // namespace drake

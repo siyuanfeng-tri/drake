@@ -33,13 +33,33 @@ MoveJoint::MoveJoint(const std::string& name,
 
 MoveJoint::MoveJoint(const std::string& name,
                      const RigidBodyTree<double>* robot,
+                     const VectorX<double>& q0,
+                     const std::vector<VectorX<double>>& q_des,
+                     const std::vector<double>& duration)
+    : MotionPrimitive(name, robot, MotionPrimitive::MOVE_J) {
+  DRAKE_DEMAND(q0.size() == get_robot().get_num_positions());
+  DRAKE_DEMAND(duration.size() == q_des.size());
+  const int N = static_cast<int>(duration.size()) + 1;
+  std::vector<double> times(N, 0);
+  std::vector<MatrixX<double>> knots(N, q0);
+  for (int i = 1; i < N; i++) {
+    times[i] = times[i - 1] + duration[i - 1];
+    knots[i] = q_des[i - 1];
+  }
+  MatrixX<double> zero = MatrixX<double>::Zero(q0.size(), 1);
+  traj_ = PiecewisePolynomial<double>::Cubic(times, knots, zero, zero);
+  trajd_ = traj_.derivative();
+}
+
+MoveJoint::MoveJoint(const std::string& name,
+                     const RigidBodyTree<double>* robot,
                      const VectorX<double>& q0, const VectorX<double>& q1)
     : MotionPrimitive(name, robot, MotionPrimitive::MOVE_J) {
   DRAKE_DEMAND(q0.size() == q1.size());
   DRAKE_DEMAND(q0.size() == get_robot().get_num_positions());
   std::vector<MatrixX<double>> knots = {q0, q1};
-  traj_ = drake::jjz::RetimeTrajCubic(knots,
-      VectorX<double>::Zero(q0.size()), VectorX<double>::Zero(q0.size()),
+  traj_ = drake::jjz::RetimeTrajCubic(
+      knots, VectorX<double>::Zero(q0.size()), VectorX<double>::Zero(q0.size()),
       get_velocity_lower_limit(), get_velocity_upper_limit(),
       VectorX<double>::Constant(q0.size(), -40),
       VectorX<double>::Constant(q0.size(), 40));
@@ -250,14 +270,15 @@ void MoveToolFollowTraj::DoControl(const IiwaState& state,
   }
   */
 
-  Isometry3<double> X_WT_ik = get_robot().CalcFramePoseInWorldFrame(get_cache(), get_frame_T());
+  Isometry3<double> X_WT_ik =
+      get_robot().CalcFramePoseInWorldFrame(get_cache(), get_frame_T());
   Isometry3<double> X_WT_d = ComputeDesiredToolInWorld(state);
 
   Vector6<double> X_WT_diff =
       get_planner().ComputePoseDiffInWorldFrame(X_WT_ik, X_WT_d);
   if ((get_in_state_time(state) > (duration + 0.5) &&
        X_WT_diff.norm() < 1e-3) ||
-       get_in_state_time(state) > 4 * duration) {
+      get_in_state_time(state) > 4 * duration) {
     output->status = PrimitiveOutput::DONE;
   }
 }

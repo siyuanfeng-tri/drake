@@ -49,6 +49,16 @@ void JjzController::MoveJ(const VectorX<double>& q_des, double duration) {
   SwapPlan(std::move(new_plan));
 }
 
+void JjzController::MoveJ(const std::vector<VectorX<double>>& q_des,
+                          const std::vector<double>& duration) {
+  PrimitiveOutput cur_output;
+  GetPrimitiveOutput(&cur_output);
+
+  std::unique_ptr<MotionPrimitive> new_plan(
+      new MoveJoint("MoveJ", &get_robot(), cur_output.q_cmd, q_des, duration));
+  SwapPlan(std::move(new_plan));
+}
+
 void JjzController::MoveJ(const VectorX<double>& q_des) {
   PrimitiveOutput cur_output;
   GetPrimitiveOutput(&cur_output);
