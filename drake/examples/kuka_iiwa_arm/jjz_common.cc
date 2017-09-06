@@ -482,7 +482,7 @@ VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WP, double min_dist, 
+    const VectorX<double>& q0, const Vector3<double>& p_WP, double min_dist,
     double width, double height, int num_width_pt, int num_height_pt) {
   KinematicsCache<double> cache = robot.CreateKinematicsCache();
   cache.initialize(q0);
@@ -653,7 +653,7 @@ PiecewisePolynomial<double> LineSearchSingleCubicSpline(
 
   PiecewisePolynomial<double> max_time_traj = GuessTrajTime3(q, v0, v1, v_lower, v_upper, vd_lower, vd_upper);
 
-  return LineSearchSingleCubicSpline(q, 0, max_time_traj.getEndTime(), v0, v1, v_lower, v_upper, vd_lower, vd_upper);
+  return LineSearchSingleCubicSpline(q, 0.1, max_time_traj.getEndTime(), v0, v1, v_lower, v_upper, vd_lower, vd_upper);
 }
 
 PiecewisePolynomial<double> RetimeTrajCubic(
