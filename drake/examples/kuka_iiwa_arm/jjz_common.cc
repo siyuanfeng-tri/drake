@@ -37,6 +37,9 @@ IiwaState::IiwaState(const RigidBodyTree<double>* iiwa,
 
 bool IiwaState::UpdateState(const lcmt_iiwa_status& msg) {
   // Check msg.
+  if (msg.num_joints != iiwa_->get_num_positions()) {
+    std::cout << "msg joints: " << msg.num_joints << std::endl;
+  }
   DRAKE_DEMAND(msg.num_joints == iiwa_->get_num_positions());
 
   const double cur_time = msg.utime / 1e6;
@@ -482,7 +485,7 @@ VectorX<double> GazeIk2(const Vector3<double>& target_in_world,
 
 std::vector<VectorX<double>> ComputeCalibrationConfigurations(
     const RigidBodyTree<double>& robot, const RigidBodyFrame<double>& frame_C,
-    const VectorX<double>& q0, const Vector3<double>& p_WP, double min_dist, 
+    const VectorX<double>& q0, const Vector3<double>& p_WP, double min_dist,
     double width, double height, int num_width_pt, int num_height_pt) {
   KinematicsCache<double> cache = robot.CreateKinematicsCache();
   cache.initialize(q0);
