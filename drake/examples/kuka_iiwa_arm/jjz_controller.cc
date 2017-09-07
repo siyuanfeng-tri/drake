@@ -40,6 +40,75 @@ const std::string JjzController::kLcmJjzControllerDebug = "CTRL_DEBUG";
 const std::string JjzController::kLcmWsgStatusChannel = "SCHUNK_WSG_STATUS";
 const std::string JjzController::kLcmWsgCommandChannel = "SCHUNK_WSG_COMMAND";
 
+JjzController::JjzController(const RigidBodyTree<double>& robot,
+                             const RigidBodyFrame<double>& frame_T)
+    : robot_(robot), frame_T_(frame_T) {
+  // Iiwa status.
+  lcm::Subscription* sub = lcm_.subscribe(
+      kLcmIiwaStatusChannel, &JjzController::HandleIiwaStatus, this);
+  // THIS IS VERY IMPORTANT!!
+  sub->setQueueCapacity(1);
+
+  // Gripper status.
+  sub = lcm_.subscribe(kLcmWsgStatusChannel, &JjzController::HandleWsgStatus,
+                       this);
+  sub->setQueueCapacity(1);
+}
+
+void JjzController::Start() {
+  if (run_flag_) {
+    std::cout << "Controller thread already running\n";
+    return;
+  }
+  run_flag_ = true;
+  iiwa_msg_ctr_ = 0;
+  wsg_msg_ctr_ = 0;
+
+  control_thread_ = std::thread(&JjzController::ControlLoop, this);
+}
+
+void JjzController::Stop() {
+  run_flag_ = false;
+  control_thread_.join();
+}
+
+void JjzController::GetPrimitiveOutput(PrimitiveOutput* output) const {
+  DRAKE_DEMAND(run_flag_);
+
+  std::lock_guard<std::mutex> guard(motion_lock_);
+  *output = primitive_output_;
+}
+
+void JjzController::CloseGripperAndSleep(double sec) {
+  std::cout << "[Close gripper]\n";
+  SetGripperPositionAndForce(0, 40);
+  if (sec <= 0) return;
+  usleep(sec * 1e6);
+}
+
+void JjzController::OpenGripperAndSleep(double sec) {
+  std::cout << "[Open gripper]\n";
+  SetGripperPositionAndForce(105, 40);
+  if (sec <= 0) return;
+  usleep(sec * 1e6);
+}
+
+void JjzController::HandleIiwaStatus(const lcm::ReceiveBuffer*,
+                                     const std::string&,
+                                     const lcmt_iiwa_status* status) {
+  std::lock_guard<std::mutex> guard(state_lock_);
+  iiwa_status_ = *status;
+  iiwa_msg_ctr_++;
+}
+
+void JjzController::HandleWsgStatus(const lcm::ReceiveBuffer*,
+                                    const std::string&,
+                                    const lcmt_schunk_wsg_status* status) {
+  std::lock_guard<std::mutex> guard(state_lock_);
+  wsg_status_ = *status;
+  wsg_msg_ctr_++;
+}
+
 void JjzController::MoveJ(const VectorX<double>& q_des, double duration) {
   PrimitiveOutput cur_output;
   GetPrimitiveOutput(&cur_output);
@@ -148,7 +217,7 @@ void JjzController::ControlLoop() {
   // queue.
   int lcm_err;
   while (iiwa_msg_ctr_ < 4) {
-    lcm_err = lcm_.handleTimeout(100);
+    lcm_err = lcm_.handleTimeout(10);
   }
   std::cout << "got first iiwa msg\n";
 

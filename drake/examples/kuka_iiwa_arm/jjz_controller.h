@@ -15,42 +15,15 @@ class JjzController {
   static const std::string kLcmWsgCommandChannel;
 
   JjzController(const RigidBodyTree<double>& robot,
-                const RigidBodyFrame<double>& frame_T)
-      : robot_(robot), frame_T_(frame_T) {
-    // Iiwa status.
-    lcm::Subscription* sub = lcm_.subscribe(
-        kLcmIiwaStatusChannel, &JjzController::HandleIiwaStatus, this);
-    // THIS IS VERY IMPORTANT!!
-    sub->setQueueCapacity(1);
-
-    // Gripper status.
-    sub = lcm_.subscribe(kLcmWsgStatusChannel, &JjzController::HandleWsgStatus,
-                         this);
-    sub->setQueueCapacity(1);
-  }
+                const RigidBodyFrame<double>& frame_T);
 
   const RigidBodyTree<double>& get_robot() const { return robot_; }
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
 
   // Starts the controller thread, needs to be called before GetIiwaState,
-  // GetPrimitiveOutput,
-  // or exectuing any motions.
-  void Start() {
-    if (run_flag_) {
-      std::cout << "Controller thread already running\n";
-      return;
-    }
-    run_flag_ = true;
-    iiwa_msg_ctr_ = 0;
-    wsg_msg_ctr_ = 0;
-
-    control_thread_ = std::thread(&JjzController::ControlLoop, this);
-  }
-
-  void Stop() {
-    run_flag_ = false;
-    control_thread_.join();
-  }
+  // GetPrimitiveOutput, or exectuing any motions.
+  void Start();
+  void Stop();
 
   // This blocks until there is at least 1 valid status message from iiwa.
   void GetIiwaState(IiwaState* state) const;
@@ -58,12 +31,7 @@ class JjzController {
   // This blocks until there is at least 1 valid status message from iiwa.
   void GetWsgState(WsgState* state) const;
 
-  void GetPrimitiveOutput(PrimitiveOutput* output) const {
-    DRAKE_DEMAND(run_flag_);
-
-    std::lock_guard<std::mutex> guard(motion_lock_);
-    *output = primitive_output_;
-  }
+  void GetPrimitiveOutput(PrimitiveOutput* output) const;
 
   void MoveJ(const VectorX<double>& q_des, double duration);
   void MoveJ(const std::vector<VectorX<double>>& q_des,
@@ -80,30 +48,17 @@ class JjzController {
   // zero.
   //
   // Note: the timing in traj should be relative, i.e time range = [0, 2], not
-  // absolute
-  // clock.
+  // absolute clock.
   void MoveToolFollowTraj(
       const manipulation::PiecewiseCartesianTrajectory<double>& traj, double Fz,
       double mu, double yaw_mu);
 
-  void CloseGripperAndSleep(double sec = 0) {
-    std::cout << "[Close gripper]\n";
-    SetGripperPositionAndForce(0, 40);
-    if (sec <= 0) return;
-    usleep(sec * 1e6);
-  }
-
-  void OpenGripperAndSleep(double sec = 0) {
-    std::cout << "[Open gripper]\n";
-    SetGripperPositionAndForce(105, 40);
-    if (sec <= 0) return;
-    usleep(sec * 1e6);
-  }
-
+  void CloseGripperAndSleep(double sec = 0);
+  void OpenGripperAndSleep(double sec = 0);
   void SetGripperPositionAndForce(double position, double force);
 
  private:
-  void SwapPlan(std::unique_ptr<MotionPrimitive> new_plan) {
+  inline void SwapPlan(std::unique_ptr<MotionPrimitive> new_plan) {
     std::lock_guard<std::mutex> guard(motion_lock_);
     primitive_ = std::move(new_plan);
     primitive_output_.status = PrimitiveOutput::UNINIT;
@@ -112,18 +67,9 @@ class JjzController {
   void ControlLoop();
 
   void HandleIiwaStatus(const lcm::ReceiveBuffer*, const std::string&,
-                        const lcmt_iiwa_status* status) {
-    std::lock_guard<std::mutex> guard(state_lock_);
-    iiwa_status_ = *status;
-    iiwa_msg_ctr_++;
-  }
-
+                        const lcmt_iiwa_status* status);
   void HandleWsgStatus(const lcm::ReceiveBuffer*, const std::string&,
-                       const lcmt_schunk_wsg_status* status) {
-    std::lock_guard<std::mutex> guard(state_lock_);
-    wsg_status_ = *status;
-    wsg_msg_ctr_++;
-  }
+                       const lcmt_schunk_wsg_status* status);
 
   lcm::LCM lcm_;
   const RigidBodyTree<double>& robot_;
