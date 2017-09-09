@@ -69,17 +69,20 @@ class WsgState {
 
   void UpdateState(const lcmt_schunk_wsg_status& msg) {
     time_ = static_cast<double>(msg.utime) / 1e6;
-    position_ = static_cast<double>(msg.actual_position_mm) / 1000.;
+    position_ = msg.actual_position_mm / 1000.;
+    velocity_ = msg.actual_speed_mm_per_s / 1000.;
     force_ = msg.actual_force;
   }
 
   double get_time() const { return time_; }
   double get_position() const { return position_; }
+  double get_velocity() const { return velocity_; }
   double get_force() const { return force_; }
 
  private:
   double time_{kUninitTime};
   double position_{0};
+  double velocity_{0};
   double force_{0};
 };
 
