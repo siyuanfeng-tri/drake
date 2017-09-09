@@ -14,11 +14,13 @@ namespace jjz {
 struct PrimitiveOutput {
   enum Status { UNINIT = 0, EXECUTING = 1, DONE = 2, ERR = 3 };
   Status status{UNINIT};
-  VectorX<double> q_cmd;
-  VectorX<double> trq_cmd;
+  VectorX<double> q_cmd{};
+  VectorX<double> trq_cmd{};
   // This is only set with all cartesian mode primitives. MoveJ has this set to
   // I.
   Isometry3<double> X_WT_cmd{Isometry3<double>::Identity()};
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 class MotionPrimitive {
@@ -79,6 +81,8 @@ class MotionPrimitive {
   const VectorX<double>& get_velocity_upper_limit() const { return v_upper_; }
   const VectorX<double>& get_velocity_lower_limit() const { return v_lower_; }
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
  protected:
   virtual void DoInitialize(const IiwaState& state) {}
   virtual void DoControl(const IiwaState& state, PrimitiveOutput* output,
@@ -87,11 +91,11 @@ class MotionPrimitive {
 
  private:
   const RigidBodyTree<double>& robot_;
-  VectorX<double> v_upper_;
-  VectorX<double> v_lower_;
+  VectorX<double> v_upper_{};
+  VectorX<double> v_lower_{};
 
-  std::string name_;
-  const Type type_;
+  std::string name_{};
+  const Type type_{UNKNOWN};
   double start_time_{0};
   bool init_{false};
 };
@@ -116,6 +120,8 @@ class MoveJoint : public MotionPrimitive {
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
  private:
   PiecewisePolynomial<double> traj_;
   PiecewisePolynomial<double> trajd_;
@@ -136,6 +142,8 @@ class MoveTool : public MotionPrimitive {
   void set_tool_gain(const Vector6<double>& gain) { gain_T_ = gain; }
 
   const RigidBodyFrame<double>& get_tool_frame() const { return frame_T_; }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  protected:
   MoveTool(const std::string& name, const RigidBodyTree<double>* robot,
@@ -177,6 +185,8 @@ class MoveToolStraightUntilTouch : public MoveTool {
   double get_f_ext_thresh() const { return f_ext_thresh_; }
   void set_f_ext_thresh(double thresh) { f_ext_thresh_ = thresh; }
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
  private:
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
@@ -200,6 +210,8 @@ class HoldPositionAndApplyForce : public MotionPrimitive {
     return ext_wrench_d_;
   }
   void set_desired_ext_wrench(const Vector6<double>& w) { ext_wrench_d_ = w; }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
   void DoInitialize(const IiwaState& state) override;
@@ -231,6 +243,8 @@ class MoveToolFollowTraj : public MoveTool {
   void set_mu(double mu) { mu_ = mu; }
   void set_yaw_mu(double mu) { yaw_mu_ = mu; }
   void set_fz(double fz) { fz_ = fz; }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
   void DoControl(const IiwaState& state, PrimitiveOutput* output,

@@ -39,6 +39,8 @@ class IiwaState {
   double get_time() const { return time_; }
   double get_dt() const { return delta_time_; }
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
  private:
   const RigidBodyTree<double>* iiwa_;
   const RigidBodyFrame<double>* frame_T_;
