@@ -61,36 +61,33 @@ void JjzController::Start() {
     return;
   }
   run_flag_ = true;
+  ready_flag_ = false;
   iiwa_msg_ctr_ = 0;
   wsg_msg_ctr_ = 0;
 
   control_thread_ = std::thread(&JjzController::ControlLoop, this);
+
+  // Block until ready.
+  while (!ready_flag_)
+    ;
 }
 
 void JjzController::Stop() {
+  if (!run_flag_) {
+    std::cout << "Controller thread not running\n";
+    return;
+  }
+
   run_flag_ = false;
+  ready_flag_ = false;
   control_thread_.join();
 }
 
 void JjzController::GetPrimitiveOutput(PrimitiveOutput* output) const {
-  DRAKE_DEMAND(run_flag_);
+  DRAKE_DEMAND(run_flag_ && ready_flag_);
 
   std::lock_guard<std::mutex> guard(motion_lock_);
   *output = primitive_output_;
-}
-
-void JjzController::CloseGripperAndSleep(double sec) {
-  std::cout << "[Close gripper]\n";
-  SetGripperPositionAndForce(0, 40);
-  if (sec <= 0) return;
-  usleep(sec * 1e6);
-}
-
-void JjzController::OpenGripperAndSleep(double sec) {
-  std::cout << "[Open gripper]\n";
-  SetGripperPositionAndForce(105, 40);
-  if (sec <= 0) return;
-  usleep(sec * 1e6);
 }
 
 void JjzController::HandleIiwaStatus(const lcm::ReceiveBuffer*,
@@ -242,6 +239,14 @@ void JjzController::ControlLoop() {
   auto plan = std::unique_ptr<MotionPrimitive>(
       new MoveJoint("hold_q", &robot_, state.get_q(), state.get_q(), 0.1));
   SwapPlan(std::move(plan));
+  {
+    lcmt_jjz_controller ctrl_debug{};
+    std::lock_guard<std::mutex> guard(motion_lock_);
+    primitive_->Initialize(state);
+    primitive_->Update(state, &ctrl_debug);
+    primitive_->Control(state, &primitive_output_, &ctrl_debug);
+  }
+  ready_flag_ = true;
 
   ////////////////////////////////////////////////////////
   // Main loop.

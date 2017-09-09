@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
     if (output.status == drake::jjz::PrimitiveOutput::DONE) {
       switch (script_idx) {
         case 0: {
-          controller.OpenGripperAndSleep(1);
+          // controller.OpenGripperAndSleep(1);
           controller.MoveJ(q0, 2);
           script_idx++;
           break;
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
           break;
         }
         case 8: {
-          controller.CloseGripperAndSleep(1.5);
+          // controller.CloseGripperAndSleep(1.5);
           script_idx++;
           break;
         }

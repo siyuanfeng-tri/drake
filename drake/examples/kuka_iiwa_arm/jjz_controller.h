@@ -53,8 +53,6 @@ class JjzController {
       const manipulation::PiecewiseCartesianTrajectory<double>& traj, double Fz,
       double mu, double yaw_mu);
 
-  void CloseGripperAndSleep(double sec = 0);
-  void OpenGripperAndSleep(double sec = 0);
   void SetGripperPositionAndForce(double position, double force);
 
  private:
@@ -87,6 +85,7 @@ class JjzController {
 
   std::thread control_thread_;
   std::atomic<bool> run_flag_{false};
+  std::atomic<bool> ready_flag_{false};
 };
 
 }  // namespace jjz
