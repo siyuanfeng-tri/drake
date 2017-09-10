@@ -31,6 +31,8 @@
 #include "drake/examples/kuka_iiwa_arm/jjz_controller.h"
 #include "drake/examples/kuka_iiwa_arm/jjz_primitives.h"
 
+#include "drake/lcmt_viewer_draw.hpp"
+
 namespace drake {
 namespace jjz {
 
@@ -201,6 +203,18 @@ void JjzController::SetGripperPositionAndForce(double position, double force) {
   lcm_.publish(kLcmWsgCommandChannel, &cmd);
 }
 
+void FillFrameMessage(const Isometry3<double>& pose, int idx,
+    drake::lcmt_viewer_draw* msg) {
+  for (int j = 0; j < 3; j++)
+      msg->position[idx][j] = static_cast<float>(pose.translation()[j]);
+
+  Quaternion<double> quat(pose.linear());
+  msg->quaternion[idx][0] = static_cast<float>(quat.w());
+  msg->quaternion[idx][1] = static_cast<float>(quat.x());
+  msg->quaternion[idx][2] = static_cast<float>(quat.y());
+  msg->quaternion[idx][3] = static_cast<float>(quat.z());
+}
+
 void JjzController::ControlLoop() {
   // We can directly read iiwa_status_ because write only happens in
   // HandleIiwaStatus, which is only triggered by calling lcm_.handle,
@@ -228,6 +242,7 @@ void JjzController::ControlLoop() {
 
   VectorX<double> q_cmd(7);
   VectorX<double> trq_cmd = VectorX<double>::Zero(7);
+  Isometry3<double> X_WT_cmd = Isometry3<double>::Identity();
 
   // Make initial plan.
   DRAKE_DEMAND(state.UpdateState(iiwa_status_));
@@ -247,6 +262,32 @@ void JjzController::ControlLoop() {
     primitive_->Control(state, &primitive_output_, &ctrl_debug);
   }
   ready_flag_ = true;
+
+  // Frame visualziation stuff.
+  Isometry3<double> GRASP = Isometry3<double>::Identity();
+
+  Isometry3<double> tf_camera_wrt_ee;
+  tf_camera_wrt_ee.matrix() <<
+    0.3994,   -0.9168,   -0.0015,   -0.0646,
+    0.9163,    0.3992,   -0.0317,    0.00111,
+    0.0297,    0.0113,    0.9995,    0.1121,
+         0,         0,         0,    1.0000;
+  Isometry3<double> tf_hand_to_ee(
+    Eigen::Translation<double, 3>(Eigen::Vector3d(0, 0, 0.185)) *
+    Eigen::AngleAxis<double>(-22. / 180. * M_PI, Eigen::Vector3d::UnitZ()) *
+    Eigen::AngleAxis<double>(M_PI, Eigen::Vector3d::UnitY()));
+
+  Isometry3<double> tf_camera_wrt_hand = tf_hand_to_ee.inverse() * tf_camera_wrt_ee;
+
+  drake::lcmt_viewer_draw frame_msg{};
+  frame_msg.link_name = {"Tool_measured", "Tool_ik", "Grasp"};
+  frame_msg.num_links = frame_msg.link_name.size();
+  // The robot num is not relevant here.
+  frame_msg.robot_num.resize(frame_msg.num_links, 0);
+  std::vector<float> pos = {0, 0, 0};
+  std::vector<float> quaternion = {1, 0, 0, 0};
+  frame_msg.position.resize(frame_msg.num_links, pos);
+  frame_msg.quaternion.resize(frame_msg.num_links, quaternion);
 
   ////////////////////////////////////////////////////////
   // Main loop.
@@ -279,7 +320,17 @@ void JjzController::ControlLoop() {
 
       q_cmd = primitive_output_.q_cmd;
       trq_cmd = primitive_output_.trq_cmd;
+      X_WT_cmd = primitive_output_.X_WT_cmd;
+
+      GRASP = primitive_->HACK_COMP_GRASP_POSE();
     }
+
+    // Generate frame visualization stuff.
+    frame_msg.timestamp = ctrl_debug.utime;
+    FillFrameMessage(state.get_X_WT() * tf_camera_wrt_hand.inverse(), 0, &frame_msg);
+    FillFrameMessage(X_WT_cmd * tf_camera_wrt_hand.inverse(), 1, &frame_msg);
+    FillFrameMessage(GRASP * tf_camera_wrt_hand.inverse(), 2, &frame_msg);
+    lcm_.publish("DRAKE_DRAW_FRAMES", &frame_msg);
 
     // send command
     iiwa_command.utime = static_cast<int64_t>(state.get_time() * 1e6);

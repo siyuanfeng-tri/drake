@@ -76,6 +76,8 @@ class MotionPrimitive {
 
   void set_name(const std::string& name) { name_ = name; }
 
+  virtual Isometry3<double> HACK_COMP_GRASP_POSE() const { return Isometry3<double>::Identity(); }
+
   virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
 
   const VectorX<double>& get_velocity_upper_limit() const { return v_upper_; }
@@ -247,6 +249,11 @@ class MoveToolFollowTraj : public MoveTool {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
+  Isometry3<double> HACK_COMP_GRASP_POSE() const override {
+    const double end_time = X_WT_traj_.get_position_trajectory().get_end_time();
+    return X_WT_traj_.get_pose(end_time);
+  }
+
   void DoControl(const IiwaState& state, PrimitiveOutput* output,
                  lcmt_jjz_controller* msg) const override;
 

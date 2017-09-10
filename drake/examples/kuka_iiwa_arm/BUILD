@@ -127,6 +127,7 @@ drake_cc_library(
         ":iiwa_common",
         ":jjz",
         ":iiwa_lcm",
+        "//drake/lcmtypes:viewer",
         "//drake/multibody:inverse_kinematics",
         "//drake/manipulation/planner:jacobian_ik",
         "//drake/manipulation/util:trajectory_utils",
