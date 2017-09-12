@@ -48,17 +48,17 @@ class IiwaState {
   double time_{kUninitTime};
   double delta_time_{0};
 
-  VectorX<double> q_;
-  VectorX<double> v_;
-  VectorX<double> trq_;
-  VectorX<double> ext_trq_;
-  MatrixX<double> J_;
+  VectorX<double> q_{};
+  VectorX<double> v_{};
+  VectorX<double> trq_{};
+  VectorX<double> ext_trq_{};
+  MatrixX<double> J_{};
 
-  Isometry3<double> X_WT_;
-  Vector6<double> V_WT_;
+  Isometry3<double> X_WT_{Isometry3<double>::Identity()};
+  Vector6<double> V_WT_{Vector6<double>::Zero()};
 
   // J^T * F = ext_trq_
-  Vector6<double> ext_wrench_;
+  Vector6<double> ext_wrench_{Vector6<double>::Zero()};
 
   bool init_{false};
 };
@@ -78,6 +78,8 @@ class WsgState {
   double get_position() const { return position_; }
   double get_velocity() const { return velocity_; }
   double get_force() const { return force_; }
+
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
   double time_{kUninitTime};

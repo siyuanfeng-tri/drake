@@ -129,7 +129,8 @@ class PiecewiseCartesianTrajectory {
    * @parma vel1 End linear velocity.
    */
   static PiecewiseCartesianTrajectory<T> MakeCubicLinearWithEndLinearVelocity(
-      const std::vector<T>& times, const std::vector<Isometry3<T>>& poses,
+      const std::vector<T>& times,
+      const eigen_aligned_std_vector<Isometry3<T>>& poses,
       const Vector3<T>& vel0, const Vector3<T>& vel1) {
     std::vector<MatrixX<T>> pos_knots(poses.size());
     eigen_aligned_std_vector<Matrix3<T>> rot_knots(poses.size());
