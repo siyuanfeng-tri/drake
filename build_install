@@ -1,1 +1,1 @@
-bazel run --config snopt --config gurobi --copt -g :install ~/drake_bazel_build
+bazel run -c dbg --config snopt --config gurobi --copt -g -s --compiler=gcc-5 :install ~/drake_bazel_build

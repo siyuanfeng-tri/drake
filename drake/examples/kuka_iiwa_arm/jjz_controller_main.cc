@@ -4,9 +4,10 @@
 
 #include "drake/manipulation/util/trajectory_utils.h"
 
+
 using namespace drake;
 
-int main(int argc, char** argv) {
+int main() {
   const std::string kPath =
       "drake/manipulation/models/iiwa_description/urdf/"
       "iiwa14_polytope_collision.urdf";
@@ -15,7 +16,8 @@ int main(int argc, char** argv) {
       kPath, drake::multibody::joints::kFixed, nullptr, &tree);
 
   RigidBodyFrame<double> tool_frame("tool", tree.FindBody(jjz::kEEName),
-                                    jjz::X_ET);
+                                    Isometry3<double>::Identity());
+                                    //jjz::X_ET);
 
   drake::jjz::JjzController controller(tree, tool_frame);
 

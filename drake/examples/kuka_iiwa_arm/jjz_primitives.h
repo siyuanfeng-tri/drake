@@ -76,7 +76,7 @@ class MotionPrimitive {
 
   void set_name(const std::string& name) { name_ = name; }
 
-  virtual void Update(const IiwaState& state, lcmt_jjz_controller* msg) {}
+  virtual void Update(const IiwaState&, lcmt_jjz_controller*) {}
 
   const VectorX<double>& get_velocity_upper_limit() const { return v_upper_; }
   const VectorX<double>& get_velocity_lower_limit() const { return v_lower_; }
@@ -84,9 +84,9 @@ class MotionPrimitive {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  protected:
-  virtual void DoInitialize(const IiwaState& state) {}
-  virtual void DoControl(const IiwaState& state, PrimitiveOutput* output,
-                         lcmt_jjz_controller* msg) const {}
+  virtual void DoInitialize(const IiwaState&) {}
+  virtual void DoControl(const IiwaState&, PrimitiveOutput*,
+                         lcmt_jjz_controller*) const {}
   Type get_type() const { return type_; }
 
  private:

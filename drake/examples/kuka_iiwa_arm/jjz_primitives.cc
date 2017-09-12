@@ -132,7 +132,7 @@ void MoveTool::Update(const IiwaState& state, lcmt_jjz_controller* msg) {
   get_robot().doKinematics(cache_);
 }
 
-void MoveTool::DoControl(const IiwaState& state, PrimitiveOutput* output,
+void MoveTool::DoControl(const IiwaState&, PrimitiveOutput* output,
                          lcmt_jjz_controller* msg) const {
   output->q_cmd = cache_.getQ();
   output->X_WT_cmd = get_robot().CalcFramePoseInWorldFrame(cache_, frame_T_);
@@ -177,7 +177,7 @@ HoldPositionAndApplyForce::HoldPositionAndApplyForce(
       cache_(robot->CreateKinematicsCache()) {}
 
 void HoldPositionAndApplyForce::Update(const IiwaState& state,
-                                       lcmt_jjz_controller* msg) {
+                                       lcmt_jjz_controller*) {
   cache_.initialize(state.get_q(), state.get_v());
   get_robot().doKinematics(cache_);
 }
@@ -190,7 +190,7 @@ void HoldPositionAndApplyForce::DoInitialize(const IiwaState& state) {
   X_WT0_ = get_robot().CalcFramePoseInWorldFrame(tmp, frame_T_);
 }
 
-void HoldPositionAndApplyForce::DoControl(const IiwaState& state,
+void HoldPositionAndApplyForce::DoControl(const IiwaState&,
                                           PrimitiveOutput* output,
                                           lcmt_jjz_controller* msg) const {
   const RigidBodyTree<double>& robot = get_robot();

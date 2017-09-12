@@ -209,10 +209,12 @@ int DoMain() {
 
   // Visualizes the end effector frame and 7th body's frame.
   std::vector<RigidBodyFrame<double>> local_transforms;
+  /*
   local_transforms.push_back(RigidBodyFrame<double>(
       "iiwa_tool", tree.FindBody(jjz::kEEName), jjz::X_ET));
   local_transforms.push_back(
       RigidBodyFrame<double>("goal", tree.FindBody("world"), jjz::X_WG));
+  */
   Isometry3<double> X_WTag(Eigen::Translation<double, 3>(Vector3<double>(1.5, -0.3, 0.2)));
   local_transforms.push_back(
       RigidBodyFrame<double>("AprilTag", tree.FindBody("world"), X_WTag));

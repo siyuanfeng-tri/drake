@@ -13,13 +13,15 @@
 namespace drake {
 namespace jjz {
 
-const Isometry3<double> X_ET(
+/*
+Isometry3<double> X_ET =
     Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.16)) *
     AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
-    AngleAxis<double>(M_PI, Vector3<double>::UnitY()));
-const Isometry3<double> X_WG(
+    AngleAxis<double>(M_PI, Vector3<double>::UnitY());
+Isometry3<double> X_WG =
     Eigen::Translation<double, 3>(Vector3<double>(0.6, 0.2, 0.)) *
-    AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ()));
+    AngleAxis<double>(-M_PI / 2., Vector3<double>::UnitZ());
+*/
 const std::string kEEName("iiwa_link_7");
 
 IiwaState::IiwaState(const RigidBodyTree<double>* iiwa,
