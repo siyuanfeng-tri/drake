@@ -36,7 +36,7 @@ void JacobianIk::Setup() {
   q_upper_ = robot_->joint_limit_max;
   v_lower_ = VectorX<double>::Constant(robot_->get_num_velocities(), -2);
   v_upper_ = VectorX<double>::Constant(robot_->get_num_velocities(), 2);
-  unconstrained_dof_v_limit_ = VectorX<double>::Constant(1, 0.1);
+  unconstrained_dof_v_limit_ = VectorX<double>::Constant(1, 0.3);
 
   identity_ = MatrixX<double>::Identity(robot_->get_num_positions(),
                                         robot_->get_num_positions());
