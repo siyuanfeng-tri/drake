@@ -15,9 +15,13 @@ int main() {
   drake::parsers::urdf::AddModelInstanceFromUrdfFile(
       kPath, drake::multibody::joints::kFixed, nullptr, &tree);
 
+  const Isometry3<double> X_ET =
+    Eigen::Translation<double, 3>(Vector3<double>(0, 0, 0.16)) *
+    AngleAxis<double>(-22. / 180. * M_PI, Vector3<double>::UnitZ()) *
+    AngleAxis<double>(M_PI, Vector3<double>::UnitY());
+
   RigidBodyFrame<double> tool_frame("tool", tree.FindBody(jjz::kEEName),
-                                    Isometry3<double>::Identity());
-                                    //jjz::X_ET);
+                                    X_ET);
 
   drake::jjz::JjzController controller(tree, tool_frame);
 

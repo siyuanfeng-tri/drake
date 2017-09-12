@@ -10,8 +10,6 @@
 namespace drake {
 namespace jjz {
 
-//extern Isometry3<double> X_ET;
-//extern Isometry3<double> X_WG;
 extern const std::string kEEName;
 
 inline double get_system_time() {
