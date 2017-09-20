@@ -3,8 +3,8 @@
 #include <memory>
 
 #include <gtest/gtest.h>
+#include "device/schunk_wsg_command_t.hpp"
 
-#include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/input_port_value.h"
 #include "drake/systems/framework/output_port_value.h"
@@ -23,12 +23,12 @@ GTEST_TEST(SchunkWsgLcmTest, SchunkWsgTrajectoryGeneratorTest) {
 
   // Start off with the gripper closed (zero) and a command to open to
   // 100mm.
-  lcmt_schunk_wsg_command initial_command{};
+  device::schunk_wsg_command_t initial_command{};
   initial_command.target_position_mm = 100;
   initial_command.force = 40;
   std::unique_ptr<systems::FreestandingInputPortValue> input_command =
       std::make_unique<systems::FreestandingInputPortValue>(
-          std::make_unique<systems::Value<lcmt_schunk_wsg_command>>(
+          std::make_unique<systems::Value<device::schunk_wsg_command_t>>(
               initial_command));
   context->SetInputPortValue(0, std::move(input_command));
   context->FixInputPort(1, Eigen::VectorXd::Zero(1));

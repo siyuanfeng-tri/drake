@@ -41,10 +41,11 @@ drake_cc_library(
     deps = [
         ":iiwa_common",
         "//drake/common/trajectories:piecewise_polynomial_trajectory",
-        "//drake/lcmtypes:iiwa",
+        #"//drake/lcmtypes:iiwa",
         "//drake/multibody:inverse_kinematics",
         "//drake/multibody:rigid_body_tree",
         "//drake/systems/framework:leaf_system",
+        "@lcmtypes_robotlocomotion//:device_lcmtypes_robotlocomotion",
     ],
 )
 

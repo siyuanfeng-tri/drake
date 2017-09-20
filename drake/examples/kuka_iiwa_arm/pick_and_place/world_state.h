@@ -5,9 +5,9 @@
 #include <string>
 
 #include "bot_core/robot_state_t.hpp"
+#include "device/schunk_wsg_status_t.hpp"
 
 #include "drake/common/drake_copyable.h"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/multibody/rigid_body_tree.h"
 
 namespace drake {
@@ -51,7 +51,7 @@ class WorldState {
   void HandleIiwaStatus(const bot_core::robot_state_t& iiwa_msg);
 
   /// Update the stored wsg status from @p wsg_msg.
-  void HandleWsgStatus(const lcmt_schunk_wsg_status& wsg_msg);
+  void HandleWsgStatus(const device::schunk_wsg_status_t& wsg_msg);
 
   /// Update the stored object status from @p obj_msg.
   void HandleObjectStatus(const bot_core::robot_state_t& obj_msg);

@@ -3,12 +3,12 @@
 #include <vector>
 
 #include <Eigen/Dense>
+#include "device/schunk_wsg_command_t.hpp"
+#include "device/schunk_wsg_status_t.hpp"
 
 #include "drake/common/drake_assert.h"
 #include "drake/common/eigen_types.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
-#include "drake/lcmt_schunk_wsg_command.hpp"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 
 namespace drake {
 namespace manipulation {
@@ -17,6 +17,8 @@ namespace schunk_wsg {
 using systems::BasicVector;
 using systems::Context;
 using systems::DiscreteValues;
+using device::schunk_wsg_command_t;
+using device::schunk_wsg_status_t;
 
 SchunkWsgTrajectoryGenerator::SchunkWsgTrajectoryGenerator(
     int input_size, int position_index)
@@ -70,7 +72,7 @@ void SchunkWsgTrajectoryGenerator::DoCalcDiscreteVariableUpdates(
     DiscreteValues<double>* discrete_state) const {
   const systems::AbstractValue* input = this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(input != nullptr);
-  const auto& command = input->GetValue<lcmt_schunk_wsg_command>();
+  const auto& command = input->GetValue<schunk_wsg_command_t>();
   // The target_position_mm field represents the distance between
   // the two fingers. The fingers are connected by a mechanical
   // linkage, so the relative movement between the two fingers is
@@ -188,8 +190,8 @@ SchunkWsgStatusSender(int input_size,
 }
 
 void SchunkWsgStatusSender::OutputStatus(const Context<double>& context,
-                                         lcmt_schunk_wsg_status* output) const {
-  lcmt_schunk_wsg_status& status = *output;
+                                         schunk_wsg_status_t* output) const {
+  schunk_wsg_status_t& status = *output;
 
   status.utime = context.get_time() * 1e6;
   const systems::BasicVector<double>* state =

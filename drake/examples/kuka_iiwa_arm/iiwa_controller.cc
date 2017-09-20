@@ -5,6 +5,8 @@
 #include <memory>
 
 #include <gflags/gflags.h>
+#include "device/iiwa_command_t.hpp"
+#include "device/iiwa_status_t.hpp"
 #include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/common/find_resource.h"
@@ -12,8 +14,6 @@
 #include "drake/common/text_logging_gflags.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
 #include "drake/manipulation/planner/robot_plan_interpolator.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/context.h"
@@ -24,6 +24,8 @@
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/primitives/demultiplexer.h"
 
+using device::iiwa_command_t;
+using device::iiwa_status_t;
 using robotlocomotion::robot_plan_t;
 
 DEFINE_string(urdf, "", "Name of urdf to load");
@@ -59,7 +61,7 @@ int DoMain() {
   const int num_joints = plan_source->tree().get_num_positions();
 
   auto status_sub = builder.AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_status>(
+      systems::lcm::LcmSubscriberSystem::Make<iiwa_status_t>(
           kLcmStatusChannel, &lcm));
   status_sub->set_name("status_sub");
 
@@ -71,7 +73,7 @@ int DoMain() {
   target_demux->set_name("target_demux");
 
   auto command_pub = builder.AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_command>(
+      systems::lcm::LcmPublisherSystem::Make<iiwa_command_t>(
           kLcmCommandChannel, &lcm));
   command_pub->set_name("command_pub");
 
@@ -97,13 +99,13 @@ int DoMain() {
   systems::lcm::LcmDrivenLoop loop(
       *diagram, *status_sub, nullptr, &lcm,
       std::make_unique<
-          systems::lcm::UtimeMessageToSeconds<lcmt_iiwa_status>>());
+          systems::lcm::UtimeMessageToSeconds<iiwa_status_t>>());
 
   // Waits for the first message.
   const systems::AbstractValue& first_msg = loop.WaitForMessage();
   double msg_time =
       loop.get_message_to_time_converter().GetTimeInSeconds(first_msg);
-  const lcmt_iiwa_status& first_status = first_msg.GetValue<lcmt_iiwa_status>();
+  const iiwa_status_t& first_status = first_msg.GetValue<iiwa_status_t>();
   VectorX<double> q0(num_joints);
   DRAKE_DEMAND(num_joints == first_status.num_joints);
   for (int i = 0; i < num_joints; i++)

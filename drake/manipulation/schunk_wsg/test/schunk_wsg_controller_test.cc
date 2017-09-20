@@ -3,8 +3,8 @@
 #include <memory>
 
 #include <gtest/gtest.h>
+#include "device/schunk_wsg_command_t.hpp"
 
-#include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_constants.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/input_port_value.h"
@@ -15,9 +15,11 @@ namespace manipulation {
 namespace schunk_wsg {
 namespace {
 
+using device::schunk_wsg_command_t;
+
 /// Runs the controller for a brief period with the specified initial
 /// conditions and returns the commanded force.
-double RunWsgControllerTestStep(const lcmt_schunk_wsg_command& wsg_command,
+double RunWsgControllerTestStep(const schunk_wsg_command_t& wsg_command,
                                 double wsg_position) {
   SchunkWsgController dut;
   std::unique_ptr<systems::Context<double>> context =
@@ -26,7 +28,7 @@ double RunWsgControllerTestStep(const lcmt_schunk_wsg_command& wsg_command,
       dut.AllocateOutput(*context);
   context->FixInputPort(
       dut.get_command_input_port().get_index(),
-      std::make_unique<systems::Value<lcmt_schunk_wsg_command>>(
+      std::make_unique<systems::Value<schunk_wsg_command_t>>(
           wsg_command));
   Eigen::VectorXd wsg_position_vec = Eigen::VectorXd::Zero(10);
   wsg_position_vec(0) = -(wsg_position / 1e3) / 2.;
@@ -41,7 +43,7 @@ double RunWsgControllerTestStep(const lcmt_schunk_wsg_command& wsg_command,
 GTEST_TEST(SchunkWsgControllerTest, SchunkWsgControllerTest) {
   // Start off with the gripper closed (zero) and a command to open to
   // 100mm.
-  lcmt_schunk_wsg_command wsg_command{};
+  schunk_wsg_command_t wsg_command{};
   wsg_command.target_position_mm = 100;
   wsg_command.force = 40;
   double commanded_force = RunWsgControllerTestStep(wsg_command, 0);

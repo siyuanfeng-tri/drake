@@ -226,9 +226,13 @@ github_archive(
 
 github_archive(
     name = "lcmtypes_robotlocomotion",
-    repository = "RobotLocomotion/lcmtypes",
-    commit = "8aea7a94d53dea01bfceba5f3cbe8e8cc9fb0244",
-    sha256 = "f23a143d7865ea4f6cd9aeb2211fe36e20712a39d439cf16fea2b11685f29b61",  # noqa
+    #repository = "RobotLocomotion/lcmtypes",
+    #commit = "8aea7a94d53dea01bfceba5f3cbe8e8cc9fb0244",
+    #sha256 = "f23a143d7865ea4f6cd9aeb2211fe36e20712a39d439cf16fea2b11685f29b61",  # noqa
+    local_repository_override = "/home/sfeng/code/lcmtypes",
+    repository = "siyuanfeng-tri/lcmtypes",
+    commit = "254940a7e9605c0a6adb2280ad12701bc4785462",
+    sha256 = "",  # noqa
     build_file = "tools/lcmtypes_robotlocomotion.BUILD",
 )
 

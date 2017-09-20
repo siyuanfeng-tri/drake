@@ -4,8 +4,6 @@
 #include <gtest/gtest.h>
 
 #include "drake/common/eigen_matrix_compare.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
 #include "drake/systems/framework/context.h"
 
 namespace drake {
@@ -13,6 +11,8 @@ namespace examples {
 namespace kuka_iiwa_arm {
 
 static const int kNumJoints = 7;
+using device::iiwa_command_t;
+using device::iiwa_status_t;
 
 GTEST_TEST(IiwaLcmTest, IiwaCommandReceiverTest) {
   IiwaCommandReceiver dut;
@@ -45,7 +45,7 @@ GTEST_TEST(IiwaLcmTest, IiwaCommandReceiverTest) {
   Eigen::VectorXd delta(kNumJoints);
   delta << 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007;
 
-  lcmt_iiwa_command command{};
+  iiwa_command_t command{};
   command.num_joints = kNumJoints;
   command.joint_position.resize(kNumJoints);
   for (int i = 0; i < kNumJoints; i++) {
@@ -53,7 +53,7 @@ GTEST_TEST(IiwaLcmTest, IiwaCommandReceiverTest) {
   }
 
   context->FixInputPort(
-      0, std::make_unique<systems::Value<lcmt_iiwa_command>>(command));
+      0, std::make_unique<systems::Value<iiwa_command_t>>(command));
 
   std::unique_ptr<systems::DiscreteValues<double>> update =
       dut.AllocateDiscreteVariables();
@@ -84,8 +84,8 @@ GTEST_TEST(IiwaLcmTest, IiwaCommandSenderTest) {
   context->FixInputPort(dut.get_position_input_port().get_index(), position);
 
   dut.CalcOutput(*context, output.get());
-  lcmt_iiwa_command command =
-      output->get_data(0)->GetValue<lcmt_iiwa_command>();
+  iiwa_command_t command =
+      output->get_data(0)->GetValue<iiwa_command_t>();
   ASSERT_EQ(command.num_joints, kNumJoints);
   for (int i = 0; i < kNumJoints; i++) {
     EXPECT_EQ(command.joint_position[i], position(i));
@@ -97,7 +97,7 @@ GTEST_TEST(IiwaLcmTest, IiwaCommandSenderTest) {
   context->FixInputPort(dut.get_torque_input_port().get_index(), torque);
 
   dut.CalcOutput(*context, output.get());
-  command = output->get_data(0)->GetValue<lcmt_iiwa_command>();
+  command = output->get_data(0)->GetValue<iiwa_command_t>();
   ASSERT_EQ(command.num_joints, kNumJoints);
   ASSERT_EQ(command.num_torques, kNumJoints);
   for (int i = 0; i < kNumJoints; i++) {
@@ -113,7 +113,7 @@ GTEST_TEST(IiwaLcmTest, IiwaStatusReceiverTest) {
   std::unique_ptr<systems::SystemOutput<double>> output =
       dut.AllocateOutput(*context);
 
-  lcmt_iiwa_status status{};
+  iiwa_status_t status{};
   status.num_joints = kNumJoints;
   status.joint_position_measured.resize(status.num_joints, 0);
   status.joint_position_commanded.resize(status.num_joints, 0.1);
@@ -123,7 +123,7 @@ GTEST_TEST(IiwaLcmTest, IiwaStatusReceiverTest) {
   status.joint_torque_external.resize(status.num_joints, 0);
 
   context->FixInputPort(
-      0, std::make_unique<systems::Value<lcmt_iiwa_status>>(status));
+      0, std::make_unique<systems::Value<iiwa_status_t>>(status));
 
   std::unique_ptr<systems::DiscreteValues<double>> update =
       dut.AllocateDiscreteVariables();
@@ -138,7 +138,7 @@ GTEST_TEST(IiwaLcmTest, IiwaStatusReceiverTest) {
   }
 
   context->FixInputPort(
-      0, std::make_unique<systems::Value<lcmt_iiwa_status>>(status));
+      0, std::make_unique<systems::Value<iiwa_status_t>>(status));
   update = dut.AllocateDiscreteVariables();
   update->SetFrom(*context->get_mutable_discrete_state());
   dut.CalcDiscreteVariableUpdates(*context, update.get());
@@ -180,8 +180,8 @@ GTEST_TEST(IiwaLcmTest, IiwaStatusSenderTest) {
   context->FixInputPort(dut.get_state_input_port().get_index(), state);
 
   dut.CalcOutput(*context, output.get());
-  lcmt_iiwa_status status =
-      output->get_data(0)->GetValue<lcmt_iiwa_status>();
+  iiwa_status_t status =
+      output->get_data(0)->GetValue<iiwa_status_t>();
   ASSERT_EQ(status.num_joints, kNumJoints);
   for (int i = 0; i < kNumJoints; i++) {
     EXPECT_EQ(status.joint_position_commanded[i], command(i));

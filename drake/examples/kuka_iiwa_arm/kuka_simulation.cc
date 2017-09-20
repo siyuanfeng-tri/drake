@@ -1,8 +1,8 @@
 /// @file
 ///
 /// Implements a simulation of the KUKA iiwa arm.  Like the driver for the
-/// physical arm, this simulation communicates over LCM using lcmt_iiwa_status
-/// and lcmt_iiwa_command messages. It is intended to be a be a direct
+/// physical arm, this simulation communicates over LCM using iiwa_status_t
+/// and iiwa_command_t messages. It is intended to be a be a direct
 /// replacement for the KUKA iiwa driver and the actual robot hardware.
 
 #include <memory>
@@ -14,8 +14,6 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
 #include "drake/manipulation/util/sim_diagram_builder.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_plant/frame_visualizer.h"
@@ -46,6 +44,8 @@ using systems::DiagramBuilder;
 using systems::FrameVisualizer;
 using systems::RigidBodyPlant;
 using systems::Simulator;
+using device::iiwa_command_t;
+using device::iiwa_status_t;
 
 int DoMain() {
   drake::lcm::DrakeLcm lcm;
@@ -98,14 +98,14 @@ int DoMain() {
   // Create the command subscriber and status publisher.
   systems::DiagramBuilder<double>* base_builder = builder.get_mutable_builder();
   auto command_sub = base_builder->AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IIWA_COMMAND",
+      systems::lcm::LcmSubscriberSystem::Make<iiwa_command_t>("IIWA_COMMAND",
                                                                  &lcm));
   command_sub->set_name("command_subscriber");
   auto command_receiver =
       base_builder->AddSystem<IiwaCommandReceiver>(num_joints);
   command_receiver->set_name("command_receiver");
   auto status_pub = base_builder->AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>("IIWA_STATUS",
+      systems::lcm::LcmPublisherSystem::Make<iiwa_status_t>("IIWA_STATUS",
                                                                &lcm));
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(kIiwaLcmStatusPeriod);

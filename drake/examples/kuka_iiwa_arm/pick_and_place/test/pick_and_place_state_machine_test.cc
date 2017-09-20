@@ -2,18 +2,21 @@
 
 #include <gtest/gtest.h>
 #include "bot_core/robot_state_t.hpp"
+#include "device/schunk_wsg_command_t.hpp"
+#include "device/schunk_wsg_status_t.hpp"
 #include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/common/find_resource.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
-#include "drake/lcmt_schunk_wsg_command.hpp"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 namespace pick_and_place {
 namespace {
+
+using device::schunk_wsg_command_t;
+using device::schunk_wsg_status_t;
 
 const char* const kIiwaUrdf =
     "drake/manipulation/models/iiwa_description/urdf/"
@@ -64,7 +67,7 @@ GTEST_TEST(PickAndPlaceStateMachineTest, StateMachineTest) {
   iiwa_msg.joint_velocity.resize(kIiwaArmNumJoints, 0);
   world_state.HandleIiwaStatus(iiwa_msg);
 
-  lcmt_schunk_wsg_status wsg_msg;
+  schunk_wsg_status_t wsg_msg;
   wsg_msg.utime = iiwa_msg.utime;
   wsg_msg.actual_position_mm = 0;
   wsg_msg.actual_force = 0;
@@ -91,10 +94,10 @@ GTEST_TEST(PickAndPlaceStateMachineTest, StateMachineTest) {
   };
 
   int wsg_command_count = 0;
-  lcmt_schunk_wsg_command wsg_command{};
+  schunk_wsg_command_t wsg_command{};
   PickAndPlaceStateMachine::WsgPublishCallback wsg_callback =
       [&wsg_command_count, &wsg_command](
-          const lcmt_schunk_wsg_command* command) {
+          const schunk_wsg_command_t* command) {
     wsg_command_count++;
     wsg_command = *command;
   };

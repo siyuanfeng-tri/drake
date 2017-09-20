@@ -12,6 +12,7 @@ namespace pick_and_place {
 namespace {
 
 using manipulation::planner::ConstraintRelaxingIk;
+using device::schunk_wsg_command_t;
 
 // Position the gripper 30cm above the object before grasp.
 const double kPreGraspHeightOffset = 0.3;
@@ -128,7 +129,7 @@ void PickAndPlaceStateMachine::Update(
       // Opens the gripper.
       case kOpenGripper: {
         if (!wsg_act_.ActionStarted()) {
-          lcmt_schunk_wsg_command msg;
+          schunk_wsg_command_t msg;
           wsg_act_.OpenGripper(env_state, &msg);
           wsg_callback(&msg);
 
@@ -207,7 +208,7 @@ void PickAndPlaceStateMachine::Update(
     case kGrasp: {
       // Grasps the object.
       if (!wsg_act_.ActionStarted()) {
-        lcmt_schunk_wsg_command msg;
+        schunk_wsg_command_t msg;
         wsg_act_.CloseGripper(env_state, &msg);
         wsg_callback(&msg);
 
@@ -313,7 +314,7 @@ void PickAndPlaceStateMachine::Update(
     case kPlace: {
       // Releases the object.
       if (!wsg_act_.ActionStarted()) {
-        lcmt_schunk_wsg_command msg;
+        schunk_wsg_command_t msg;
         wsg_act_.OpenGripper(env_state, &msg);
         wsg_callback(&msg);
 

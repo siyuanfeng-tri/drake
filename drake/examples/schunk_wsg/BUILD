@@ -31,7 +31,6 @@ drake_cc_binary(
     deps = [
         ":simulated_schunk_wsg_system",
         "//drake/lcm",
-        "//drake/lcmtypes:schunk",
         "//drake/manipulation/schunk_wsg:schunk_wsg_constants",
         "//drake/manipulation/schunk_wsg:schunk_wsg_controller",
         "//drake/manipulation/schunk_wsg:schunk_wsg_lcm",
@@ -41,6 +40,7 @@ drake_cc_binary(
         "//drake/systems/framework",
         "//drake/systems/lcm",
         "@com_github_gflags_gflags//:gflags",
+        "@lcmtypes_robotlocomotion//:device_lcmtypes_robotlocomotion",
     ],
 )
 

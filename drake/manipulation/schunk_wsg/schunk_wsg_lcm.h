@@ -6,8 +6,9 @@
 #include <memory>
 #include <vector>
 
+#include "device/schunk_wsg_status_t.hpp"
+
 #include "drake/common/trajectories/trajectory.h"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/manipulation/schunk_wsg/gen/schunk_wsg_trajectory_generator_state_vector.h"
 #include "drake/systems/framework/leaf_system.h"
 
@@ -87,7 +88,7 @@ class SchunkWsgTrajectoryGenerator : public systems::LeafSystem<double> {
   mutable std::unique_ptr<Trajectory> trajectory_;
 };
 
-/// Sends lcmt_schunk_wsg_status messages for a Schunk WSG.  This
+/// Sends device::schunk_wsg_status_t messages for a Schunk WSG.  This
 /// system has one input port for the current state of the simulated
 /// WSG (probably a RigidBodyPlant).
 class SchunkWsgStatusSender : public systems::LeafSystem<double> {
@@ -97,7 +98,7 @@ class SchunkWsgStatusSender : public systems::LeafSystem<double> {
 
  private:
   void OutputStatus(const systems::Context<double>& context,
-                    lcmt_schunk_wsg_status* output) const;
+                    device::schunk_wsg_status_t* output) const;
 
   const int position_index_{};
   const int velocity_index_{};

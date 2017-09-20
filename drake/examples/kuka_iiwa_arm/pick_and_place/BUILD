@@ -29,13 +29,13 @@ drake_cc_library(
         "//drake/common/trajectories:piecewise_polynomial",
         "//drake/common/trajectories:piecewise_quaternion",
         "//drake/examples/kuka_iiwa_arm:iiwa_common",
-        "//drake/lcmtypes:schunk",
         "//drake/manipulation/planner:constraint_relaxing_ik",
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/parsers",
         "//drake/util:lcm_util",
         "@lcmtypes_bot2_core",
         "@lcmtypes_robotlocomotion",
+        "@lcmtypes_robotlocomotion//:device_lcmtypes_robotlocomotion",
     ],
 )
 

@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
+#include "device/schunk_wsg_command_t.hpp"
 #include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/common/drake_copyable.h"
 #include "drake/examples/kuka_iiwa_arm/pick_and_place/world_state.h"
-#include "drake/lcmt_schunk_wsg_command.hpp"
 
 namespace drake {
 namespace examples {
@@ -127,14 +127,14 @@ class WsgAction : public Action {
    * driver to fully open.
    */
   void OpenGripper(const WorldState& est_state,
-                   lcmt_schunk_wsg_command* msg);
+                   device::schunk_wsg_command_t* msg);
 
   /**
    * Populates @p msg with an LCM message that tells the WSG gripper
    * driver to fully close.
    */
   void CloseGripper(const WorldState& est_state,
-                    lcmt_schunk_wsg_command* msg);
+                    device::schunk_wsg_command_t* msg);
 
   // TODO(siyuanfeng): Implement something meaningful here like a check for a
   // force threshold being crossed.

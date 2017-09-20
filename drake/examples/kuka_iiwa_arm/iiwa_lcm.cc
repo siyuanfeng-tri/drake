@@ -2,9 +2,10 @@
 
 #include <vector>
 
+#include "device/iiwa_command_t.hpp"
+#include "device/iiwa_status_t.hpp"
+
 #include "drake/common/drake_assert.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
 
 namespace drake {
 namespace examples {
@@ -16,6 +17,8 @@ using systems::DiscreteValues;
 using systems::State;
 using systems::SystemOutput;
 using systems::DiscreteUpdateEvent;
+using device::iiwa_command_t;
+using device::iiwa_status_t;
 
 // This value is chosen to match the value in getSendPeriodMilliSec()
 // when initializing the FRI configuration on the iiwa's control
@@ -47,7 +50,7 @@ void IiwaCommandReceiver::DoCalcDiscreteVariableUpdates(
     DiscreteValues<double>* discrete_state) const {
   const systems::AbstractValue* input = this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(input != nullptr);
-  const auto& command = input->GetValue<lcmt_iiwa_command>();
+  const auto& command = input->GetValue<iiwa_command_t>();
   // TODO(sam.creasey) Support torque control.
   DRAKE_ASSERT(command.num_torques == 0);
 
@@ -88,8 +91,8 @@ IiwaCommandSender::IiwaCommandSender(int num_joints)
 }
 
 void IiwaCommandSender::OutputCommand(
-    const Context<double>& context, lcmt_iiwa_command* output) const {
-  lcmt_iiwa_command& command = *output;
+    const Context<double>& context, iiwa_command_t* output) const {
+  iiwa_command_t& command = *output;
 
   command.utime = context.get_time() * 1e6;
   const systems::BasicVector<double>* positions =
@@ -138,7 +141,7 @@ void IiwaStatusReceiver::DoCalcDiscreteVariableUpdates(
     DiscreteValues<double>* discrete_state) const {
   const systems::AbstractValue* input = this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(input != nullptr);
-  const auto& status = input->GetValue<lcmt_iiwa_status>();
+  const auto& status = input->GetValue<iiwa_status_t>();
 
   // If we're using a default constructed message (haven't received
   // status yet), keep using the initial state.
@@ -188,8 +191,8 @@ IiwaStatusSender::IiwaStatusSender(int num_joints)
                                   &IiwaStatusSender::OutputStatus);
 }
 
-lcmt_iiwa_status IiwaStatusSender::MakeOutputStatus() const {
-  lcmt_iiwa_status msg{};
+iiwa_status_t IiwaStatusSender::MakeOutputStatus() const {
+  iiwa_status_t msg{};
   msg.num_joints = num_joints_;
   msg.joint_position_measured.resize(msg.num_joints, 0);
   msg.joint_position_commanded.resize(msg.num_joints, 0);
@@ -201,8 +204,8 @@ lcmt_iiwa_status IiwaStatusSender::MakeOutputStatus() const {
 }
 
 void IiwaStatusSender::OutputStatus(
-    const Context<double>& context, lcmt_iiwa_status* output) const {
-  lcmt_iiwa_status& status = *output;
+    const Context<double>& context, iiwa_status_t* output) const {
+  iiwa_status_t& status = *output;
 
   status.utime = context.get_time() * 1e6;
   const systems::BasicVector<double>* command =

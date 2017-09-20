@@ -76,7 +76,7 @@ class PickAndPlaceStateMachineSystem : public systems::LeafSystem<double> {
 
   /**
    * Getter for the input port corresponding to the abstract input with the wsg
-   * status message (LCM `lcmt_schunk_wsg_status` message).
+   * status message (LCM `device::schunk_wsg_status` message).
    * @return The corresponding `sytems::InputPortDescriptor`.
    */
   const systems::InputPortDescriptor<double>& get_input_port_wsg_status()
@@ -110,7 +110,7 @@ class PickAndPlaceStateMachineSystem : public systems::LeafSystem<double> {
 
   void CalcWsgCommand(
       const systems::Context<double>& context,
-      lcmt_schunk_wsg_command* wsg_command) const;
+      device::schunk_wsg_command_t* wsg_command) const;
 
   struct InternalState;
 

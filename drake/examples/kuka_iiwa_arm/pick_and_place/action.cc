@@ -71,18 +71,18 @@ bool IiwaMove::ActionFinished(const WorldState& est_state) const {
 WsgAction::WsgAction() {}
 
 void WsgAction::OpenGripper(const WorldState& est_state,
-                            lcmt_schunk_wsg_command* msg) {
+                            device::schunk_wsg_command_t* msg) {
   StartAction(est_state.get_wsg_time());
-  *msg = lcmt_schunk_wsg_command();
+  *msg = device::schunk_wsg_command_t();
   msg->utime = est_state.get_wsg_time() * 1e6;
   msg->target_position_mm = 100;  // Maximum aperture for WSG
   msg->force = 40;  // Force in center of WSG range
 }
 
 void WsgAction::CloseGripper(const WorldState& est_state,
-                             lcmt_schunk_wsg_command* msg) {
+                             device::schunk_wsg_command_t* msg) {
   StartAction(est_state.get_wsg_time());
-  *msg = lcmt_schunk_wsg_command();
+  *msg = device::schunk_wsg_command_t();
   msg->utime = est_state.get_wsg_time() * 1e6;
   msg->target_position_mm = 8;  // 0 would smash the fingers together
                                 // and keep applying force on a real

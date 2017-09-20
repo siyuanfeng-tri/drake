@@ -6,11 +6,12 @@
 #include <memory>
 #include <vector>
 
+#include "device/iiwa_command_t.hpp"
+#include "device/iiwa_status_t.hpp"
+
 #include "drake/common/drake_copyable.h"
 #include "drake/common/eigen_types.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
 #include "drake/systems/framework/leaf_system.h"
 
 namespace drake {
@@ -19,7 +20,7 @@ namespace kuka_iiwa_arm {
 
 extern const double kIiwaLcmStatusPeriod;
 
-/// Handles lcmt_iiwa_command messages from a LcmSubscriberSystem.
+/// Handles iiwa_command_t messages from a LcmSubscriberSystem.
 /// Has a single output port which publishes the commanded position
 /// for each joint along with an estimate of the commanded velocity
 /// for each joint.
@@ -52,7 +53,7 @@ class IiwaCommandReceiver : public systems::LeafSystem<double> {
   const int num_joints_;
 };
 
-/// Creates and outputs lcmt_iiwa_command messages
+/// Creates and outputs iiwa_command_t messages
 ///
 /// This system has two vector-valued input ports, one for the
 /// commanded position (which must be connected) and one for commanded
@@ -61,11 +62,11 @@ class IiwaCommandReceiver : public systems::LeafSystem<double> {
 /// message.
 ///
 /// This system has one abstract valued output port that contains a
-/// systems::Value object templated on type `lcmt_iiwa_command`. Note that this
+/// systems::Value object templated on type `iiwa_command_t`. Note that this
 /// system does not actually send this message on an LCM channel. To send the
 /// message, the output of this system should be connected to an input port of
 /// a systems::lcm::LcmPublisherSystem that accepts a
-/// systems::Value object templated on type `lcmt_iiwa_command`.
+/// systems::Value object templated on type `iiwa_command_t`.
 class IiwaCommandSender : public systems::LeafSystem<double> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(IiwaCommandSender)
@@ -82,7 +83,7 @@ class IiwaCommandSender : public systems::LeafSystem<double> {
 
  private:
   void OutputCommand(const systems::Context<double>& context,
-                     lcmt_iiwa_command* output) const;
+                     device::iiwa_command_t* output) const;
 
   const int num_joints_;
   const int position_input_port_{};
@@ -92,7 +93,7 @@ class IiwaCommandSender : public systems::LeafSystem<double> {
 // TODO(sam.creasey) Add output for torques once we have a system
 // which needs them.
 
-/// Handles lcmt_iiwa_status messages from a LcmSubscriberSystem.  Has
+/// Handles iiwa_status_t messages from a LcmSubscriberSystem.  Has
 /// the following output ports:
 ///
 /// * Measured position and estimated velocity for each joint
@@ -132,7 +133,7 @@ class IiwaStatusReceiver : public systems::LeafSystem<double> {
   const int commanded_position_output_port_{};
 };
 
-/// Creates and outputs lcmt_iiwa_status messages.
+/// Creates and outputs iiwa_status_t messages.
 ///
 /// This system has two vector-valued input ports, one for the plant's
 /// current state and one for the most recently received command.
@@ -141,11 +142,11 @@ class IiwaStatusReceiver : public systems::LeafSystem<double> {
 /// with the outputs from IiwaCommandReceiver and RigidBodyPlant).
 ///
 /// This system has one abstract valued output port that contains a
-/// systems::Value object templated on type `lcmt_iiwa_status`. Note that this
+/// systems::Value object templated on type `iiwa_status_t`. Note that this
 /// system does not actually send this message on an LCM channel. To send the
 /// message, the output of this system should be connected to an input port of
 /// a systems::lcm::LcmPublisherSystem that accepts a
-/// systems::Value object templated on type `lcmt_iiwa_status`. For an example
+/// systems::Value object templated on type `iiwa_status_t`. For an example
 /// of this, see iiwa_wsg_simulation.cc.
 class IiwaStatusSender : public systems::LeafSystem<double> {
  public:
@@ -163,11 +164,11 @@ class IiwaStatusSender : public systems::LeafSystem<double> {
 
  private:
   // This is the method to use for the output port allocator.
-  lcmt_iiwa_status MakeOutputStatus() const;
+  device::iiwa_status_t MakeOutputStatus() const;
 
   // This is the calculator method for the output port.
   void OutputStatus(const systems::Context<double>& context,
-                    lcmt_iiwa_status* output) const;
+                    device::iiwa_status_t* output) const;
 
   const int num_joints_;
 };

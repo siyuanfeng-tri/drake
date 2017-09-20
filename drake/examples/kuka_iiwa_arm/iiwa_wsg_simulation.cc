@@ -2,25 +2,25 @@
 ///
 /// Implements a simulation of the KUKA iiwa arm with a Schunk WSG 50
 /// attached as an end effector.  Like the driver for the physical
-/// arm, this simulation communicates over LCM using lcmt_iiwa_status
-/// and lcmt_iiwa_command messages for the arm, and the
-/// lcmt_schunk_status and lcmt_schunk_command messages for the
+/// arm, this simulation communicates over LCM using iiwa_status_t
+/// and iiwa_command_t messages for the arm, and the
+/// schunk_status and schunk_command messages for the
 /// gripper. It is intended to be a be a direct replacement for the
 /// KUKA iiwa driver and the actual robot hardware.
 
 #include <memory>
 
 #include <gflags/gflags.h>
+#include "device/iiwa_command_t.hpp"
+#include "device/iiwa_status_t.hpp"
+#include "device/schunk_wsg_command_t.hpp"
+#include "device/schunk_wsg_status_t.hpp"
 
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/iiwa_wsg_diagram_factory.h"
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
-#include "drake/lcmt_schunk_wsg_command.hpp"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_constants.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_controller.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_lcm.h"
@@ -58,6 +58,10 @@ using systems::InputPortDescriptor;
 using systems::OutputPort;
 using systems::RigidBodyPlant;
 using systems::Simulator;
+using device::schunk_wsg_command_t;
+using device::schunk_wsg_status_t;
+using device::iiwa_command_t;
+using device::iiwa_status_t;
 
 const char* const kIiwaUrdf =
     "drake/manipulation/models/iiwa_description/urdf/"
@@ -151,20 +155,20 @@ int DoMain() {
   visualizer->set_publish_period(kIiwaLcmStatusPeriod);
 
   // Create the command subscriber and status publisher.
-  auto iiwa_command_sub = builder.AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IIWA_COMMAND",
+  auto iiwa_command_t_sub = builder.AddSystem(
+      systems::lcm::LcmSubscriberSystem::Make<iiwa_command_t>("IIWA_COMMAND",
                                                                  &lcm));
-  iiwa_command_sub->set_name("iiwa_command_subscriber");
-  auto iiwa_command_receiver = builder.AddSystem<IiwaCommandReceiver>();
-  iiwa_command_receiver->set_name("iwwa_command_receiver");
+  iiwa_command_t_sub->set_name("iiwa_command_t_subscriber");
+  auto iiwa_command_t_receiver = builder.AddSystem<IiwaCommandReceiver>();
+  iiwa_command_t_receiver->set_name("iwwa_command_receiver");
 
-  auto iiwa_status_pub = builder.AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>("IIWA_STATUS",
+  auto iiwa_status_t_pub = builder.AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<iiwa_status_t>("IIWA_STATUS",
                                                                &lcm));
-  iiwa_status_pub->set_name("iiwa_status_publisher");
-  iiwa_status_pub->set_publish_period(kIiwaLcmStatusPeriod);
-  auto iiwa_status_sender = builder.AddSystem<IiwaStatusSender>();
-  iiwa_status_sender->set_name("iiwa_status_sender");
+  iiwa_status_t_pub->set_name("iiwa_status_t_publisher");
+  iiwa_status_t_pub->set_publish_period(kIiwaLcmStatusPeriod);
+  auto iiwa_status_t_sender = builder.AddSystem<IiwaStatusSender>();
+  iiwa_status_t_sender->set_name("iiwa_status_t_sender");
 
   // TODO(siyuan): Connect this to kuka_planner runner once it generates
   // reference acceleration.
@@ -173,28 +177,28 @@ int DoMain() {
           Eigen::VectorXd::Zero(7));
   iiwa_zero_acceleration_source->set_name("zero_acceleration");
 
-  builder.Connect(iiwa_command_sub->get_output_port(0),
-                  iiwa_command_receiver->get_input_port(0));
-  builder.Connect(iiwa_command_receiver->get_output_port(0),
+  builder.Connect(iiwa_command_t_sub->get_output_port(0),
+                  iiwa_command_t_receiver->get_input_port(0));
+  builder.Connect(iiwa_command_t_receiver->get_output_port(0),
                   model->get_input_port_iiwa_state_command());
   builder.Connect(iiwa_zero_acceleration_source->get_output_port(),
                   model->get_input_port_iiwa_acceleration_command());
 
   builder.Connect(model->get_output_port_iiwa_state(),
-                  iiwa_status_sender->get_state_input_port());
-  builder.Connect(iiwa_command_receiver->get_output_port(0),
-                  iiwa_status_sender->get_command_input_port());
-  builder.Connect(iiwa_status_sender->get_output_port(0),
-                  iiwa_status_pub->get_input_port(0));
+                  iiwa_status_t_sender->get_state_input_port());
+  builder.Connect(iiwa_command_t_receiver->get_output_port(0),
+                  iiwa_status_t_sender->get_command_input_port());
+  builder.Connect(iiwa_status_t_sender->get_output_port(0),
+                  iiwa_status_t_pub->get_input_port(0));
 
   auto wsg_command_sub = builder.AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_schunk_wsg_command>(
+      systems::lcm::LcmSubscriberSystem::Make<schunk_wsg_command_t>(
           "SCHUNK_WSG_COMMAND", &lcm));
   wsg_command_sub->set_name("wsg_command_subscriber");
   auto wsg_controller = builder.AddSystem<SchunkWsgController>();
 
   auto wsg_status_pub = builder.AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_schunk_wsg_status>(
+      systems::lcm::LcmPublisherSystem::Make<schunk_wsg_status_t>(
           "SCHUNK_WSG_STATUS", &lcm));
   wsg_status_pub->set_name("wsg_status_publisher");
   wsg_status_pub->set_publish_period(

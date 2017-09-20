@@ -34,6 +34,20 @@ lcm_cc_library(
     deps = ["@lcmtypes_bot2_core"],
 )
 
+lcm_c_library(
+    name = "device_lcmtypes_robotlocomotion_c",
+    includes = ["lcmtypes/device"],
+    lcm_package = "device",
+    lcm_srcs = glob(["lcmtypes/device/*.lcm"]),
+)
+
+lcm_cc_library(
+    name = "device_lcmtypes_robotlocomotion",
+    includes = ["lcmtypes/device"],
+    lcm_package = "device",
+    lcm_srcs = glob(["lcmtypes/device/*.lcm"]),
+)
+
 lcm_java_library(
     name = "lcmtypes_robotlocomotion_java",
     lcm_package = "robotlocomotion",

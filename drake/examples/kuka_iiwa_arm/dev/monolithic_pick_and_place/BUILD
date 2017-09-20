@@ -42,7 +42,6 @@ drake_cc_binary(
         "//drake/examples/kuka_iiwa_arm:iiwa_lcm",
         "//drake/examples/kuka_iiwa_arm/iiwa_world:iiwa_wsg_diagram_factory",
         "//drake/lcm",
-        "//drake/lcmtypes:iiwa",
         "//drake/manipulation/planner:robot_plan_interpolator",
         "//drake/manipulation/schunk_wsg:schunk_wsg_controller",
         "//drake/manipulation/util:world_sim_tree_builder",
@@ -50,6 +49,7 @@ drake_cc_binary(
         "//drake/systems/analysis:simulator",
         "@com_github_gflags_gflags//:gflags",
         "@lcmtypes_bot2_core",
+        "@lcmtypes_robotlocomotion//:device_lcmtypes_robotlocomotion",
     ],
 )
 

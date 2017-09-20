@@ -15,9 +15,6 @@
 #include "drake/common/find_resource.h"
 #include "drake/examples/kuka_iiwa_arm/pick_and_place/pick_and_place_state_machine.h"
 #include "drake/examples/kuka_iiwa_arm/pick_and_place/world_state.h"
-#include "drake/lcmt_iiwa_status.hpp"
-#include "drake/lcmt_schunk_wsg_command.hpp"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/manipulation/planner/constraint_relaxing_ik.h"
 #include "drake/util/lcmUtil.h"
 
@@ -65,7 +62,7 @@ class WorldStateSubscriber {
 
   // Handles WSG states from the LCM message.
   void HandleWsgStatus(const lcm::ReceiveBuffer*, const std::string&,
-                       const lcmt_schunk_wsg_status* wsg_msg) {
+                       const device::schunk_wsg_status_t* wsg_msg) {
     DRAKE_DEMAND(wsg_msg != nullptr);
     state_->HandleWsgStatus(*wsg_msg);
   }
@@ -116,7 +113,7 @@ void RunPickAndPlaceDemo() {
       });
 
   PickAndPlaceStateMachine::WsgPublishCallback wsg_callback =
-      ([&](const lcmt_schunk_wsg_command* msg) {
+      ([&](const device::schunk_wsg_command_t* msg) {
         lcm.publish("SCHUNK_WSG_COMMAND", msg);
       });
 

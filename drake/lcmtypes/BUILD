@@ -221,23 +221,23 @@ lcm_cc_library(
     ],
 )
 
-lcm_cc_library(
-    name = "iiwa",
-    lcm_package = "drake",
-    lcm_srcs = [
-        "lcmt_iiwa_command.lcm",
-        "lcmt_iiwa_status.lcm",
-    ],
-)
-
-lcm_cc_library(
-    name = "schunk",
-    lcm_package = "drake",
-    lcm_srcs = [
-        "lcmt_schunk_wsg_command.lcm",
-        "lcmt_schunk_wsg_status.lcm",
-    ],
-)
+#lcm_cc_library(
+#    name = "iiwa",
+#    lcm_package = "drake",
+#    lcm_srcs = [
+#        "lcmt_iiwa_command.lcm",
+#        "lcmt_iiwa_status.lcm",
+#    ],
+#)
+#
+#lcm_cc_library(
+#    name = "schunk",
+#    lcm_package = "drake",
+#    lcm_srcs = [
+#        "lcmt_schunk_wsg_command.lcm",
+#        "lcmt_schunk_wsg_status.lcm",
+#    ],
+#)
 
 # TODO(jwnimmer-tri) Many more C++ messages are missing ...
 
@@ -272,7 +272,7 @@ DRAKE_LCMTYPES = [
     ":desired_centroidal_momentum_dot",
     ":desired_dof_motions",
     ":drake_signal",
-    ":iiwa",
+    #":iiwa",
     ":inverse_dynamics_debug_info",
     ":joint_pd_override",
     ":manipulator_plan_move_end_effector",
@@ -283,7 +283,7 @@ DRAKE_LCMTYPES = [
     ":qp_controller_input",
     ":qp_input",
     ":resolved_contact",
-    ":schunk",
+    #":schunk",
     ":support_data",
     ":viewer",
     ":whole_body_data",

@@ -3,7 +3,7 @@
 /// kuka_plan_runner is designed to wait for LCM messages contraining
 /// a robot_plan_t message, and then execute the plan on an iiwa arm
 /// (also communicating via LCM using the
-/// lcmt_iiwa_command/lcmt_iiwa_status messages).
+/// iiwa_command_t/iiwa_status_t messages).
 ///
 /// When a plan is received, it will immediately begin executing that
 /// plan on the arm (replacing any plan in progress).
@@ -12,6 +12,8 @@
 #include <memory>
 
 #include <lcm/lcm-cpp.hpp>
+#include "device/iiwa_command_t.hpp"
+#include "device/iiwa_status_t.hpp"
 #include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/common/drake_assert.h"
@@ -19,8 +21,6 @@
 #include "drake/common/trajectories/piecewise_polynomial.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
-#include "drake/lcmt_iiwa_command.hpp"
-#include "drake/lcmt_iiwa_status.hpp"
 #include "drake/multibody/joints/floating_base_types.h"
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/multibody/rigid_body_tree.h"
@@ -31,6 +31,8 @@ using Eigen::VectorXi;
 using drake::Vector1d;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
+using device::iiwa_command_t;
+using device::iiwa_status_t;
 
 namespace drake {
 namespace examples {
@@ -65,20 +67,20 @@ class RobotPlanRunner {
 
     // Initialize the timestamp to an invalid number so we can detect
     // the first message.
-    iiwa_status_.utime = cur_time_us;
+    iiwa_status_t_.utime = cur_time_us;
 
-    lcmt_iiwa_command iiwa_command;
-    iiwa_command.num_joints = kNumJoints;
-    iiwa_command.joint_position.resize(kNumJoints, 0.);
-    iiwa_command.num_torques = 0;
-    iiwa_command.joint_torque.resize(kNumJoints, 0.);
+    iiwa_command_t iiwa_command_t;
+    iiwa_command_t.num_joints = kNumJoints;
+    iiwa_command_t.joint_position.resize(kNumJoints, 0.);
+    iiwa_command_t.num_torques = 0;
+    iiwa_command_t.joint_torque.resize(kNumJoints, 0.);
 
     while (true) {
       // Call lcm handle until at least one status message is
       // processed.
-      while (0 == lcm_.handleTimeout(10) || iiwa_status_.utime == -1) { }
+      while (0 == lcm_.handleTimeout(10) || iiwa_status_t_.utime == -1) { }
 
-      cur_time_us = iiwa_status_.utime;
+      cur_time_us = iiwa_status_t_.utime;
 
       if (plan_) {
         if (plan_number_ != cur_plan_number) {
@@ -91,27 +93,27 @@ class RobotPlanRunner {
             static_cast<double>(cur_time_us - start_time_us) / 1e6;
         const auto desired_next = plan_->value(cur_traj_time_s);
 
-        iiwa_command.utime = iiwa_status_.utime;
+        iiwa_command_t.utime = iiwa_status_t_.utime;
 
         for (int joint = 0; joint < kNumJoints; joint++) {
-          iiwa_command.joint_position[joint] = desired_next(joint);
+          iiwa_command_t.joint_position[joint] = desired_next(joint);
         }
 
-        lcm_.publish(kLcmCommandChannel, &iiwa_command);
+        lcm_.publish(kLcmCommandChannel, &iiwa_command_t);
       }
     }
   }
 
  private:
   void HandleStatus(const lcm::ReceiveBuffer*, const std::string&,
-                    const lcmt_iiwa_status* status) {
-    iiwa_status_ = *status;
+                    const iiwa_status_t* status) {
+    iiwa_status_t_ = *status;
   }
 
   void HandlePlan(const lcm::ReceiveBuffer*, const std::string&,
                   const robotlocomotion::robot_plan_t* plan) {
     std::cout << "New plan received." << std::endl;
-    if (iiwa_status_.utime == -1) {
+    if (iiwa_status_t_.utime == -1) {
       std::cout << "Discarding plan, no status message received yet"
                 << std::endl;
       return;
@@ -134,9 +136,9 @@ class RobotPlanRunner {
         if (i == 0) {
           // Always start moving from the position which we're
           // currently commanding.
-          DRAKE_DEMAND(iiwa_status_.utime != -1);
+          DRAKE_DEMAND(iiwa_status_t_.utime != -1);
           knots[0](name_to_idx[state.joint_name[j]], 0) =
-              iiwa_status_.joint_position_commanded[j];
+              iiwa_status_t_.joint_position_commanded[j];
         } else {
           knots[i](name_to_idx[state.joint_name[j]], 0) =
               state.joint_position[j];
@@ -163,7 +165,7 @@ class RobotPlanRunner {
   const RigidBodyTree<double>& tree_;
   int plan_number_{};
   std::unique_ptr<PiecewisePolynomialTrajectory> plan_;
-  lcmt_iiwa_status iiwa_status_;
+  iiwa_status_t iiwa_status_t_;
 };
 
 int do_main() {

@@ -9,6 +9,8 @@ namespace examples {
 namespace kuka_iiwa_arm {
 namespace pick_and_place {
 
+using device::schunk_wsg_status_t;
+
 WorldState::WorldState(const std::string& iiwa_model_path,
                        const std::string& end_effector_name)
     : iiwa_model_path_(iiwa_model_path),
@@ -68,7 +70,7 @@ void WorldState::HandleIiwaStatus(const bot_core::robot_state_t& iiwa_msg) {
       iiwa_->CalcBodySpatialVelocityInWorldFrame(cache, *end_effector_);
 }
 
-void WorldState::HandleWsgStatus(const lcmt_schunk_wsg_status& wsg_msg) {
+void WorldState::HandleWsgStatus(const schunk_wsg_status_t& wsg_msg) {
   bool is_first_msg = wsg_time_ == -1;
   double cur_time = wsg_msg.utime / 1e6;
   double dt = cur_time - wsg_time_;

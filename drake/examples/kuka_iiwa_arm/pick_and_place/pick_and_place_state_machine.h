@@ -4,13 +4,13 @@
 #include <memory>
 #include <vector>
 
+#include "device/schunk_wsg_command_t.hpp"
 #include "robotlocomotion/robot_plan_t.hpp"
 
 #include "drake/common/drake_copyable.h"
 #include "drake/common/eigen_types.h"
 #include "drake/examples/kuka_iiwa_arm/pick_and_place/action.h"
 #include "drake/examples/kuka_iiwa_arm/pick_and_place/world_state.h"
-#include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/manipulation/planner/constraint_relaxing_ik.h"
 
 namespace drake {
@@ -42,7 +42,7 @@ class PickAndPlaceStateMachine {
   typedef std::function<void(
       const robotlocomotion::robot_plan_t*)> IiwaPublishCallback;
   typedef std::function<void(
-      const lcmt_schunk_wsg_command*)> WsgPublishCallback;
+      const device::schunk_wsg_command_t*)> WsgPublishCallback;
 
   /// Construct a pick and place state machine.  @p place_locations
   /// should contain a list of locations to place the target.  The

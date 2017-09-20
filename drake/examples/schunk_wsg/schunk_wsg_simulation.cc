@@ -10,12 +10,12 @@
 #include <memory>
 
 #include <gflags/gflags.h>
+#include "device/schunk_wsg_command_t.hpp"
+#include "device/schunk_wsg_status_t.hpp"
 
 #include "drake/common/drake_assert.h"
 #include "drake/examples/schunk_wsg/simulated_schunk_wsg_system.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/lcmt_schunk_wsg_command.hpp"
-#include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_constants.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_controller.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_lcm.h"
@@ -36,6 +36,8 @@ namespace examples {
 namespace schunk_wsg {
 namespace {
 
+using device::schunk_wsg_command_t;
+using device::schunk_wsg_status_t;
 using manipulation::schunk_wsg::SchunkWsgStatusSender;
 using manipulation::schunk_wsg::SchunkWsgController;
 using systems::Context;
@@ -56,14 +58,14 @@ int DoMain() {
       builder.AddSystem<DrakeVisualizer>(tree, &lcm);
   visualizer->set_name("visualizer");
   auto command_sub = builder.AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_schunk_wsg_command>(
+      systems::lcm::LcmSubscriberSystem::Make<schunk_wsg_command_t>(
           "SCHUNK_WSG_COMMAND", &lcm));
   command_sub->set_name("command_subscriber");
 
   auto wsg_controller = builder.AddSystem<SchunkWsgController>();
 
   auto status_pub = builder.AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_schunk_wsg_status>(
+      systems::lcm::LcmPublisherSystem::Make<schunk_wsg_status_t>(
           "SCHUNK_WSG_STATUS", &lcm));
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(

@@ -7,6 +7,8 @@
 #include "robotlocomotion/robot_plan_t.hpp"
 
 using bot_core::robot_state_t;
+using device::schunk_wsg_command_t;
+using device::schunk_wsg_status_t;
 
 namespace drake {
 namespace examples {
@@ -22,8 +24,8 @@ robotlocomotion::robot_plan_t MakeDefaultIiwaPlan() {
   return default_plan;
 }
 
-lcmt_schunk_wsg_command MakeDefaultWsgCommand() {
-  lcmt_schunk_wsg_command default_command{};
+schunk_wsg_command_t MakeDefaultWsgCommand() {
+  schunk_wsg_command_t default_command{};
   default_command.utime = 0;
   default_command.target_position_mm = 110;  // maximum aperture
   default_command.force = 0;
@@ -50,7 +52,7 @@ struct PickAndPlaceStateMachineSystem::InternalState {
   pick_and_place::WorldState world_state;
   PickAndPlaceStateMachine state_machine;
   robotlocomotion::robot_plan_t last_iiwa_plan;
-  lcmt_schunk_wsg_command last_wsg_command;
+  schunk_wsg_command_t last_wsg_command;
 };
 
 PickAndPlaceStateMachineSystem::PickAndPlaceStateMachineSystem(
@@ -115,7 +117,7 @@ void PickAndPlaceStateMachineSystem::CalcIiwaPlan(
 
 void PickAndPlaceStateMachineSystem::CalcWsgCommand(
     const systems::Context<double>& context,
-    lcmt_schunk_wsg_command* wsg_command) const {
+    schunk_wsg_command_t* wsg_command) const {
   /* Call actions based on state machine logic */
   const InternalState& internal_state =
       context.get_abstract_state<InternalState>(0);
@@ -137,9 +139,9 @@ void PickAndPlaceStateMachineSystem::DoCalcUnrestrictedUpdate(
   const robot_state_t& box_state =
       this->EvalAbstractInput(context, input_port_box_state_)
           ->GetValue<robot_state_t>();
-  const lcmt_schunk_wsg_status& wsg_status =
+  const schunk_wsg_status_t& wsg_status =
       this->EvalAbstractInput(context, input_port_wsg_status_)
-          ->GetValue<lcmt_schunk_wsg_status>();
+          ->GetValue<schunk_wsg_status_t>();
 
   internal_state.world_state.HandleIiwaStatus(iiwa_state);
   internal_state.world_state.HandleWsgStatus(wsg_status);
@@ -151,7 +153,7 @@ void PickAndPlaceStateMachineSystem::DoCalcUnrestrictedUpdate(
       });
 
   PickAndPlaceStateMachine::WsgPublishCallback wsg_callback =
-      ([&](const lcmt_schunk_wsg_command* msg) {
+      ([&](const schunk_wsg_command_t* msg) {
         internal_state.last_wsg_command = *msg;
       });
   internal_state.state_machine.Update(

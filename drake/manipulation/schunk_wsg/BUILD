@@ -38,8 +38,8 @@ drake_cc_library(
         ":schunk_wsg_trajectory_generator_state_vector",
         "//drake/common/trajectories:piecewise_polynomial_trajectory",
         "//drake/common/trajectories:trajectory",
-        "//drake/lcmtypes:schunk",
         "//drake/systems/framework:leaf_system",
+        "@lcmtypes_robotlocomotion//:device_lcmtypes_robotlocomotion",
     ],
 )
 
