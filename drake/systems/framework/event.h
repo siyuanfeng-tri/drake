@@ -93,6 +93,10 @@ class Event {
      */
     kWitness,
 
+    /**
+     * This trigger indicates that the associated event is triggered by some
+     * external system. (I should add a pointer to the source system later).
+     */
     kExternal,
   };
 

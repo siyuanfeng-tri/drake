@@ -1483,15 +1483,28 @@ class System {
     *time = std::numeric_limits<T>::infinity();
   }
 
+  /// Computes the next time at which an event is schedule by this system for
+  /// some other system..
+  /// You should interpret the results this way:
+  /// At @p time, for every `other_sys, other_sys_events` pair
+  /// in @p external_events_for_other_systems, this schedule `events` for
+  /// 'other_sys'. Note that `other_sys` should be a LeafSystem... or equivalent.
   virtual void DoCalcNextExternalUpdateTime(
       const Context<T>& context,
       std::unordered_map<const System<T>*,
-          std::unique_ptr<LeafCompositeEventCollection<T>>>* other_guys_stuff,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>* external_events_for_other_systems,
           T* time) const {
-    unused(context, other_guys_stuff);
+    unused(context, external_events_for_other_systems);
     *time = std::numeric_limits<T>::infinity();
   }
 
+  /// Convert a flat collection of `sys, events` pair in @p flat_events to
+  /// CompositeEventCollection in @p result that reflects the topology of
+  /// this underlying system (diagram vs leaf). Note that @p flat_events
+  /// can have systems that are not a child of this, in which case, those
+  /// pairs will be ignored by this function.
+  /// The real copy will happen in the leaf level. The diagram's version
+  /// only delegates.
   virtual void DoConvertLeafCompositeEventCollection(
       const std::unordered_map<const System<T>*,
           std::unique_ptr<LeafCompositeEventCollection<T>>>& flat_events,

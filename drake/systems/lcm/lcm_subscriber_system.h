@@ -137,6 +137,11 @@ class LcmSubscriberSystem : public LeafSystem<double>,
    */
   int GetMessageCount(const Context<double>& context) const;
 
+  /**
+   * Add a pair of @p other_system and @p event to the internal list such that
+   * whenenver a new message arrives, this subscriber will schedule @p event
+   * to @p other_system.
+   */
   void AddEventWhenReceive(const System<double>* other_system,
       const Event<double>& event);
 
@@ -144,6 +149,12 @@ class LcmSubscriberSystem : public LeafSystem<double>,
   void DoCalcNextUpdateTime(const Context<double>& context,
                             systems::CompositeEventCollection<double>* events,
                             double* time) const override;
+
+  void DoCalcNextExternalUpdateTime(
+      const Context<double>& context,
+      std::unordered_map<const System<double>*,
+          std::unique_ptr<LeafCompositeEventCollection<double>>>* other_guys_stuff,
+          double* time) const override;
 
   void DoCalcUnrestrictedUpdate(
       const Context<double>&,
@@ -173,12 +184,6 @@ class LcmSubscriberSystem : public LeafSystem<double>,
                       const LcmAndVectorBaseTranslator* translator,
                       std::unique_ptr<SerializerInterface> serializer,
                       drake::lcm::DrakeLcmInterface* lcm);
-
-  void DoCalcNextExternalUpdateTime(
-      const Context<double>& context,
-      std::unordered_map<const System<double>*,
-          std::unique_ptr<LeafCompositeEventCollection<double>>>* other_guys_stuff,
-          double* time) const override;
 
   void ProcessMessageAndStoreToDiscreteState(
       DiscreteValues<double>* discrete_state) const;

@@ -37,6 +37,7 @@ void controller_loop() {
       valkyrie_controller, state_msg_subscriber, nullptr, &lcm,
       std::make_unique<
           systems::lcm::UtimeMessageToSeconds<bot_core::robot_state_t>>());
+  loop.set_publish_on_every_received_message(false);
 
   // Initializes based on the first received message.
   const systems::AbstractValue& first_msg = loop.WaitForMessage();
