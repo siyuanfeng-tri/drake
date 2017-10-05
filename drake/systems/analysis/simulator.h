@@ -503,6 +503,7 @@ void Simulator<T>::StepTo(const T& boundary_time) {
 
   // Integrate until desired interval has completed.
   auto timed_events = system_.AllocateCompositeEventCollection();
+  auto ext_events = system_.AllocateCompositeEventCollection();
   auto merged_events = system_.AllocateCompositeEventCollection();
   auto witnessed_events = system_.AllocateCompositeEventCollection();
   DRAKE_DEMAND(timed_events != nullptr);
@@ -546,8 +547,32 @@ void Simulator<T>::StepTo(const T& boundary_time) {
     }
 
     // How far can we go before we have to take a sampling break?
-    const T next_sample_time =
+    T next_sample_time =
         system_.CalcNextUpdateTime(*context_, timed_events.get());
+
+    {
+      std::unordered_map<const System<T>*, std::unique_ptr<LeafCompositeEventCollection<T>>> haha;
+      const T next_ext_event_time =
+        system_.CalcNextExternalUpdateTime(*context_, &haha);
+
+      std::cout << "next_sample_time: " << next_sample_time << "\n";
+      std::cout << "next_ext_event_time: " << next_ext_event_time << "\n";
+      std::cout << "size: " << haha.size() << "\n";
+      for (const auto& pair : haha) {
+        std::cout << pair.first->get_name() << "\n";
+      }
+
+      if (next_sample_time < next_ext_event_time) {
+        // no op
+      } else if (next_sample_time == next_ext_event_time) {
+        system_.ConvertLeafCompositeEventCollection(haha, ext_events.get());
+        timed_events->Merge(*ext_events);
+      } else {
+        system_.ConvertLeafCompositeEventCollection(haha, ext_events.get());
+        timed_events->SetFrom(*ext_events);
+        next_sample_time = next_ext_event_time;
+      }
+    }
 
     DRAKE_DEMAND(next_sample_time >= step_start_time);
 

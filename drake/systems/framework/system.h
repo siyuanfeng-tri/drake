@@ -572,6 +572,27 @@ class System {
     return time;
   }
 
+  T CalcNextExternalUpdateTime(
+      const Context<T>& context,
+      std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>* other_guys_stuff) const {
+    DRAKE_ASSERT_VOID(CheckValidContext(context));
+    DRAKE_DEMAND(other_guys_stuff != nullptr);
+    other_guys_stuff->clear();
+    T time;
+    DoCalcNextExternalUpdateTime(context, other_guys_stuff, &time);
+    return time;
+  }
+
+  void ConvertLeafCompositeEventCollection(
+      const std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>& flat_events,
+      CompositeEventCollection<T>* result) const {
+    DRAKE_DEMAND(result != nullptr);
+    result->Clear();
+    DoConvertLeafCompositeEventCollection(flat_events, result);
+  }
+
   /// This method is called by Simulator::Initialize() to gather all
   /// update and publish events that are to be handled in StepTo() at the point
   /// before Simulator integrates continuous state. It is assumed that these
@@ -985,6 +1006,15 @@ class System {
   void set_parent(const detail::InputPortEvaluatorInterface<T>* parent) {
     DRAKE_DEMAND(parent_ == nullptr || parent_ == parent);
     parent_ = parent;
+  }
+
+  const System<T>* get_parent_system() const {
+    return parent_system_;
+  }
+
+  void set_parent_system(const System<T>* parent) {
+    DRAKE_DEMAND(parent_system_ == nullptr || parent_system_ == parent);
+    parent_system_ = parent;
   }
   //@}
 
@@ -1453,6 +1483,22 @@ class System {
     *time = std::numeric_limits<T>::infinity();
   }
 
+  virtual void DoCalcNextExternalUpdateTime(
+      const Context<T>& context,
+      std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>* other_guys_stuff,
+          T* time) const {
+    unused(context, other_guys_stuff);
+    *time = std::numeric_limits<T>::infinity();
+  }
+
+  virtual void DoConvertLeafCompositeEventCollection(
+      const std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>& flat_events,
+      CompositeEventCollection<T>* result) const {
+    unused(flat_events, result);
+  }
+
   /// Implement this method to return any events to be handled before the
   /// simulator integrates the system's continuous state at each time step.
   /// @p events is cleared in the public non-virtual GetPerStepEvents()
@@ -1727,6 +1773,8 @@ class System {
   // Attorney-Client idiom to expose a subset of private elements of System.
   // Refer to SystemImpl comments for details.
   friend class SystemImpl;
+
+  const System<T>* parent_system_{nullptr};
 
   std::string name_;
   // input_ports_ and output_ports_ are vectors of unique_ptr so that references

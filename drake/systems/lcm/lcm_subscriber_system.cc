@@ -170,6 +170,54 @@ void LcmSubscriberSystem::DoCalcNextUpdateTime(
   }
 }
 
+void LcmSubscriberSystem::AddEventWhenReceive(
+    const System<double>* sys, const Event<double>& event) {
+  auto it = fire_when_receive_.find(sys);
+  if (it != fire_when_receive_.end()) {
+    event.add_to_composite(it->second.get());
+  } else {
+    auto composite_events = std::make_unique<LeafCompositeEventCollection<double>>();
+    event.add_to_composite(composite_events.get());
+    fire_when_receive_.emplace(sys, std::move(composite_events));
+  }
+}
+
+void LcmSubscriberSystem::DoCalcNextExternalUpdateTime(
+      const Context<double>& context,
+      std::unordered_map<const System<double>*,
+          std::unique_ptr<LeafCompositeEventCollection<double>>>* events,
+          double* time) const {
+  int last_message_count = GetMessageCount(context);
+
+  std::unique_lock<std::mutex> lock(received_message_mutex_);
+  // Has a new message. Schedule an update event.
+  if (last_message_count != received_message_count_) {
+
+    // This is tricky..
+    // I can't have this earlier than the scheduled time in DoCalcNextUpdateTime.
+    // If we do that, then the event I scheduled to update my internal state
+    // will be lost in the merge process, and last_message_count will never be
+    // updated. I can't have this after, because this event will be lost in the
+    // merge process.
+    *time = context.get_time() + 0.0001;
+
+    for (const auto& pair : fire_when_receive_) {
+      auto it = events->find(pair.first);
+      if (it == events->end()) {
+        auto composite_events = std::make_unique<LeafCompositeEventCollection<double>>();
+        composite_events->SetFrom(*pair.second);
+        events->emplace(pair.first, std::move(composite_events));
+      } else {
+        // I think this should never happen.
+        DRAKE_DEMAND(false);
+        it->second->Merge(*pair.second);
+      }
+    }
+  } else {
+    LeafSystem<double>::DoCalcNextExternalUpdateTime(context, events, time);
+  }
+}
+
 std::unique_ptr<DiscreteValues<double>>
 LcmSubscriberSystem::AllocateDiscreteState() const {
   // Only make discrete states if we are outputting vector values.

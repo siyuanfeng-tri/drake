@@ -37,8 +37,8 @@ QpInverseDynamicsSystem::QpInverseDynamicsSystem(
                                 &QpInverseDynamicsSystem::CopyOutDebugInfo)
           .get_index();
 
-  set_name("QpInverseDynamicsSystem");
-  DeclarePeriodicUnrestrictedUpdate(control_dt_, 0);
+  if (control_dt_ > 0)
+    DeclarePeriodicUnrestrictedUpdate(control_dt_, 0);
 
   abs_state_index_qp_output_ = DeclareAbstractState(
       systems::AbstractValue::Make<QpOutput>(QpOutput(GetDofNames(robot_))));

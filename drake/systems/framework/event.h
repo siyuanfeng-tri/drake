@@ -92,6 +92,8 @@ class Event {
      * WitnessFunction::AddEvent().
      */
     kWitness,
+
+    kExternal,
   };
 
   /**

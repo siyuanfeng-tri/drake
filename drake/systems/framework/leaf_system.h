@@ -327,6 +327,16 @@ class LeafSystem : public System<T> {
     DoCalcNextUpdateTimeImpl(context, events, time);
   }
 
+  void DoConvertLeafCompositeEventCollection(
+      const std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>& flat_events,
+      CompositeEventCollection<T>* result) const final {
+    auto it = flat_events.find(this);
+    if (it != flat_events.end()) {
+      result->SetFrom(*it->second);
+    }
+  }
+
   /// Allocates a vector that is suitable as an input value for @p descriptor.
   /// The default implementation in this class either clones the model_vector
   /// (if the port was declared via DeclareVectorInputPort) or else allocates a

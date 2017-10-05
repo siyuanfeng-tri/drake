@@ -137,6 +137,9 @@ class LcmSubscriberSystem : public LeafSystem<double>,
    */
   int GetMessageCount(const Context<double>& context) const;
 
+  void AddEventWhenReceive(const System<double>* other_system,
+      const Event<double>& event);
+
  protected:
   void DoCalcNextUpdateTime(const Context<double>& context,
                             systems::CompositeEventCollection<double>* events,
@@ -170,6 +173,12 @@ class LcmSubscriberSystem : public LeafSystem<double>,
                       const LcmAndVectorBaseTranslator* translator,
                       std::unique_ptr<SerializerInterface> serializer,
                       drake::lcm::DrakeLcmInterface* lcm);
+
+  void DoCalcNextExternalUpdateTime(
+      const Context<double>& context,
+      std::unordered_map<const System<double>*,
+          std::unique_ptr<LeafCompositeEventCollection<double>>>* other_guys_stuff,
+          double* time) const override;
 
   void ProcessMessageAndStoreToDiscreteState(
       DiscreteValues<double>* discrete_state) const;
@@ -216,6 +225,9 @@ class LcmSubscriberSystem : public LeafSystem<double>,
 
   // A message counter that's incremented every time the handler is called.
   int received_message_count_{0};
+
+  std::unordered_map<const System<double>*,
+      std::unique_ptr<LeafCompositeEventCollection<double>>> fire_when_receive_;
 };
 
 }  // namespace lcm

@@ -963,6 +963,14 @@ class Diagram : public System<T>,
     DoCalcNextUpdateTimeImpl(context, event_info, time);
   }
 
+  void DoCalcNextExternalUpdateTime(
+      const Context<T>& context,
+      std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>* other_guys_stuff,
+          T* time) const override {
+    DoCalcNextExternalUpdateTimeImpl(context, other_guys_stuff, time);
+  }
+
   BasicVector<T>* DoAllocateInputVector(
       const InputPortDescriptor<T>& descriptor) const override {
     // Ask the subsystem to perform the allocation.
@@ -1306,6 +1314,78 @@ class Diagram : public System<T>,
     }
   }
 
+  // Aborts for scalar types that are not numeric, since there is no reasonable
+  // definition of "next update time" outside of the real line.
+  //
+  // @tparam T1 SFINAE boilerplate for the scalar type. Do not set.
+  template <typename T1 = T>
+  typename std::enable_if<!is_numeric<T1>::value>::type
+  DoCalcNextExternalUpdateTimeImpl(
+      const Context<T1>&,
+      std::unordered_map<const System<T1>*,
+          std::unique_ptr<LeafCompositeEventCollection<T1>>>*,
+          T1*) const {
+    DRAKE_ABORT_MSG(
+        "The default implementation of Diagram<T>::DoCalcNextExternalUpdateTimeImpl "
+        "only works with types that are drake::is_numeric.");
+  }
+
+  // Computes the next update time across all the scheduled events, for
+  // scalar types that are numeric.
+  //
+  // @tparam T1 SFINAE boilerplate for the scalar type. Do not set.
+  template <typename T1 = T>
+  typename std::enable_if<is_numeric<T1>::value>::type DoCalcNextExternalUpdateTimeImpl(
+      const Context<T1>& context,
+      std::unordered_map<const System<T1>*,
+          std::unique_ptr<LeafCompositeEventCollection<T1>>>* all_ext_events,
+          T1* time) const {
+    auto diagram_context = dynamic_cast<const DiagramContext<T1>*>(&context);
+    DRAKE_DEMAND(diagram_context != nullptr);
+
+    T1 most_recent_time = std::numeric_limits<T1>::infinity();
+
+    for (int i = 0; i < num_subsystems(); ++i) {
+      const Context<T1>& subcontext = diagram_context->GetSubsystemContext(i);
+
+      // For every subsystem, get all the A schedule B type events.
+      std::unordered_map<const System<T1>*,
+          std::unique_ptr<LeafCompositeEventCollection<T1>>> temp;
+      // Everything in temp happens at new_time.
+      const T1 new_time = registered_systems_[i]->CalcNextExternalUpdateTime(subcontext,
+          &temp);
+
+      if (new_time < most_recent_time) {
+        all_ext_events->clear();
+        for (auto& pair : temp)
+          all_ext_events->emplace(pair.first, std::move(pair.second));
+        most_recent_time = new_time;
+      } else if (new_time == most_recent_time) {
+        for (auto& pair : temp)
+          all_ext_events->emplace(pair.first, std::move(pair.second));
+      } else {
+        // noop.
+      }
+    }
+    *time = most_recent_time;
+  }
+
+  void DoConvertLeafCompositeEventCollection(
+      const std::unordered_map<const System<T>*,
+          std::unique_ptr<LeafCompositeEventCollection<T>>>& flat_events,
+      CompositeEventCollection<T>* result) const final {
+
+    auto diagram_result = dynamic_cast<DiagramCompositeEventCollection<T>*>(result);
+    DRAKE_DEMAND(diagram_result != nullptr);
+
+    for (int i = 0; i < num_subsystems(); ++i) {
+      CompositeEventCollection<T>& subresult =
+          diagram_result->get_mutable_subevent_collection(i);
+      registered_systems_[i]->ConvertLeafCompositeEventCollection(
+          flat_events, &subresult);
+    }
+  }
+
   void DoGetPerStepEvents(
       const Context<T>& context,
       CompositeEventCollection<T>* event_info) const override {
@@ -1362,6 +1442,7 @@ class Diagram : public System<T>,
     for (int i = 0; i < num_subsystems(); ++i) {
       system_index_map_[registered_systems_[i].get()] = i;
       registered_systems_[i]->set_parent(this);
+      registered_systems_[i]->set_parent_system(this);
     }
 
     // Generate constraints for the diagram from the constraints on the

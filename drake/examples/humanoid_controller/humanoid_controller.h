@@ -46,12 +46,14 @@ class HumanoidController : public systems::Diagram<double> {
         builder.AddSystem(std::make_unique<RobotStateMsgToHumanoidStatusSystem>(
             robot_.get(), alias_group_path));
 
-    const double kControlDt = 0.003;
+    //const double kControlDt = 0.003;
     plan_eval_ = builder.AddSystem(std::make_unique<HumanoidPlanEvalSystem>(
-        robot_.get(), alias_group_path, control_config_path, kControlDt));
+        robot_.get(), alias_group_path, control_config_path, 0));
+        //robot_.get(), alias_group_path, control_config_path, kControlDt));
 
     QpInverseDynamicsSystem* qp_con = builder.AddSystem(
-        std::make_unique<QpInverseDynamicsSystem>(robot_.get(), kControlDt));
+        std::make_unique<QpInverseDynamicsSystem>(robot_.get(), 0));
+        //std::make_unique<QpInverseDynamicsSystem>(robot_.get(), kControlDt));
 
     // TODO(siyuan): bot_core::atlas_command_t is very specific to the Atlas
     // humanoid. Consider switch to another more generic message type.
@@ -91,6 +93,17 @@ class HumanoidController : public systems::Diagram<double> {
                     atlas_command_publisher->get_input_port(0));
 
     builder.BuildInto(this);
+
+    // Add the inter system wires.
+    robot_state_subscriber_->AddEventWhenReceive(plan_eval_,
+        systems::UnrestrictedUpdateEvent<double>(
+            systems::Event<double>::TriggerType::kExternal));
+    robot_state_subscriber_->AddEventWhenReceive(qp_con,
+        systems::UnrestrictedUpdateEvent<double>(
+            systems::Event<double>::TriggerType::kExternal));
+    robot_state_subscriber_->AddEventWhenReceive(atlas_command_publisher,
+        systems::PublishEvent<double>(
+            systems::Event<double>::TriggerType::kExternal));
   }
 
   /**

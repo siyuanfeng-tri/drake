@@ -66,11 +66,13 @@ void LcmDrivenLoop::RunToSecondsAssumingInitialized(double stop_time) {
 
     stepper_->StepTo(msg_time);
 
+    /*
     // Explicitly publish after we are done with all the intermediate
     // computation.
     if (publish_on_every_received_message_) {
       system_.Publish(stepper_->get_context());
     }
+    */
   }
 }
 
