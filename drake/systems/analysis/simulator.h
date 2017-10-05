@@ -558,6 +558,13 @@ void Simulator<T>::StepTo(const T& boundary_time) {
       const T next_ext_event_time =
           system_.CalcNextExternalUpdateTime(*context_, &flat_external_events);
 
+      if (!flat_external_events.empty()) {
+        for (const auto& pair : flat_external_events) {
+          std::cout << pair.first->get_name() << "\n";
+        }
+        std::cout << "now: " << context_->get_time() << ", next_ext_event_time: " << next_ext_event_time << "\n";
+      }
+
       // Now we need to merge flat_external_events with timed_events.
       if (next_sample_time < next_ext_event_time) {
         // no op
