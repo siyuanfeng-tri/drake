@@ -67,9 +67,6 @@ void InverseDynamics<T>::CalcOutputTorque(const Context<T>& context,
       cache, f_ext, desired_vd,
       !pure_gravity_compensation_ /* include v dependent terms */);
 
-  std::cout << "desired_vd: " << desired_vd.transpose() << "\n";
-  std::cout << "trq: " << torque.transpose() << "\n";
-
   DRAKE_ASSERT(torque.size() == output->size());
   output->get_mutable_value() = torque;
 }

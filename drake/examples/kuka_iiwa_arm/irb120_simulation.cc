@@ -60,14 +60,13 @@ int DoMain() {
   // Adds a plant.
   RigidBodyPlant<double>* plant = nullptr;
   const std::string kModelPath =
-      "/home/sfeng/code/drake5/drake/manipulation/models/irb120/urdf/irb120_3_58.urdf";
-      // "/home/sfeng/code/drake5/drake/examples/irb140/urdf/irb_140_convhull.urdf";
+      //"/home/sfeng/code/drake5/drake/manipulation/models/irb120/urdf/irb120_3_58.urdf";
+      "/home/jjz/robot_works/externals/drake/drake/manipulation/models/irb120/urdf/irb120_3_58.urdf";
   {
     auto tree = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
         kModelPath, multibody::joints::kFixed, tree.get());
 
-    std::cout << tree->get_num_positions() << ", " << tree->get_num_actuators() << "\n\n";
     plant = builder.AddPlant(std::move(tree));
   }
   // Creates and adds LCM publisher for visualization.
@@ -78,16 +77,12 @@ int DoMain() {
   const int num_joints = tree.get_num_positions();
 
   // Adds a iiwa controller
-  VectorX<double> iiwa_kp = VectorX<double>::Constant(num_joints, 10);
-  iiwa_kp.tail(3) << 1, 1, 1;
+  VectorX<double> iiwa_kp = VectorX<double>::Constant(num_joints, 30);
   VectorX<double> iiwa_kd(num_joints);
   for (int i = 0; i < num_joints; i++)
     iiwa_kd[i] = 1 * std::sqrt(iiwa_kp[i]);
-  VectorX<double> iiwa_ki = VectorX<double>::Zero(num_joints);
 
-  std::cout << iiwa_kp.transpose() << "\n";
-  std::cout << iiwa_kd.transpose() << "\n";
-  std::cout << iiwa_ki.transpose() << "\n";
+  VectorX<double> iiwa_ki = VectorX<double>::Constant(num_joints, 0);
 
   auto controller = builder.AddController<
       systems::controllers::InverseDynamicsController<double>>(
