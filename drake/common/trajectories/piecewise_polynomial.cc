@@ -430,6 +430,100 @@ static int sign(CoefficientType val, CoefficientType tol) {
   return 0;
 }
 
+template <typename CoefficientType>
+PiecewisePolynomial<CoefficientType>
+PiecewisePolynomial<CoefficientType>::Trapezoidal(
+    const std::vector<double>& breaks,
+    const std::vector<CoefficientMatrix>& knots) {
+  // Demand four critical time points.
+  DRAKE_DEMAND(breaks.size() == 4);
+  CheckSplineGenerationInputValidityOrThrow(breaks, knots, 2);
+
+  std::vector<PolynomialMatrix> polys;
+  polys.reserve(breaks.size() - 1);
+  for (int i = 0; i < static_cast<int>(breaks.size()) - 1; ++i) {
+    PolynomialMatrix poly_matrix(knots[0].rows(), knots[0].cols());
+    double dt = breaks[i+1] - breaks[i];
+    for (int j = 0; j < knots[i].rows(); ++j) {
+      for (int k = 0; k < knots[i].cols(); ++k) {
+        if (i==0) {
+          // The first piece is constant acceleration.
+          double acceleration = 
+              (knots[i+1](j,k) - knots[i](j,k)) * 2.0 / (dt * dt); 
+          poly_matrix(j, k) = 
+              PolynomialType(Eigen::Matrix<CoefficientType, 3, 1>(
+              knots[i](j, k), 0, 0.5 * acceleration));
+        } else if (i==1) {
+          // The second piece is constant velocity.
+          double velocity = (knots[i+1](j,k) - knots[i](j,k)) / dt;
+          double velocity_prev = 2 * (knots[i](j,k) - knots[i-1](j,k)) / 
+              (breaks[i] - breaks[i-1]);
+          // Check for continuity of velocity.
+          DRAKE_DEMAND(fabs(velocity - velocity_prev) < 1e-3);
+          poly_matrix(j,k) = 
+              PolynomialType(Eigen::Matrix<CoefficientType, 2, 1>(
+              knots[i](j, k), velocity));              
+        } else {
+          // The third piece is constant deacceleration.
+          double velocity_prev = (knots[i](j,k) - knots[i-1](j,k)) / 
+              (breaks[i] - breaks[i-1]);
+          double acceleration = 
+              ((knots[i+1](j,k) - knots[i](j,k)) - velocity_prev * dt) * 2.0 /
+              (dt * dt);
+          poly_matrix(j, k) = 
+              PolynomialType(Eigen::Matrix<CoefficientType, 3, 1>(
+              knots[i](j, k), velocity_prev, 0.5 * acceleration));
+
+        }
+      }
+    }
+    polys.push_back(poly_matrix);
+  }
+  return PiecewisePolynomial<CoefficientType>(polys, breaks);  
+}
+
+template <typename CoefficientType>
+PiecewisePolynomial<CoefficientType>
+PiecewisePolynomial<CoefficientType>::BangbangAcceleration(
+    const std::vector<double>& breaks,
+    const std::vector<CoefficientMatrix>& knots) {
+  // Demand four critical time points.
+  DRAKE_DEMAND(breaks.size() == 3);
+  CheckSplineGenerationInputValidityOrThrow(breaks, knots, 2);
+
+  std::vector<PolynomialMatrix> polys;
+  polys.reserve(breaks.size() - 1);
+  for (int i = 0; i < static_cast<int>(breaks.size()) - 1; ++i) {
+    PolynomialMatrix poly_matrix(knots[0].rows(), knots[0].cols());
+    double dt = breaks[i+1] - breaks[i];
+    for (int j = 0; j < knots[i].rows(); ++j) {
+      for (int k = 0; k < knots[i].cols(); ++k) {
+        if (i==0) {
+          // The first piece is constant acceleration.
+          double acceleration = 
+              (knots[i+1](j,k) - knots[i](j,k)) * 2.0 / (dt * dt); 
+          poly_matrix(j, k) = 
+              PolynomialType(Eigen::Matrix<CoefficientType, 3, 1>(
+              knots[i](j, k), 0, 0.5 * acceleration));
+        } else if (i==1) {
+          // The second piece is constant deacceleration.
+          double velocity_prev = 2 * (knots[i](j,k) - knots[i-1](j,k)) / 
+              (breaks[i] - breaks[i-1]);
+          double acceleration = 
+              ((knots[i+1](j,k) - knots[i](j,k)) - velocity_prev * dt) * 2.0 /
+              (dt * dt);
+          poly_matrix(j, k) = 
+              PolynomialType(Eigen::Matrix<CoefficientType, 3, 1>(
+              knots[i](j, k), velocity_prev, 0.5 * acceleration));
+        } 
+      }
+    }
+    polys.push_back(poly_matrix);
+  }
+  return PiecewisePolynomial<CoefficientType>(polys, breaks);  
+}
+
+
 // Computes the first derivative for either the starting or the end knot point.
 // This is an internal helpful function for pchip.
 // The first derivative is computed using a non-centered, shape-preserving
