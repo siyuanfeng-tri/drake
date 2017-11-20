@@ -101,6 +101,27 @@ class PiecewisePolynomial final : public PiecewisePolynomialBase {
       const std::vector<CoefficientMatrix>& knots);
 
   /**
+   * Constructs a trapezoidal trajectory. The robots accelerates from zero 
+   * velocity and then maintains constant velocity before finally 
+   * deaccelerate to zero velocity.
+   * The first piece is a quadratic trajectory with constant acceleration 
+   * until maximum velocity.
+   * The second piece is a linear trajectory with constant maximum velocity.
+   * The third piece is a mirror of the first with constant deacceleration 
+   * until zero velocity. 
+   */
+  static PiecewisePolynomial<CoefficientType> Trapezoidal(
+      const std::vector<double>& breaks,
+      const std::vector<CoefficientMatrix>& knots);
+  /**
+   * Constructs a bang-bang (triangular shaped profile) trajectory. The robot
+   * accelerates to a certain velocity and then deaccelerates to zero velocity.
+   */
+  static PiecewisePolynomial<CoefficientType> BangbangAcceleration(
+      const std::vector<double>& breaks,
+      const std::vector<CoefficientMatrix>& knots);
+
+  /**
    * Constructs a third order PiecewisePolynomial from `breaks` and `knots`.
    * First derivatives are chosen to be "shape preserving", i.e. if
    * `knots` is monotonic within some interval, the interpolated data will
