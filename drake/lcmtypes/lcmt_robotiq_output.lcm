@@ -1,0 +1,11 @@
+package drake;
+
+struct lcmt_robotiq_output
+{
+  byte rACT;
+  byte rGTO;
+  byte rATR;
+  byte rPR;
+  byte rSP;
+  byte rFR;
+}

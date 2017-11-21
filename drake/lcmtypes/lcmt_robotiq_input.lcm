@@ -1,0 +1,13 @@
+package drake;
+
+struct lcmt_robotiq_input
+{
+  byte gACT; 
+  byte gGTO; 
+  byte gSTA; 
+  byte gOBJ; 
+  byte gFLT;
+  byte gPR;
+  byte gPO;
+  byte gCU;
+}
