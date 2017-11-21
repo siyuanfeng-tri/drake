@@ -260,6 +260,15 @@ drake_lcm_cc_library(
 )
 
 drake_lcm_cc_library(
+    name = "robotiq",
+    lcm_package = "drake",
+    lcm_srcs = [
+        "lcmt_robotiq_input.lcm",
+        "lcmt_robotiq_output.lcm",
+    ],
+)
+
+drake_lcm_cc_library(
     name = "schunk",
     lcm_package = "drake",
     lcm_srcs = [
@@ -328,6 +337,7 @@ DRAKE_LCMTYPES = [
     ":whole_body_data",
     ":zmp_data",
     ":zmp_com_observer_state",
+    ":robotiq",
 ]
 
 # This rule should list every LCM type that is known to Drake or its external
