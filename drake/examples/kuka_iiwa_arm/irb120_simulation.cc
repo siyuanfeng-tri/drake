@@ -92,14 +92,14 @@ int DoMain() {
   // Create the command subscriber and status publisher.
   systems::DiagramBuilder<double>* base_builder = builder.get_mutable_builder();
   auto command_sub = base_builder->AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IIWA_COMMAND",
+      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_command>("IRB120_COMMAND",
                                                                  &lcm));
   command_sub->set_name("command_subscriber");
   auto command_receiver =
       base_builder->AddSystem<IiwaCommandReceiver>(num_joints);
   command_receiver->set_name("command_receiver");
   auto status_pub = base_builder->AddSystem(
-      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>("IIWA_STATUS",
+      systems::lcm::LcmPublisherSystem::Make<lcmt_iiwa_status>("IRB120_STATUS",
                                                                &lcm));
   status_pub->set_name("status_publisher");
   status_pub->set_publish_period(kIiwaLcmStatusPeriod);

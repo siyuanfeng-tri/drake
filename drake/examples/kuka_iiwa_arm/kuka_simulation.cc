@@ -129,6 +129,7 @@ int DoMain() {
   base_builder->Connect(status_sender->get_output_port(0),
                         status_pub->get_input_port(0));
 
+  /*
   if (FLAGS_visualize_frames) {
     // TODO(sam.creasey) This try/catch block is here because even
     // though RigidBodyTree::FindBody returns a pointer and could return
@@ -157,6 +158,7 @@ int DoMain() {
       return 1;
     }
   }
+  */
 
   auto sys = builder.Build();
 
