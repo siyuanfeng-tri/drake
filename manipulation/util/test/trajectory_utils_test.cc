@@ -246,5 +246,37 @@ TEST_F(PiecewiseCartesianTrajectoryTest, TestIsApprox) {
   }
 }
 
+GTEST_TEST(SingleSegmentCartesianTrajectoryTest, SingleSegmentCartesianTrajectoryTest) {
+  Isometry3<double> X0(AngleAxis<double>(0.3, Vector3<double>(0, 1, 2).normalized()));
+  Isometry3<double> X1(AngleAxis<double>(-0.3, Vector3<double>(0, 1, 2).normalized()));
+
+  const double t0 = 0;
+  const double t1 = 1.2;
+  const double dt = 0.01;
+
+  SingleSegmentCartesianTrajectory<double> traj(X0, X1,
+      Vector3<double>::Zero(), Vector3<double>::Zero(),
+      0, 0,
+      t0, t1);
+
+
+  std::cout << "X0:\n" << X0.matrix() << "\n";
+  std::cout << "X1:\n" << X1.matrix() << "\n";
+
+  std::vector<double> T = {t0 - 0.1, (t0 + t1) / 2., t1 + 0.1};
+
+  for (double t : T) {
+    std::cout << "X(" << t <<"):\n" << traj.get_pose(t).matrix() << "\n";
+    std::cout << "V(" << t <<"): "  << traj.get_velocity(t).transpose() << "\n";
+    std::cout << "Vd(" << t <<"): "  << traj.get_acceleration(t).transpose() << "\n";
+  }
+
+  /*
+  for (int t = t0; t <= t1; t += dt) {
+    Isometry3<double> X = traj.get_pose(t);
+  }
+  */
+}
+
 }  // namespace manipulation
 }  // namespace drake
