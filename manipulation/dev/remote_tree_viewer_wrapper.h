@@ -61,6 +61,11 @@ class RemoteTreeViewerWrapper {
                        const Eigen::Affine3d& tf, const Eigen::Vector4d& color,
                        const std::vector<std::string>& path);
 
+  void UpdateRigidBodyTree(const RigidBodyTree<double>& tree,
+                           const Eigen::VectorXd& q,
+                           const std::vector<std::string>& path, bool visual);
+  void UpdateRigidBody(const Eigen::Affine3d& tf,
+                       const std::vector<std::string>& path);
  private:
   drake::lcm::DrakeLcm* lcm_{};
   std::unique_ptr<drake::lcm::DrakeLcm> owned_lcm_{};

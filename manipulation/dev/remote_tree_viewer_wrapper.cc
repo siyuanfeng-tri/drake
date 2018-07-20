@@ -205,8 +205,9 @@ void RemoteTreeViewerWrapper::PublishRigidBody(
     for (const auto& element : body.get_visual_elements()) {
       if (element.hasGeometry()) {
         std::vector<std::string> full_name = path;
-        full_name.push_back(body.get_name() + "_visual_" +
-                            std::to_string(ctr++));
+        full_name.push_back(body.get_name());
+        full_name.push_back("visual");
+        full_name.push_back(std::to_string(ctr++));
         PublishGeometry(element.getGeometry(), tf * element.getLocalTransform(),
                         color, full_name);
       }
@@ -217,13 +218,54 @@ void RemoteTreeViewerWrapper::PublishRigidBody(
       auto element = tree.FindCollisionElement(collision_elem_id);
       if (element->hasGeometry()) {
         std::vector<std::string> full_name = path;
-        full_name.push_back(body.get_name() + "_collision_" +
-                            std::to_string(ctr++));
+        full_name.push_back(body.get_name());
+        full_name.push_back("collision");
+        full_name.push_back(std::to_string(ctr++));
         PublishGeometry(element->getGeometry(),
                         tf * element->getLocalTransform(), color, full_name);
       }
     }
   }
+}
+
+void RemoteTreeViewerWrapper::UpdateRigidBodyTree(
+    const RigidBodyTree<double>& tree,
+    const Eigen::VectorXd& q,
+    const std::vector<std::string>& path, bool visual) {
+  auto kinematics_cache = tree.doKinematics(q);
+  for (int i = 0; i < tree.get_num_bodies(); ++i) {
+    const auto& body = tree.get_body(i);
+    std::vector<std::string> full_name = path;
+    full_name.push_back(body.get_name());
+    UpdateRigidBody(tree.relativeTransform(kinematics_cache, 0, i), path);
+  }
+}
+
+void RemoteTreeViewerWrapper::UpdateRigidBody(
+    const Eigen::Affine3d& tf,
+    const std::vector<std::string>& path) {
+  int64_t now = GetUnixTime() * 1000 * 1000;
+  // Extract std::vector-formatted translation and quaternion from the tf
+  std::vector<double> translation = {tf.translation()[0], tf.translation()[1],
+                                     tf.translation()[2]};
+  Eigen::Quaterniond q(tf.rotation());
+  std::vector<double> rotation = {q.w(), q.x(), q.y(), q.z()};
+
+  // Format a JSON string to update the transform for @p path
+  json j = {
+            {
+                "setgeometry", json({}),
+            },
+            {"settransform",
+             {{{"path", path},
+               {"transform",
+                {{"translation", translation}, {"quaternion", rotation}}}}}},
+            {"delete", json({})}};
+
+  auto msg = lcmt_viewer2_comms();
+  FillLcmView2CommsMessage(now, j, &msg);
+  // Use channel 0 for remote viewer communications.
+  lcm_->get_lcm_instance()->publish("DIRECTOR_TREE_VIEWER_REQUEST_<0>", &msg);
 }
 
 void RemoteTreeViewerWrapper::PublishGeometry(
