@@ -72,7 +72,8 @@ class SchunkWsgTrajectoryGenerator : public systems::LeafSystem<double> {
   std::unique_ptr<systems::DiscreteValues<double>> AllocateDiscreteState()
       const override;
 
-  void UpdateTrajectory(double cur_position, double target_position) const;
+  void UpdateTrajectory(
+      double cur_position, double target_position, double t0) const;
 
   /// The minimum change between the last received command and the
   /// current command to trigger a trajectory update.  Based on

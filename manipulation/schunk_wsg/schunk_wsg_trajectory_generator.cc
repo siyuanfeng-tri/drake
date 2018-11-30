@@ -43,8 +43,7 @@ void SchunkWsgTrajectoryGenerator::OutputTarget(
           &context.get_discrete_state(0));
 
   if (trajectory_) {
-    output->get_mutable_value() = trajectory_->value(
-        context.get_time() - traj_state->trajectory_start_time());
+    output->get_mutable_value() = trajectory_->value(context.get_time());
   } else {
     output->get_mutable_value() =
         Eigen::Vector2d(traj_state->last_position(), 0);
@@ -90,14 +89,11 @@ void SchunkWsgTrajectoryGenerator::DoCalcDiscreteVariableUpdates(
 
   if (std::abs(last_traj_state->last_target_position() - target_position) >
       kTargetEpsilon) {
-    UpdateTrajectory(cur_position, target_position);
+    UpdateTrajectory(cur_position, target_position, context.get_time());
     new_traj_state->set_last_target_position(target_position);
-    new_traj_state->set_trajectory_start_time(context.get_time());
   } else {
     new_traj_state->set_last_target_position(
         last_traj_state->last_target_position());
-    new_traj_state->set_trajectory_start_time(
-        last_traj_state->trajectory_start_time());
   }
 }
 
@@ -108,7 +104,7 @@ SchunkWsgTrajectoryGenerator::AllocateDiscreteState() const {
 }
 
 void SchunkWsgTrajectoryGenerator::UpdateTrajectory(
-    double cur_position, double target_position) const {
+    double cur_position, double target_position, double t0) const {
   // The acceleration and velocity limits correspond to the maximum
   // values available for manual control through the gripper's web
   // interface.
@@ -123,7 +119,7 @@ void SchunkWsgTrajectoryGenerator::UpdateTrajectory(
   std::vector<Eigen::MatrixXd> knots;
   std::vector<double> times;
   knots.push_back(Eigen::Vector2d(cur_position, 0));
-  times.push_back(0);
+  times.push_back(t0);
 
   const double direction = (cur_position < target_position) ? 1 : -1;
   const double delta = std::abs(target_position - cur_position);
@@ -144,24 +140,24 @@ void SchunkWsgTrajectoryGenerator::UpdateTrajectory(
     const double mid_time = mid_velocity / kMaxAccel;
     knots.push_back(Eigen::Vector2d(cur_position + mid_distance * direction,
                                     mid_velocity * direction));
-    times.push_back(mid_time);
+    times.push_back(t0 + mid_time);
     knots.push_back(Eigen::Vector2d(target_position, 0));
-    times.push_back(mid_time * 2);
+    times.push_back(t0 + mid_time * 2);
   } else {
     knots.push_back(
         Eigen::Vector2d(cur_position + (kDistanceToMaxVelocity * direction),
                         kMaxVelocity * direction));
-    times.push_back(kTimeToMaxVelocity);
+    times.push_back(t0 + kTimeToMaxVelocity);
 
     const double time_at_max =
         (delta - 2 * kDistanceToMaxVelocity) / kMaxVelocity;
     knots.push_back(
         Eigen::Vector2d(target_position - (kDistanceToMaxVelocity * direction),
                         kMaxVelocity * direction));
-    times.push_back(kTimeToMaxVelocity + time_at_max);
+    times.push_back(t0 + kTimeToMaxVelocity + time_at_max);
 
     knots.push_back(Eigen::Vector2d(target_position, 0));
-    times.push_back(kTimeToMaxVelocity + time_at_max + kTimeToMaxVelocity);
+    times.push_back(t0 + kTimeToMaxVelocity + time_at_max + kTimeToMaxVelocity);
   }
   trajectory_.reset(new trajectories::PiecewisePolynomial<double>(
       trajectories::PiecewisePolynomial<double>::FirstOrderHold(times, knots)));
