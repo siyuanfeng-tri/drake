@@ -8,6 +8,7 @@
 #include "drake/geometry/dev/scene_graph.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_constants.h"
 #include "drake/manipulation/schunk_wsg/schunk_wsg_position_controller.h"
+#include "drake/manipulation/schunk_wsg/schunk_wsg_trajectory_generator.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/math/rotation_matrix.h"
 #include "drake/multibody/multibody_tree/joints/prismatic_joint.h"
@@ -20,6 +21,7 @@
 #include "drake/systems/primitives/constant_vector_source.h"
 #include "drake/systems/primitives/demultiplexer.h"
 #include "drake/systems/primitives/discrete_derivative.h"
+#include "drake/systems/primitives/gain.h"
 #include "drake/systems/primitives/linear_system.h"
 #include "drake/systems/primitives/matrix_gain.h"
 #include "drake/systems/primitives/pass_through.h"
@@ -367,6 +369,14 @@ void ManipulationStation<T>::Finalize() {
 
   {
     const double wsg_update_period = 0.05;
+
+    auto wsg_trajectory_generator =
+        builder.template AddSystem<
+            manipulation::schunk_wsg::SchunkWsgTrajectoryGenerator>(2, 0);
+    auto demux = builder.template AddSystem<systems::Demultiplexer>(2, 1);
+    builder.Connect(wsg_trajectory_generator->get_target_output_port(),
+                    demux->get_input_port(0));
+
     auto wsg_controller = builder.template AddSystem<
         manipulation::schunk_wsg::SchunkWsgPositionController>(
         wsg_update_period, wsg_kp_, wsg_kd_);
@@ -377,7 +387,22 @@ void ManipulationStation<T>::Finalize() {
     builder.Connect(plant_->get_continuous_state_output_port(wsg_model_),
                     wsg_controller->get_state_input_port());
 
+    auto flip = builder.template AddSystem<systems::Gain<double>>(-1, 1);
+    builder.Connect(demux->get_output_port(0),
+                    flip->get_input_port());
+    builder.Connect(flip->get_output_port(),
+                    wsg_controller->get_desired_position_input_port());
+
+    auto zero = builder.template AddSystem<systems::ConstantVectorSource<double>>(
+        0);
+    builder.Connect(zero->get_output_port(),
+                    wsg_trajectory_generator->get_force_limit_input_port());
+
+    /*
     builder.ExportInput(wsg_controller->get_desired_position_input_port(),
+                        "wsg_position");
+    */
+    builder.ExportInput(wsg_trajectory_generator->get_desired_position_input_port(),
                         "wsg_position");
     builder.ExportInput(wsg_controller->get_force_limit_input_port(),
                         "wsg_force_limit");
@@ -392,6 +417,12 @@ void ManipulationStation<T>::Finalize() {
 
     builder.ExportOutput(wsg_controller->get_grip_force_output_port(),
                          "wsg_force_measured");
+
+    auto flip2 = builder.template AddSystem<systems::Gain<double>>(-0.5, 2);
+    builder.Connect(wsg_mbp_state_to_wsg_state->get_output_port(),
+                    flip2->get_input_port());
+    builder.Connect(flip2->get_output_port(),
+                    wsg_trajectory_generator->get_state_input_port());
   }
 
   builder.ExportOutput(
@@ -437,6 +468,8 @@ void ManipulationStation<T>::Finalize() {
                        "contact_results");
   builder.ExportOutput(plant_->get_continuous_state_output_port(),
                        "plant_continuous_state");
+  builder.ExportOutput(plant_->get_geometry_poses_output_port(),
+                       "geometry_poses");
 
   builder.BuildInto(this);
 }

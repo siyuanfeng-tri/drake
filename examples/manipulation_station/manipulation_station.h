@@ -55,6 +55,7 @@ enum class IiwaCollisionModel { kNoCollision, kBoxCollision };
 ///   @output_port{<b style="color:orange">pose_bundle</b>}
 ///   @output_port{<b style="color:orange">contact_results</b>}
 ///   @output_port{<b style="color:orange">plant_continuous_state</b>}
+///   @output_port{<b style="color:orange">geometry_poses</b>}
 /// }
 ///
 /// Note that outputs in <b style="color:orange">orange</b> are

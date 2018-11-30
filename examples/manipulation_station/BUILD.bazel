@@ -33,6 +33,7 @@ drake_cc_library(
         "//geometry/dev:scene_graph",
         "//manipulation/schunk_wsg:schunk_wsg_constants",
         "//manipulation/schunk_wsg:schunk_wsg_position_controller",
+        "//manipulation/schunk_wsg:schunk_wsg_trajectory_generator",
         "//math:geometric_transform",
         "//multibody/multibody_tree/multibody_plant",
         "//multibody/multibody_tree/parsing:multibody_plant_sdf_parser",
