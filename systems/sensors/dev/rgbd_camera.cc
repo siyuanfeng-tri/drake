@@ -1,4 +1,3 @@
-
 #include "drake/systems/sensors/dev/rgbd_camera.h"
 
 #include <algorithm>
