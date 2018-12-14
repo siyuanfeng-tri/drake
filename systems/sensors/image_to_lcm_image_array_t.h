@@ -66,6 +66,11 @@ class ImageToLcmImageArrayT : public systems::LeafSystem<double> {
         name, systems::Value<Image<kPixelType>>());
   }
 
+  static void PackImageToLcmImageT(
+      const AbstractValue& untyped_image, PixelType pixel_type, int64_t utime,
+      const std::string& frame_name, robotlocomotion::image_t* msg,
+      bool do_compress);
+
  private:
   void CalcImageArray(const systems::Context<double>& context,
                       robotlocomotion::image_array_t* msg) const;

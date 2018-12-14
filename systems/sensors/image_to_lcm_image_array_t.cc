@@ -53,8 +53,8 @@ void Pack(const Image<kPixelType>& image, image_t* msg) {
 }
 
 template <PixelType kPixelType>
-void PackImageToLcmImageT(const Image<kPixelType>& image, image_t* msg,
-                          bool do_compress) {
+void PackImage(const Image<kPixelType>& image, image_t* msg,
+               bool do_compress) {
   // TODO(kunimatsu-tri) Fix seq here that is always set to zero.
   msg->header.seq = 0;
   msg->width = image.width();
@@ -69,67 +69,6 @@ void PackImageToLcmImageT(const Image<kPixelType>& image, image_t* msg,
     Compress(image, msg);
   } else {
     Pack(image, msg);
-  }
-}
-
-void PackImageToLcmImageT(const AbstractValue& untyped_image,
-                          PixelType pixel_type, int64_t utime,
-                          const string& frame_name, image_t* msg,
-                          bool do_compress) {
-  msg->header.utime = utime;
-  msg->header.frame_name = frame_name;
-
-  switch (pixel_type) {
-    case PixelType::kRgb8U: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kRgb8U>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kBgr8U: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kBgr8U>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kRgba8U: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kRgba8U>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kBgra8U: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kBgra8U>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kGrey8U: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kGrey8U>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kDepth16U: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kDepth16U>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kDepth32F: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kDepth32F>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kLabel16I: {
-      const auto& image_value =
-          untyped_image.GetValue<Image<PixelType::kLabel16I>>();
-      PackImageToLcmImageT(image_value, msg, do_compress);
-      break;
-    }
-    case PixelType::kExpr:
-      DRAKE_ABORT_MSG("PixelType::kExpr is not supported.");
   }
 }
 
@@ -195,6 +134,66 @@ void ImageToLcmImageArrayT::CalcImageArray(
                          &image_msg, do_compress_);
     msg->images.push_back(image_msg);
     msg->num_images++;
+  }
+}
+
+void ImageToLcmImageArrayT::PackImageToLcmImageT(
+    const AbstractValue& untyped_image, PixelType pixel_type, int64_t utime,
+    const string& frame_name, image_t* msg, bool do_compress) {
+  msg->header.utime = utime;
+  msg->header.frame_name = frame_name;
+
+  switch (pixel_type) {
+    case PixelType::kRgb8U: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kRgb8U>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kBgr8U: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kBgr8U>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kRgba8U: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kRgba8U>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kBgra8U: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kBgra8U>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kGrey8U: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kGrey8U>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kDepth16U: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kDepth16U>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kDepth32F: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kDepth32F>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kLabel16I: {
+      const auto& image_value =
+          untyped_image.GetValue<Image<PixelType::kLabel16I>>();
+      PackImage(image_value, msg, do_compress);
+      break;
+    }
+    case PixelType::kExpr:
+      DRAKE_ABORT_MSG("PixelType::kExpr is not supported.");
   }
 }
 
