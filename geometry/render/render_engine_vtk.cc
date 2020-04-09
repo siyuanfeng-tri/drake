@@ -221,6 +221,7 @@ void RenderEngineVtk::RenderLabelImage(const CameraProperties& camera,
       color.r = image.at(u, v)[0];
       color.g = image.at(u, v)[1];
       color.b = image.at(u, v)[2];
+      // label_image_out->at(u, v)[0] = color.r;
       label_image_out->at(u, v)[0] = RenderEngine::LabelFromColor(color);
     }
   }
@@ -508,21 +509,6 @@ void RenderEngineVtk::ImplementGeometry(vtkPolyDataAlgorithm* source,
     pipelines_[image_type]->renderer->AddActor(actors[image_type].Get());
   };
 
-  // Label actor.
-  const RenderLabel label = GetRenderLabelOrThrow(data.properties);
-  if (label != RenderLabel::kDoNotRender) {
-    // NOTE: We only configure the label actor if it doesn't have to "do not
-    // render" label applied. We *have* created an actor and connected it to
-    // a mapper; but otherwise, we leave it disconnected.
-    auto& label_actor = actors[ImageType::kLabel];
-    // This is to disable shadows and to get an object painted with a single
-    // color.
-    label_actor->GetProperty()->LightingOff();
-    const auto color = RenderEngine::GetColorDFromLabel(label);
-    label_actor->GetProperty()->SetColor(color.r, color.g, color.b);
-    connect_actor(ImageType::kLabel);
-  }
-
   // Color actor.
   auto& color_actor = actors[ImageType::kColor];
   const std::string& diffuse_map_name =
@@ -568,6 +554,40 @@ void RenderEngineVtk::ImplementGeometry(vtkPolyDataAlgorithm* source,
     color_actor->GetProperty()->SetColor(diffuse(0), diffuse(1), diffuse(2));
     color_actor->GetProperty()->SetOpacity(diffuse(3));
   }
+
+  // Label actor.
+  const RenderLabel label = GetRenderLabelOrThrow(data.properties);
+  if (label != RenderLabel::kDoNotRender) {
+    // NOTE: We only configure the label actor if it doesn't have to "do not
+    // render" label applied. We *have* created an actor and connected it to
+    // a mapper; but otherwise, we leave it disconnected.
+    auto& label_actor = actors[ImageType::kLabel];
+    // This is to disable shadows and to get an object painted with a single
+    // color.
+    label_actor->GetProperty()->LightingOff();
+
+    std::string mask_texture_name;
+    if (file_exist) {
+      mask_texture_name = RemoveFileExtension(diffuse_map_name) + "_mask.png";
+      std::ifstream mask_texture(mask_texture_name);
+      if (!mask_texture) mask_texture_name = {};
+    }
+
+    if (mask_texture_name.empty()) {
+      const auto color = RenderEngine::GetColorDFromLabel(label);
+      label_actor->GetProperty()->SetColor(color.r, color.g, color.b);
+    } else {
+      vtkNew<vtkPNGReader> texture_reader;
+      texture_reader->SetFileName(mask_texture_name.c_str());
+      texture_reader->Update();
+      vtkNew<vtkOpenGLTexture> texture;
+      texture->SetInputConnection(texture_reader->GetOutputPort());
+      texture->InterpolateOn();
+      label_actor->SetTexture(texture.Get());
+    }
+    connect_actor(ImageType::kLabel);
+  }
+
   // TODO(SeanCurtis-TRI): Determine if this precludes modulating the texture
   //  with arbitrary rgba values (e.g., tinting red or making everything
   //  slightly transparent). In other words, should opacity be set regardless

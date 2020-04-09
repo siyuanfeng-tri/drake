@@ -13,6 +13,8 @@ install(
         "//manipulation/models/jaco_description:install_data",
         "//manipulation/models/wsg_50_description:install_data",
         "//manipulation/models/ycb:install_data",
+        "//manipulation/models/wood_floor_cody:install_data",
+        "//manipulation/models/wood_floor_taku:install_data",
     ],
 )
 

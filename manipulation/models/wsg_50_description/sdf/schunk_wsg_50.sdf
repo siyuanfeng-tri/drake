@@ -41,6 +41,7 @@
         <cast_shadows>1</cast_shadows>
         <transparency>0</transparency>
       </visual>
+      <!--
       <collision name='collision'>
         <laser_retro>0</laser_retro>
         <max_contacts>10</max_contacts>
@@ -96,6 +97,7 @@
           </contact>
         </surface>
       </collision>
+      -->
     </link>
     <frame name='body_frame'>
       <pose frame='body'>0 0 0 0 0 0</pose>
@@ -140,6 +142,7 @@
         <cast_shadows>1</cast_shadows>
         <transparency>0</transparency>
       </visual>
+      <!--
       <collision name='collision'>
         <laser_retro>0</laser_retro>
         <max_contacts>10</max_contacts>
@@ -195,6 +198,7 @@
           </contact>
         </surface>
       </collision>
+      -->
     </link>
     <link name='right_finger'>
       <pose frame=''>0.008 0.025 0 0 -0 0</pose>
@@ -236,6 +240,7 @@
         <cast_shadows>1</cast_shadows>
         <transparency>0</transparency>
       </visual>
+      <!--
       <collision name='collision'>
         <laser_retro>0</laser_retro>
         <max_contacts>10</max_contacts>
@@ -291,6 +296,7 @@
           </contact>
         </surface>
       </collision>
+      -->
     </link>
     <joint name='left_finger_sliding_joint' type='prismatic'>
       <parent>body</parent>

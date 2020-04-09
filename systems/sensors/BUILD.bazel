@@ -33,6 +33,7 @@ drake_cc_package_library(
         ":image_writer",
         ":lcm_image_array_to_images",
         ":lcm_image_traits",
+        ":mask_converter",
         ":optitrack_sender",
         ":rgbd_sensor",
         ":rotary_encoders",
@@ -241,6 +242,17 @@ drake_cc_library(
         "//systems/framework",
         "@vtk//:vtkCommonDataModel",
         "@vtk//:vtkIOImage",
+    ],
+)
+
+drake_cc_library(
+    name = "mask_converter",
+    srcs = ["mask_converter.cc"],
+    hdrs = ["mask_converter.h"],
+    deps = [
+        ":image",
+        "//common:essential",
+        "//systems/framework",
     ],
 )
 

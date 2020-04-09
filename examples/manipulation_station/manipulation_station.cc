@@ -175,9 +175,15 @@ ManipulationStation<T>::ManipulationStation(double time_step)
 template <typename T>
 void ManipulationStation<T>::AddManipulandFromFile(
     const std::string& model_file, const RigidTransform<double>& X_WObject) {
+  AddManipulandFromAbsoluteFile(FindResourceOrThrow(model_file), X_WObject);
+}
+
+template <typename T>
+void ManipulationStation<T>::AddManipulandFromAbsoluteFile(
+    const std::string& abs_model_file,
+    const RigidTransform<double>& X_WObject) {
   multibody::Parser parser(plant_);
-  const auto model_index =
-      parser.AddModelFromFile(FindResourceOrThrow(model_file));
+  const auto model_index = parser.AddModelFromFile(abs_model_file);
   const auto indices = plant_->GetBodyIndices(model_index);
   // Only support single-body objects for now.
   // Note: this could be generalized fairly easily... would just want to
@@ -227,7 +233,7 @@ void ManipulationStation<T>::SetupClutterClearingStation(
     const int kWidth = 848;
     const double fov_y = std::atan(kHeight / 2. / kFocalY) * 2;
     geometry::render::DepthCameraProperties camera_properties(
-        kWidth, kHeight, fov_y, default_renderer_name_, 0.1, 2.0);
+        kWidth, kHeight, fov_y, default_renderer_name_, 0.0, 20000.0);
 
     RegisterRgbdSensor("0", plant_->world_frame(),
                        X_WCameraBody.value_or(math::RigidTransform<double>(
@@ -238,6 +244,87 @@ void ManipulationStation<T>::SetupClutterClearingStation(
 
   AddDefaultIiwa(collision_model);
   AddDefaultWsg();
+}
+
+template <typename T>
+void ManipulationStation<T>::SetupPdcDataCollectStation(
+    const std::optional<const math::RigidTransform<double>>& X_7CameraBody,
+    IiwaCollisionModel collision_model) {
+  DRAKE_DEMAND(setup_ == Setup::kNone);
+  setup_ = Setup::kPdcDataCollect;
+
+  // Add ground.
+  {
+    const double kSize = 2;
+    const RigidTransformd X_WG{Vector3d{0, 0, -kSize / 2}};
+    geometry::Box ground = geometry::Box::MakeCube(kSize);
+    /*
+    const Vector4<double> color(0.5, 0.5, 0.5, 1);
+    plant_->RegisterVisualGeometry(plant_->world_body(), X_WG, ground,
+                                   "GroundVisualGeometry", color);
+    */
+    std::default_random_engine generator(
+        std::chrono::system_clock::now().time_since_epoch().count());
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    std::string floor_name;
+    double aa = distribution(generator);
+    if (aa > 0.5) {
+      floor_name = "drake/manipulation/models/wood_floor_cody/wood.obj";
+    } else {
+      floor_name = "drake/manipulation/models/wood_floor_taku/wood.obj";
+    }
+    plant_->RegisterVisualGeometry(
+        plant_->world_body(),
+        X_WG * RigidTransformd(Eigen::Vector3d(0, 0, kSize / 2)),
+        geometry::Mesh(FindResourceOrThrow(floor_name), 1.5),
+        "GroundVisualGeometry");
+    geometry::ProximityProperties props;
+    geometry::AddRigidHydroelasticProperties(kSize, &props);
+    geometry::AddContactMaterial(
+        {}, {}, multibody::CoulombFriction<double>(1, 1), &props);
+    plant_->RegisterCollisionGeometry(plant_->world_body(), X_WG, ground,
+                                      "GroundCollisionGeometry",
+                                      std::move(props));
+  }
+
+  AddDefaultIiwa(collision_model);
+  AddDefaultWsg();
+
+  // Add wrist camera.
+  {
+    // Typical D415 intrinsics for 848 x 480 resolution, note that rgb and
+    // depth are slightly different. And we are not able to model that at the
+    // moment.
+    // RGB:
+    // - w: 848, h: 480, fx: 616.285, fy: 615.778, ppx: 405.418, ppy: 232.864
+    // DEPTH:
+    // - w: 848, h: 480, fx: 645.138, fy: 645.138, ppx: 420.789, ppy: 239.13
+    // For this camera, we are going to assume that fx = fy, and we can compute
+    // fov_y by: fy = height / 2 / tan(fov_y / 2)
+    const double kFocalY = 645.;
+    const int kHeight = 480;
+    const int kWidth = 640;
+    const double fov_y = std::atan(kHeight / 2. / kFocalY) * 2;
+    geometry::render::DepthCameraProperties camera_properties(
+        kWidth, kHeight, fov_y, default_renderer_name_, 0.0, 5.0);
+
+    const auto& link7 =
+        plant_->GetFrameByName("iiwa_link_7", iiwa_model_.model_instance);
+
+    // DUY: i made this up.
+    auto X_7C = X_7CameraBody.value_or(math::RigidTransform<double>(
+        math::RollPitchYaw<double>(0, 0, 0), Eigen::Vector3d(0.05, 0, 0.114)));
+    const auto& cam_frame =
+        plant_->AddFrame(std::make_unique<multibody::FixedOffsetFrame<double>>(
+            "wrist_camera_frame", link7, X_7C));
+    RegisterRgbdSensor("wrist_camera", cam_frame,
+                       math::RigidTransform<double>(), camera_properties);
+
+    auto X_7T = math::RigidTransform<double>(
+        math::RollPitchYaw<double>(0, M_PI, 0), Eigen::Vector3d(0, 0, 0.2));
+    plant_->AddFrame(std::make_unique<multibody::FixedOffsetFrame<double>>(
+        "tool_frame", link7, X_7T));
+  }
 }
 
 template <typename T>
@@ -402,7 +489,21 @@ void ManipulationStation<T>::SetRandomState(
   for (const auto& body_index : shuffled_object_ids) {
     math::RigidTransform<T> pose =
         plant_->GetFreeBodyPose(plant_context, plant_->get_body(body_index));
+    // DUY: if you don't do any thing here, the obj pose will be sampled
+    // directly from the distribution you specified in Finalize(). You could
+    // override it here.
+    /*
+    std::uniform_real_distribution<T> dis(-1 * M_PI_2, 1 * M_PI_2);
+    T yaw = dis(*generator);
+    drake::log()->info("YAW{}", yaw);
+    math::RotationMatrix<T> rot =
+        math::RotationMatrix<T>::MakeZRotation(yaw);
+        math::RotationMatrix<T>::MakeYRotation(M_PI_2) *
+        math::RotationMatrix<T>::MakeZRotation(-M_PI_2);
+    pose.set_rotation(rot);
+    */
     pose.set_translation(pose.translation() + Vector3d{0, 0, z_offset});
+    drake::log()->info("POS: {}", pose.translation().transpose());
     z_offset += 0.1;
     plant_->SetFreeBodyPose(plant_context, &plant_state,
                             plant_->get_body(body_index), pose);
@@ -497,6 +598,24 @@ void ManipulationStation<T>::Finalize(
           y(-0.8, -.55), z(0.3, 0.35);
       const Vector3<symbolic::Expression> xyz{x(), y(), z()};
       for (const auto& body_index : object_ids_) {
+        const multibody::Body<T>& body = plant_->get_body(body_index);
+        plant_->SetFreeBodyRandomPositionDistribution(body, xyz);
+        plant_->SetFreeBodyRandomRotationDistributionToUniform(body);
+      }
+      break;
+    }
+    case Setup::kPdcDataCollect: {
+      // Set the initial positions of the IIWA to a configuration right above
+      // the picking bin.
+      // q0_iiwa << -1.57, 0.1, 0, -1.2, 0, 1.6, 0;
+      q0_iiwa << -0.483169, 0.565567, -2.5566, 1.10944, -0.382038, -1.7204,
+          0.751417;
+
+      // DUY: this sets up the distribution for the obj pose.
+      std::uniform_real_distribution<symbolic::Expression> x(-0.03, 0.03),
+          y(-0.03, 0.03), z(0.1, 0.13);
+      const Vector3<symbolic::Expression> xyz{x(), y(), z()};
+      for (const auto body_index : object_ids_) {
         const multibody::Body<T>& body = plant_->get_body(body_index);
         plant_->SetFreeBodyRandomPositionDistribution(body, xyz);
         plant_->SetFreeBodyRandomRotationDistributionToUniform(body);
@@ -907,7 +1026,8 @@ void ManipulationStation<T>::AddDefaultIiwa(
     case IiwaCollisionModel::kNoCollision:
       sdf_path = FindResourceOrThrow(
           "drake/manipulation/models/iiwa_description/iiwa7/"
-          "iiwa7_no_collision.sdf");
+          "iiwa7_no_collision_w_slide.sdf");
+      //"iiwa7_no_collision.sdf");
       break;
     case IiwaCollisionModel::kBoxCollision:
       sdf_path = FindResourceOrThrow(
@@ -919,10 +1039,12 @@ void ManipulationStation<T>::AddDefaultIiwa(
   }
   const auto X_WI = RigidTransform<double>::Identity();
   auto iiwa_instance = internal::AddAndWeldModelFrom(
-      sdf_path, "iiwa", plant_->world_frame(), "iiwa_link_0", X_WI, plant_);
-  RegisterIiwaControllerModel(
-      sdf_path, iiwa_instance, plant_->world_frame(),
-      plant_->GetFrameByName("iiwa_link_0", iiwa_instance), X_WI);
+      sdf_path, "iiwa", plant_->world_frame(), "shim_0", X_WI, plant_);
+  // sdf_path, "iiwa", plant_->world_frame(), "iiwa_link_0", X_WI, plant_);
+  RegisterIiwaControllerModel(sdf_path, iiwa_instance, plant_->world_frame(),
+                              plant_->GetFrameByName("shim_0", iiwa_instance),
+                              X_WI);
+  // plant_->GetFrameByName("iiwa_link_0", iiwa_instance), X_WI);
 }
 
 // Add default wsg.
@@ -932,8 +1054,11 @@ void ManipulationStation<T>::AddDefaultWsg() {
       "drake/manipulation/models/wsg_50_description/sdf/schunk_wsg_50.sdf");
   const multibody::Frame<T>& link7 =
       plant_->GetFrameByName("iiwa_link_7", iiwa_model_.model_instance);
+  // DUY: i moved the gripper forward a bit to get it out of the way for the
+  // camera.
   const RigidTransform<double> X_7G(RollPitchYaw<double>(M_PI_2, 0, M_PI_2),
-                                    Vector3d(0, 0, 0.114));
+                                    Vector3d(0, 0, -0.1));
+  // Vector3d(0, 0, 0.114));
   auto wsg_instance = internal::AddAndWeldModelFrom(sdf_path, "gripper", link7,
                                                     "body", X_7G, plant_);
   RegisterWsgControllerModel(sdf_path, wsg_instance, link7,

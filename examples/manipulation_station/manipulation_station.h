@@ -22,7 +22,13 @@ namespace manipulation_station {
 enum class IiwaCollisionModel { kNoCollision, kBoxCollision };
 
 /// Determines which manipulation station is simulated.
-enum class Setup { kNone, kManipulationClass, kClutterClearing, kPlanarIiwa };
+enum class Setup {
+  kNone,
+  kManipulationClass,
+  kClutterClearing,
+  kPlanarIiwa,
+  kPdcDataCollect
+};
 
 /// @defgroup manipulation_station_systems Manipulation Station
 /// @{
@@ -146,6 +152,10 @@ class ManipulationStation : public systems::Diagram<T> {
       const std::optional<const math::RigidTransformd>& X_WCameraBody = {},
       IiwaCollisionModel collision_model = IiwaCollisionModel::kNoCollision);
 
+  void SetupPdcDataCollectStation(
+      const std::optional<const math::RigidTransformd>& X_GCameraBody = {},
+      IiwaCollisionModel collision_model = IiwaCollisionModel::kNoCollision);
+
   /// Adds a default iiwa, wsg, cupboard, and 80/20 frame for the MIT
   /// Intelligent Robot Manipulation class, then calls
   /// RegisterIiwaControllerModel() and RegisterWsgControllerModel() with
@@ -262,6 +272,10 @@ class ManipulationStation : public systems::Diagram<T> {
   /// @param X_WObject The pose of the object in world frame.
   void AddManipulandFromFile(const std::string& model_file,
                              const math::RigidTransform<double>& X_WObject);
+
+  void AddManipulandFromAbsoluteFile(
+      const std::string& model_file,
+      const math::RigidTransform<double>& X_WObject);
 
   // TODO(russt): Add scalar copy constructor etc once we support more
   // scalar types than T=double.  See #9573.
@@ -399,6 +413,11 @@ class ManipulationStation : public systems::Diagram<T> {
   /// Convenience method for setting the velocity of the Schunk WSG.
   void SetWsgVelocity(systems::Context<T>* station_context, const T& v) const {
     SetWsgVelocity(*station_context, &station_context->get_mutable_state(), v);
+  }
+
+  const geometry::render::DepthCameraProperties& GetCameraProperties(
+      const std::string& camera_name) const {
+    return camera_information_.at(camera_name).properties;
   }
 
   /// Returns a map from camera name to X_WCameraBody for all the static

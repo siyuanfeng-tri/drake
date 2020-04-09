@@ -705,7 +705,7 @@ void SetIpoptOptions(const MathematicalProgram& prog,
   merged_solver_options.Merge(prog.solver_options());
 
   // The default tolerance.
-  const double tol = 1.05e-10;  // Note: SNOPT is only 1e-6, but in #3712 we
+  const double tol = 1.05e-6;  // Note: SNOPT is only 1e-6, but in #3712 we
   // diagnosed that the CompareMatrices tolerance needed to be the sqrt of the
   // constr_viol_tol
   SetIpoptOptionsHelper<double>("tol", tol, &merged_solver_options);
