@@ -12,6 +12,7 @@ output from potato_generator.py
 The arguments for the batch driver should be pretty self explanatory. 
 
 The output should looks like this:
+```
 sfeng@sfeng0 ~/tmp $ tree mar_5
 mar_5
 ├── 2020-03-05-15-22-43
@@ -60,4 +61,5 @@ mar_5
 │           ├── 000010_depth.png
 │           ├── 000011_depth.png
 │           └── 000012_depth.png
+```
 
