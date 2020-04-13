@@ -1,0 +1,61 @@
+# -*- python -*-
+# This file contains rules for Bazel; see drake/doc/bazel.rst.
+
+load(
+    "@drake//tools/skylark:drake_cc.bzl",
+    "drake_cc_binary",
+    "drake_cc_googletest",
+    "drake_cc_library",
+)
+load(
+    "@drake//tools/skylark:drake_py.bzl",
+    "drake_py_binary",
+    "drake_py_library",
+)
+load("@drake//tools/skylark:test_tags.bzl", "vtk_test_tags")
+load("//tools/install:install_data.bzl", "install_data")
+load("//tools/lint:lint.bzl", "add_lint_tests")
+load("//tools/skylark:test_tags.bzl", "vtk_test_tags")
+
+drake_cc_library(
+    name = "image_generator",
+    srcs = [
+        "image_generator.cc",
+    ],
+    hdrs = [
+        "image_generator.h",
+    ],
+    copts = ["-g"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//examples/manipulation_station:pose_writer",
+        "//systems/sensors:image_writer",
+        "//systems/sensors:mask_converter",
+        "//common:find_resource",
+        "//geometry:scene_graph",
+        "//geometry/render:render_engine_vtk",
+        "//geometry/render:render_engine_ospray",
+        "//math:geometric_transform",
+        "//multibody/parsing",
+        "//multibody/plant",
+        "//systems/framework",
+        "//systems/sensors:rgbd_sensor",
+    ],
+)
+
+drake_cc_binary(
+    name = "generate",
+    srcs = [
+        "main.cc",
+    ],
+    copts = ["-g"],
+    linkopts = ["-lstdc++fs"],
+    deps = [
+        ":image_generator",
+        "@gflags",
+    ],
+)
+
+# Tests
+
+add_lint_tests()
