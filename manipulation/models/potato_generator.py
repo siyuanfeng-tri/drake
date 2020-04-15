@@ -256,11 +256,28 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--obj_dir', type=str,
         default='/home/sfeng/Downloads/potato_sdf', help='Dir to obj files')
+    parser.add_argument(
+        "--obj_names",
+        type=str,
+        metavar="STRING",
+        required=False,
+        nargs='+',
+        default=[],
+    )
     parser.add_argument('--texture_root_dir', type=str,
         default='/home/sfeng/Downloads/potato_texture',
         help='''Dir to png texture and masks. The mask should be a 3 channel
                 8 bit binary image, where 255 means peeled part, 0 means
                 skin.''')
+    parser.add_argument(
+        "--texture_names",
+        type=str,
+        metavar="STRING",
+        required=False,
+        nargs='+',
+        default=[],
+    )
+    parser.add_argument('--texture_dir', type=str)
     parser.add_argument('--output_dir', type=str,
         default='/home/sfeng/code/drake/manipulation/models',
         help='Output dir.')
@@ -271,7 +288,12 @@ def main():
     output_dir = args.output_dir
 
     obj_files = os.listdir(obj_dir)
+    if len(args.obj_names):
+        obj_files = [x for x in obj_files if x in args.obj_names]
+
     potato_dirs = os.listdir(texture_root_dir)
+    if len(args.texture_names):
+        potato_dirs = [x for x in potato_dirs if x in args.texture_names]
 
     # Note: This is also hardcoded in the training code.
     PEELED_MASK = 2
