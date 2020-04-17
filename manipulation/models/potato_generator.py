@@ -277,7 +277,6 @@ def main():
         nargs='+',
         default=[],
     )
-    parser.add_argument('--texture_dir', type=str)
     parser.add_argument('--output_dir', type=str,
         default='/home/sfeng/code/drake/manipulation/models',
         help='Output dir.')

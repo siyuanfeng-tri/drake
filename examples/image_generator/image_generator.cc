@@ -58,7 +58,8 @@ void WriteCameraIntrinsics(
 }  // namespace
 
 ImageGenerator::ImageGenerator(const std::string& abs_model_path,
-                               const std::string& output_root_dir) {
+                               const std::string& output_root_dir,
+                               int mask_value_source) {
   owned_plant_ = std::make_unique<MultibodyPlant<double>>(0);
   owned_scene_graph_ = std::make_unique<SceneGraph<double>>();
 
@@ -137,8 +138,17 @@ ImageGenerator::ImageGenerator(const std::string& abs_model_path,
               "camera_depth", proc_dir + "/rendered_images/{count:06}_depth",
               record_period, start_record_t);
   builder.Connect(camera->depth_image_16U_output_port(), depth_port);
-  auto converter = builder.AddSystem<systems::sensors::PotatoMaskConverter>(
-      10, kWidth, kHeight);
+
+  systems::LeafSystem<double>* converter = {};
+  if (mask_value_source == -1) {
+    converter = builder.AddSystem<systems::sensors::PotatoMaskConverter>(
+        10, kWidth, kHeight);
+  } else {
+    converter = builder.AddSystem<systems::sensors::MaskConverter>(
+        static_cast<int>(object_body_->index()),
+        static_cast<uint8_t>(mask_value_source),
+        kWidth, kHeight);
+  }
   const auto& label_port =
       image_writer_
           ->DeclareImageInputPort<systems::sensors::PixelType::kGrey8U>(

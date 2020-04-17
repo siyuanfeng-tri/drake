@@ -13,6 +13,7 @@ DEFINE_double(max_xy, 0, "");
 DEFINE_double(min_z, 0.3, "");
 DEFINE_double(max_z, 0.6, "");
 DEFINE_int32(num_images, 1, "");
+DEFINE_int32(mask_value, -1, "");
 
 DEFINE_string(model_path, "", "Path to model");
 DEFINE_string(output_dir, "/home/sfeng/tmp/image_generator/",
@@ -38,7 +39,7 @@ int do_main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   const std::string output_root = GetExperimentRootDir();
-  ImageGenerator gen(FLAGS_model_path, output_root);
+  ImageGenerator gen(FLAGS_model_path, output_root, FLAGS_mask_value);
   auto context = gen.CreateDefaultContext();
 
   auto timed_events = gen.AllocateCompositeEventCollection();

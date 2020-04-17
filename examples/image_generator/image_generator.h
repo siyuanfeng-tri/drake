@@ -18,8 +18,11 @@ namespace image_generator {
 class ImageGenerator : public systems::Diagram<double> {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ImageGenerator)
+  // if mask_value_source == -1, mask value is coming from the texture.
+  // otherwise, mask for obj will be set to mask_value_source.
   ImageGenerator(const std::string& model_path,
-                 const std::string& output_root_dir);
+                 const std::string& output_root_dir,
+                 int mask_value_source = -1);
 
   void SetCameraPose(const math::RigidTransform<double>& X_WCamera,
                      systems::Context<double>* station_context) const;
