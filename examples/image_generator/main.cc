@@ -7,6 +7,7 @@
 
 #include "drake/examples/image_generator/image_generator.h"
 #include "drake/math/random_rotation.h"
+#include "drake/math/roll_pitch_yaw.h"
 
 DEFINE_double(min_xy, -0, "");
 DEFINE_double(max_xy, 0, "");
@@ -14,6 +15,12 @@ DEFINE_double(min_z, 0.3, "");
 DEFINE_double(max_z, 0.6, "");
 DEFINE_int32(num_images, 1, "");
 DEFINE_int32(mask_value, -1, "");
+DEFINE_double(min_r, 0., "");
+DEFINE_double(max_r, 0., "");
+DEFINE_double(min_p, 0., "");
+DEFINE_double(max_p, 0., "");
+DEFINE_double(min_y, 0., "");
+DEFINE_double(max_y, 0., "");
 
 DEFINE_string(model_path, "", "Path to model");
 DEFINE_string(output_dir, "/home/sfeng/tmp/image_generator/",
@@ -57,21 +64,39 @@ int do_main(int argc, char* argv[]) {
   std::uniform_real_distribution<double> z_dist(FLAGS_min_z, FLAGS_max_z);
   std::uniform_real_distribution<double> xy_dist(FLAGS_min_xy, FLAGS_max_xy);
 
-  for (int i = 0; i < FLAGS_num_images; i++) {
+  /*
+  std::uniform_real_distribution<double> r_dist(FLAGS_min_r * M_PI / 180., FLAGS_max_r * M_PI / 180.);
+  std::uniform_real_distribution<double> p_dist(FLAGS_min_p * M_PI / 180., FLAGS_max_p * M_PI / 180.);
+  std::uniform_real_distribution<double> y_dist(FLAGS_min_y * M_PI / 180., FLAGS_max_y * M_PI / 180.);
+  */
+
+  for (int i = 0; i < FLAGS_num_images;) {
     const Eigen::Vector3d xyz(xy_dist(generator), xy_dist(generator),
                               z_dist(generator));
-    drake::log()->info("xyz: {}", xyz.transpose());
+    // drake::log()->info("xyz: {}", xyz.transpose());
     const Eigen::Quaterniond rand_q =
         math::UniformlyRandomQuaternion(&generator);
 
+    // const math::RollPitchYaw rand_q(r_dist(generator), p_dist(generator),
+    //                        y_dist(generator));
+
     math::RigidTransform<double> X_OC =
-        math::RigidTransform<double>(rand_q, Eigen::Vector3d::Zero()) *
+        math::RigidTransform<double>(rand_q, Eigen::Vector3d::Zero());
+
+    if (X_OC.rotation().matrix().col(2).dot(Eigen::Vector3d::UnitY()) < 0) {
+      continue;
+    }
+
+    X_OC = X_OC *
         math::RigidTransform<double>(xyz) *
         math::RigidTransform<double>(math::RollPitchYaw<double>(0, M_PI, 0),
+                                     Eigen::Vector3d::Zero()) *
+        math::RigidTransform<double>(math::RollPitchYaw<double>(0, 0, M_PI),
                                      Eigen::Vector3d::Zero());
-    gen.SetCameraPose(X_WO * X_OC, context.get()),
 
+    gen.SetCameraPose(X_WO * X_OC, context.get()),
         gen.Publish(*context, publish_events);
+    i++;
   }
 
   return 0;
