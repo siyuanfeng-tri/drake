@@ -27,6 +27,10 @@ RobotBridge::RobotBridge(const multibody::MultibodyPlant<double>* plant,
       builder.AddSystem<MoveToolStraight>(plant, tool_frame, timestep);
   primitives_[move_t->get_name()] = move_t;
 
+  auto move_v =
+      builder.AddSystem<MoveToolWithVelocity>(plant, tool_frame, timestep);
+  primitives_[move_v->get_name()] = move_v;
+
   // Add a passthrough for state to all primitives.
   auto pass_through = builder.AddSystem<systems::PassThrough<double>>(
       plant->num_multibody_states());
@@ -72,6 +76,8 @@ RobotBridge::RobotBridge(const multibody::MultibodyPlant<double>* plant,
   builder.ExportInput(pass_through->get_input_port(), "state");
   builder.ExportInput(move_q->get_trajectory_input(), "q_trajectory");
   builder.ExportInput(move_t->get_trajectory_input(), "tool_trajectory");
+  builder.ExportInput(move_v->get_velocity_input(), "tool_velocity");
+  builder.ExportInput(move_v->get_active_input(), "tool_velocity_active");
 
   builder.ExportOutput(motion_summary_switch_->get_output_port(),
                        "motion_summary");

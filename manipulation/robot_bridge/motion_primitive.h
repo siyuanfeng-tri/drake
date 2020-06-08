@@ -217,6 +217,37 @@ class MoveTool : public MotionPrimitive {
   const systems::InputPort<double>* tool_frame_vel_input_port_;
 };
 
+class MoveToolWithVelocity : public MoveTool {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(MoveToolWithVelocity)
+
+  MoveToolWithVelocity(const multibody::MultibodyPlant<double>* plant,
+                       const multibody::Frame<double>* tool_frame,
+                       double timestep);
+
+  const systems::InputPort<double>& get_active_input() const {
+    return *active_input_port_;
+  }
+
+  const systems::InputPort<double>& get_velocity_input() const {
+    return *velocity_input_port_;
+  }
+
+ private:
+  Vector6<double> ComputeDesiredToolVelocityInWorldFrame(
+      const systems::State<double>& state, double time) const override;
+
+  void UpdateLogic(const systems::Context<double>& context,
+                   systems::State<double>* state) const override;
+
+  void UpdateMotionSummary(const systems::Context<double>& context,
+                           systems::State<double>* state) const override;
+
+  const systems::InputPort<double>* active_input_port_;
+  const systems::InputPort<double>* velocity_input_port_;
+  systems::DiscreteStateIndex v_command_index_;
+};
+
 class MoveToolStraight final : public MoveTool {
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(MoveToolStraight)

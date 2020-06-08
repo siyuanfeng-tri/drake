@@ -485,22 +485,22 @@ void ManipulationStation<T>::SetRandomState(
   std::vector<multibody::BodyIndex> shuffled_object_ids(object_ids_);
   std::shuffle(shuffled_object_ids.begin(), shuffled_object_ids.end(),
                *generator);
-  double z_offset = 0.1;
+  double z_offset = 0.;
   for (const auto& body_index : shuffled_object_ids) {
     math::RigidTransform<T> pose =
         plant_->GetFreeBodyPose(plant_context, plant_->get_body(body_index));
     // DUY: if you don't do any thing here, the obj pose will be sampled
     // directly from the distribution you specified in Finalize(). You could
     // override it here.
-    /*
-    std::uniform_real_distribution<T> dis(-1 * M_PI_2, 1 * M_PI_2);
+    std::uniform_real_distribution<T> dis(-1 * M_PI, 1 * M_PI);
     T yaw = dis(*generator);
     drake::log()->info("YAW{}", yaw);
     math::RotationMatrix<T> rot =
-        math::RotationMatrix<T>::MakeZRotation(yaw);
+        math::RotationMatrix<T>::MakeZRotation(yaw) *
         math::RotationMatrix<T>::MakeYRotation(M_PI_2) *
         math::RotationMatrix<T>::MakeZRotation(-M_PI_2);
     pose.set_rotation(rot);
+    /*
     */
     pose.set_translation(pose.translation() + Vector3d{0, 0, z_offset});
     drake::log()->info("POS: {}", pose.translation().transpose());
@@ -607,13 +607,13 @@ void ManipulationStation<T>::Finalize(
     case Setup::kPdcDataCollect: {
       // Set the initial positions of the IIWA to a configuration right above
       // the picking bin.
-      // q0_iiwa << -1.57, 0.1, 0, -1.2, 0, 1.6, 0;
-      q0_iiwa << -0.483169, 0.565567, -2.5566, 1.10944, -0.382038, -1.7204,
-          0.751417;
+      q0_iiwa << -0.5, 0, 0.5, 0, 0, 0, -1.57, 0, M_PI_2, 0;
+      //q0_iiwa << -0.483169, 0.565567, -2.5566, 1.10944, -0.382038, -1.7204,
+      //    0.751417;
 
       // DUY: this sets up the distribution for the obj pose.
-      std::uniform_real_distribution<symbolic::Expression> x(-0.03, 0.03),
-          y(-0.03, 0.03), z(0.1, 0.13);
+      std::uniform_real_distribution<symbolic::Expression> x(-0.02, 0.02),
+          y(-0.02, 0.02), z(0.1, 0.13);
       const Vector3<symbolic::Expression> xyz{x(), y(), z()};
       for (const auto body_index : object_ids_) {
         const multibody::Body<T>& body = plant_->get_body(body_index);
@@ -642,6 +642,7 @@ void ManipulationStation<T>::Finalize(
   const auto iiwa_joint_indices =
       plant_->GetJointIndices(iiwa_model_.model_instance);
   int q0_index = 0;
+  int p_idx = 0;
   for (const auto joint_index : iiwa_joint_indices) {
     multibody::RevoluteJoint<T>* joint =
         dynamic_cast<multibody::RevoluteJoint<T>*>(
@@ -649,7 +650,14 @@ void ManipulationStation<T>::Finalize(
     // Note: iiwa_joint_indices includes the WeldJoint at the base.  Only set
     // the RevoluteJoints.
     if (joint) {
-      joint->set_default_angle(q0_iiwa[q0_index++]);
+      joint->set_default_angle(q0_iiwa[3 + q0_index++]);
+    }
+
+    multibody::PrismaticJoint<T>* p_joint =
+        dynamic_cast<multibody::PrismaticJoint<T>*>(
+            &plant_->get_mutable_joint(joint_index));
+    if (p_joint) {
+      p_joint->set_default_translation(q0_iiwa[p_idx++]);
     }
   }
 

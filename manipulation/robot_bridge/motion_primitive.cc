@@ -302,6 +302,55 @@ void MoveToolStraight::UpdateMotionSummary(
   }
 }
 
+MoveToolWithVelocity::MoveToolWithVelocity(
+    const multibody::MultibodyPlant<double>* plant,
+    const multibody::Frame<double>* tool_frame, const double timestep)
+    : MoveTool(plant, tool_frame, timestep) {
+  this->set_name("MoveToolWithVelocity");
+
+  velocity_input_port_ = &this->DeclareVectorInputPort(
+      "tool_velocity_command", systems::BasicVector<double>(6));
+  active_input_port_ = &this->DeclareVectorInputPort(
+      "active_command", systems::BasicVector<double>(1));
+
+  v_command_index_ = this->DeclareDiscreteState(
+      systems::BasicVector<double>(6));
+}
+
+void MoveToolWithVelocity::UpdateLogic(
+    const systems::Context<double>& context,
+    systems::State<double>* state) const {
+  const auto v_cmd = this->EvalVectorInput(
+      context, velocity_input_port_->get_index());
+  Eigen::VectorXd v = Eigen::VectorXd::Zero(6);
+  if (v_cmd) {
+    v = v_cmd->get_value();
+  }
+  state->get_mutable_discrete_state(v_command_index_).set_value(v);
+}
+
+Vector6<double> MoveToolWithVelocity::ComputeDesiredToolVelocityInWorldFrame(
+    const systems::State<double>& state, double) const {
+  return state.get_discrete_state(v_command_index_).get_value();
+}
+
+void MoveToolWithVelocity::UpdateMotionSummary(
+    const systems::Context<double>& context,
+    systems::State<double>* state) const {
+  auto& summary = get_mutable_motion_summary(state);
+  summary.motion_name = this->get_name();
+
+  const auto active = this->EvalVectorInput(
+      context, active_input_port_->get_index());
+  MotionStatus status = MotionStatus::kDone;
+  if (active) {
+    if (active->get_value()[0] == 1) {
+      status = MotionStatus::kExecuting;
+    }
+  }
+  summary.status = status;
+}
+
 }  // namespace robot_bridge
 }  // namespace manipulation
 }  // namespace drake

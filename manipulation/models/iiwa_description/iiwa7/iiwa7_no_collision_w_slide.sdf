@@ -136,7 +136,6 @@
           <izz>0.0178</izz>
         </inertia>
       </inertial>
-      <!--
       <visual name='iiwa_link_0_visual'>
         <pose frame=''>0 0 0 0 0 0</pose>
         <geometry>
@@ -149,6 +148,7 @@
           <diffuse>0.4 0.4 0.4 1.0</diffuse>
         </material>
       </visual>
+      <!--
       -->
       <gravity>1</gravity>
       <velocity_decay/>
@@ -169,7 +169,6 @@
           <izz>0.006</izz>
         </inertia>
       </inertial>
-      <!--
       <visual name='iiwa_link_1_visual'>
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
@@ -182,6 +181,7 @@
           <diffuse>0.4 0.4 0.4 1.0</diffuse>
         </material>
       </visual>
+      <!--
       -->
       <gravity>1</gravity>
       <velocity_decay/>
@@ -221,7 +221,6 @@
           <izz>0.0061</izz>
         </inertia>
       </inertial>
-      <!--
       <visual name='iiwa_link_2_visual'>
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
@@ -234,6 +233,7 @@
           <diffuse>1.0 0.423529411765 0.0392156862745 1.0</diffuse>
         </material>
       </visual>
+      <!--
       -->
       <gravity>1</gravity>
       <velocity_decay/>
@@ -273,7 +273,6 @@
           <izz>0.0076</izz>
         </inertia>
       </inertial>
-      <!--
       <visual name='iiwa_link_3_visual'>
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
@@ -286,6 +285,7 @@
           <diffuse>0.4 0.4 0.4 1.0</diffuse>
         </material>
       </visual>
+      <!--
       -->
       <gravity>1</gravity>
       <velocity_decay/>
@@ -325,7 +325,6 @@
           <izz>0.0061</izz>
         </inertia>
       </inertial>
-      <!--
       <visual name='iiwa_link_4_visual'>
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
@@ -338,6 +337,7 @@
           <diffuse>1.0 0.423529411765 0.0392156862745 1.0</diffuse>
         </material>
       </visual>
+      <!--
       -->
       <gravity>1</gravity>
       <velocity_decay/>
@@ -377,7 +377,6 @@
           <izz>0.00449</izz>
         </inertia>
       </inertial>
-      <!--
       <visual name='iiwa_link_5_visual'>
         <pose frame=''>0 0 0 0 -0 0</pose>
         <geometry>
@@ -390,6 +389,7 @@
           <diffuse>0.4 0.4 0.4 1.0</diffuse>
         </material>
       </visual>
+      <!--
       -->
       <gravity>1</gravity>
       <velocity_decay/>

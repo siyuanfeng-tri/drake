@@ -232,6 +232,39 @@ drake_cc_binary(
 )
 
 drake_cc_binary(
+    name = "servo_obj",
+    srcs = [
+        "servo_obj.cc",
+    ],
+    copts = ["-g"],
+    linkopts = ["-lstdc++fs"],
+    deps = [
+        ":manipulation_station",
+        ":pdc_common",
+        ":pdc_ik",
+        ":pose_writer",
+        ":point_cloud_visualizer",
+        "//manipulation/robot_bridge:robot_bridge",
+        "//geometry:geometry_visualization",
+        "//multibody/plant:contact_results_to_lcm",
+        "//systems/analysis:simulator",
+        "//systems/sensors:image_to_lcm_image_array_t",
+        "//systems/sensors:image_writer",
+        "//systems/sensors:mask_converter",
+        "//multibody/plant:frame_visualizer",
+        "//multibody/plant:kinematics_calculator",
+        "@gflags",
+    ],
+    data = [
+        "//manipulation/models/iiwa_description:models",
+        "//manipulation/models/wsg_50_description:models",
+        "//manipulation/models/ycb:models",
+        "//manipulation/models/wood_floor_taku:models",
+        "//manipulation/models/wood_floor_cody:models",
+    ],
+)
+
+drake_cc_binary(
     name = "potato_demo",
     srcs = [
         "potato_demo.cc",
