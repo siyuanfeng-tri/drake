@@ -28,9 +28,11 @@ class PoseWriter : public systems::LeafSystem<double> {
    * kinematics. Its life span must be longer than this.
    * @param local_transforms A vector of frames to be visualized.
    */
-  PoseWriter(const MultibodyPlant<double>* plant,
-             const std::vector<const Frame<double>*>& frames,
-             const std::string& file_name, double period, double t_offset);
+  PoseWriter(
+      const MultibodyPlant<double>* plant,
+      const std::vector<const Frame<double>*>& frames,
+      const std::map<std::string, std::string>& frame_name_to_output_name,
+      const std::string& file_name, double period, double t_offset);
 
  private:
   void WritePose(const systems::Context<double>& context) const;
@@ -38,6 +40,21 @@ class PoseWriter : public systems::LeafSystem<double> {
   const MultibodyPlant<double>& plant_;
   mutable std::unique_ptr<systems::Context<double>> context_;
   const std::vector<const Frame<double>*> frames_;
+  const std::map<std::string, std::string> frame_name_to_output_name_;
+
+  mutable int ctr_{0};
+  mutable std::ofstream out_;
+};
+
+class VectorWriter : public systems::LeafSystem<double> {
+ public:
+  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(VectorWriter)
+  VectorWriter(const std::string& file_name, const std::string& name, int size,
+               double period, double t_offset);
+
+ private:
+  void WriteVector(const systems::Context<double>& context) const;
+  const std::string name_;
 
   mutable int ctr_{0};
   mutable std::ofstream out_;

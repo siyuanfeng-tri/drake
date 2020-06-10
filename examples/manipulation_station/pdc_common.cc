@@ -217,6 +217,11 @@ MegaDiagramStuff build_pdc_mega_diagram(
   builder.Connect(robot_comm->GetOutputPort("torque"),
                   station->GetInputPort("iiwa_feedforward_torque"));
 
+  auto vec_src = builder.AddSystem<systems::ConstantVectorSource<double>>(
+      Eigen::VectorXd::Zero(6));
+  builder.Connect(vec_src->get_output_port(),
+                  robot_comm->GetInputPort("tool_velocity"));
+
   /////////////////////////////////////////////////////////////////////////////
   /// Optional stuff.
   /////////////////////////////////////////////////////////////////////////////
@@ -290,11 +295,19 @@ MegaDiagramStuff build_pdc_mega_diagram(
     // Pose writer.
     std::vector<const multibody::Frame<double>*> frames_to_write;
     frames_to_write.push_back(&plant.GetFrameByName("wrist_camera_frame"));
+    frames_to_write.push_back(&plant.GetFrameByName("tool_frame"));
+    std::map<std::string, std::string> frame_name_to_output_name;
+    frame_name_to_output_name["wrist_camera_frame"] = "camera_to_world";
+    frame_name_to_output_name["tool_frame"] = "tool_frame";
     auto pose_writer = builder.template AddSystem<multibody::PoseWriter>(
-        &plant, frames_to_write, proc_dir + "/images/pose_data.yaml",
-        record_period, start_record_t);
+        &plant, frames_to_write, frame_name_to_output_name,
+        proc_dir + "/images/pose_data.yaml", record_period, start_record_t);
     builder.Connect(station->GetOutputPort("plant_continuous_state"),
                     pose_writer->get_input_port(0));
+    auto vel_writer = builder.template AddSystem<multibody::VectorWriter>(
+        proc_dir + "/images/tool_velocity_cmd.yaml", "tool_velocity_cmd", 6,
+        record_period, start_record_t);
+    builder.Connect(vec_src->get_output_port(), vel_writer->get_input_port(0));
   }
 
   systems::lcm::LcmSubscriberSystem* peel_cmd_sub{};
@@ -306,8 +319,8 @@ MegaDiagramStuff build_pdc_mega_diagram(
 
   auto diagram = builder.Build();
 
-  return {std::move(diagram), std::move(rb_plant), station, robot_comm,
-          peel_cmd_sub};
+  return {std::move(diagram), std::move(rb_plant), station,
+          robot_comm,         peel_cmd_sub,        vec_src};
 }
 
 RigidTransform<double> CalcRelativeTransform(

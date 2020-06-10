@@ -146,8 +146,7 @@ ImageGenerator::ImageGenerator(const std::string& abs_model_path,
   } else {
     converter = builder.AddSystem<systems::sensors::MaskConverter>(
         static_cast<int>(object_body_->index()),
-        static_cast<uint8_t>(mask_value_source),
-        kWidth, kHeight);
+        static_cast<uint8_t>(mask_value_source), kWidth, kHeight);
   }
   const auto& label_port =
       image_writer_
@@ -161,9 +160,12 @@ ImageGenerator::ImageGenerator(const std::string& abs_model_path,
   // Add pose writer.
   std::vector<const multibody::Frame<double>*> frames_to_write;
   frames_to_write.push_back(&camera_body_->body_frame());
+  std::map<std::string, std::string> frame_name_to_output_name;
+  frame_name_to_output_name[camera_body_->body_frame().name()] =
+      "camera_to_world";
   pose_writer_ = builder.template AddSystem<multibody::PoseWriter>(
-      plant_, frames_to_write, proc_dir + "/images/pose_data.yaml",
-      record_period, start_record_t);
+      plant_, frames_to_write, frame_name_to_output_name,
+      proc_dir + "/images/pose_data.yaml", record_period, start_record_t);
   builder.Connect(plant_->get_state_output_port(),
                   pose_writer_->get_input_port(0));
 

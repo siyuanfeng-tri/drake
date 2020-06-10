@@ -64,27 +64,33 @@ int do_main(int argc, char* argv[]) {
   std::uniform_real_distribution<double> z_dist(FLAGS_min_z, FLAGS_max_z);
   std::uniform_real_distribution<double> xy_dist(FLAGS_min_xy, FLAGS_max_xy);
 
-  std::uniform_real_distribution<double> r_dist(FLAGS_min_r * M_PI / 180., FLAGS_max_r * M_PI / 180.);
-  std::uniform_real_distribution<double> p_dist(FLAGS_min_p * M_PI / 180., FLAGS_max_p * M_PI / 180.);
-  std::uniform_real_distribution<double> y_dist(FLAGS_min_y * M_PI / 180., FLAGS_max_y * M_PI / 180.);
+  std::uniform_real_distribution<double> r_dist(FLAGS_min_r * M_PI / 180.,
+                                                FLAGS_max_r * M_PI / 180.);
+  std::uniform_real_distribution<double> p_dist(FLAGS_min_p * M_PI / 180.,
+                                                FLAGS_max_p * M_PI / 180.);
+  std::uniform_real_distribution<double> y_dist(FLAGS_min_y * M_PI / 180.,
+                                                FLAGS_max_y * M_PI / 180.);
 
   for (int i = 0; i < FLAGS_num_images;) {
     const Eigen::Vector3d xyz(xy_dist(generator), xy_dist(generator),
                               -z_dist(generator));
     // drake::log()->info("xyz: {}", xyz.transpose());
-//    const Eigen::Quaterniond rand_q =
-  //      math::UniformlyRandomQuaternion(&generator);
+    //    const Eigen::Quaterniond rand_q =
+    //      math::UniformlyRandomQuaternion(&generator);
 
     // const math::RollPitchYaw rand_q(r_dist(generator), p_dist(generator),
     //                        y_dist(generator));
 
     math::RigidTransform<double> X_OC =
-        math::RigidTransform<double>(math::RollPitchYaw<double>(r_dist(generator), 0, 0),
-                                     Eigen::Vector3d::Zero()) *
-        math::RigidTransform<double>(math::RollPitchYaw<double>(0, p_dist(generator), 0),
-                                     Eigen::Vector3d::Zero()) *
-        math::RigidTransform<double>(math::RollPitchYaw<double>(0, 0, y_dist(generator)),
-                                     Eigen::Vector3d::Zero()) *
+        math::RigidTransform<double>(
+            math::RollPitchYaw<double>(r_dist(generator), 0, 0),
+            Eigen::Vector3d::Zero()) *
+        math::RigidTransform<double>(
+            math::RollPitchYaw<double>(0, p_dist(generator), 0),
+            Eigen::Vector3d::Zero()) *
+        math::RigidTransform<double>(
+            math::RollPitchYaw<double>(0, 0, y_dist(generator)),
+            Eigen::Vector3d::Zero()) *
         math::RigidTransform<double>(xyz);
 
     gen.SetCameraPose(X_WO * X_OC, context.get()),

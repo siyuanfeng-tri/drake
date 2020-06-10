@@ -4,6 +4,7 @@
 #include "drake/manipulation/robot_bridge/robot_bridge.h"
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
+#include "drake/systems/primitives/constant_vector_source.h"
 
 namespace drake {
 namespace examples {
@@ -25,6 +26,7 @@ struct MegaDiagramStuff {
   ManipulationStation<double>* station{};
   manipulation::robot_bridge::RobotBridge* robot_comm{};
   systems::lcm::LcmSubscriberSystem* peel_command_sub{};
+  systems::ConstantVectorSource<double>* tool_vel_cmd{};
 };
 
 MegaDiagramStuff build_pdc_mega_diagram(

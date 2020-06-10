@@ -313,15 +313,14 @@ MoveToolWithVelocity::MoveToolWithVelocity(
   active_input_port_ = &this->DeclareVectorInputPort(
       "active_command", systems::BasicVector<double>(1));
 
-  v_command_index_ = this->DeclareDiscreteState(
-      systems::BasicVector<double>(6));
+  v_command_index_ =
+      this->DeclareDiscreteState(systems::BasicVector<double>(6));
 }
 
-void MoveToolWithVelocity::UpdateLogic(
-    const systems::Context<double>& context,
-    systems::State<double>* state) const {
-  const auto v_cmd = this->EvalVectorInput(
-      context, velocity_input_port_->get_index());
+void MoveToolWithVelocity::UpdateLogic(const systems::Context<double>& context,
+                                       systems::State<double>* state) const {
+  const auto v_cmd =
+      this->EvalVectorInput(context, velocity_input_port_->get_index());
   Eigen::VectorXd v = Eigen::VectorXd::Zero(6);
   if (v_cmd) {
     v = v_cmd->get_value();
@@ -340,8 +339,8 @@ void MoveToolWithVelocity::UpdateMotionSummary(
   auto& summary = get_mutable_motion_summary(state);
   summary.motion_name = this->get_name();
 
-  const auto active = this->EvalVectorInput(
-      context, active_input_port_->get_index());
+  const auto active =
+      this->EvalVectorInput(context, active_input_port_->get_index());
   MotionStatus status = MotionStatus::kDone;
   if (active) {
     if (active->get_value()[0] == 1) {

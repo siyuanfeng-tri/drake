@@ -21,9 +21,11 @@ drake_cc_library(
     name = "manipulation_station",
     srcs = [
         "manipulation_station.cc",
+        "lcm_blocking_trigger.cc",
     ],
     hdrs = [
         "manipulation_station.h",
+        "lcm_blocking_trigger.h",
     ],
     copts = ["-g"],
     data = [
@@ -253,6 +255,7 @@ drake_cc_binary(
         "//systems/sensors:mask_converter",
         "//multibody/plant:frame_visualizer",
         "//multibody/plant:kinematics_calculator",
+        "//lcmtypes:lcmtypes_drake_cc",
         "@gflags",
     ],
     data = [

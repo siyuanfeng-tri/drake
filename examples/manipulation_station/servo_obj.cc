@@ -5,20 +5,21 @@
 #include <gflags/gflags.h>
 
 #include "drake/common/trajectories/piecewise_polynomial.h"
+#include "drake/examples/manipulation_station/lcm_blocking_trigger.h"
 #include "drake/examples/manipulation_station/pdc_common.h"
 #include "drake/examples/manipulation_station/pdc_ik.h"
 #include "drake/multibody/plant/multibody_plant.h"
 #include "drake/systems/analysis/simulator.h"
 
+#include "drake/lcmt_force_torque.hpp"
+
 DEFINE_double(target_realtime_rate, 1.0,
               "Playback speed.  See documentation for "
               "Simulator::set_target_realtime_rate() for details.");
 DEFINE_double(duration, 1e33, "Simulation duration.");
-DEFINE_bool(test, false, "Disable random initial conditions in test mode.");
-DEFINE_bool(viz_point_cloud, false, "Visualize point cloud?");
-
-DEFINE_double(min_z, 0.3, "");
-DEFINE_double(max_z, 0.6, "");
+DEFINE_bool(
+    test, false,
+    "Set to true when testing the trained policy, false to collect data.");
 
 DEFINE_double(record_start, 3, "");
 DEFINE_double(record_period, 0.1, "");
@@ -60,12 +61,11 @@ math::RigidTransform<double> ComputeX_WT_desired(
 }
 
 math::RigidTransform<double> ComputeX_WT(
-    const multibody::MultibodyPlant<double>& plant,
-    const Eigen::VectorXd& q, systems::Context<double>* context) {
+    const multibody::MultibodyPlant<double>& plant, const Eigen::VectorXd& q,
+    systems::Context<double>* context) {
   const auto& tool_frame = plant.GetFrameByName("tool_frame");
   plant.SetPositions(context, q);
-  return plant.CalcRelativeTransform(
-      *context, plant.world_frame(), tool_frame);
+  return plant.CalcRelativeTransform(*context, plant.world_frame(), tool_frame);
 }
 
 Eigen::VectorXd ComputeControl(
@@ -76,6 +76,27 @@ Eigen::VectorXd ComputeControl(
   return diff_W;
 }
 
+Eigen::VectorXd WaitForRemoteControl(
+    double time, const math::RigidTransform<double>& X_WT_now) {
+  LcmBlockingTrigger<lcmt_force_torque> handle("REMOTE_V_CMD", "");
+  lcmt_force_torque response{};
+  lcmt_force_torque request{};
+  request.timestamp = static_cast<int64_t>(time * 1e6);
+  handle.PublishTriggerAndWaitForAck(request, &response);
+
+  Vector6<double> diff_T = Vector6<double>::Zero();
+  diff_T[0] = response.tx;
+  diff_T[1] = response.ty;
+  diff_T[2] = response.tz;
+  diff_T[3] = response.fx;
+  diff_T[4] = response.fy;
+  diff_T[5] = response.fz;
+
+  diff_T.head<3>() = X_WT_now.rotation() * diff_T.head<3>();
+  diff_T.tail<3>() = X_WT_now.rotation() * diff_T.tail<3>();
+  return diff_T;
+}
+
 int do_main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   DataRecordParams record_params;
@@ -83,9 +104,10 @@ int do_main(int argc, char* argv[]) {
   record_params.record_root_dir = GetExperimentRootDir();
   record_params.record_start_time = FLAGS_record_start;
 
-  MegaDiagramStuff stuff = build_pdc_mega_diagram(
-      FLAGS_model_name, FLAGS_model_dir, FLAGS_viz_point_cloud, record_params,
-      std::nullopt);
+  const bool viz_point_cloud = false;
+  MegaDiagramStuff stuff =
+      build_pdc_mega_diagram(FLAGS_model_name, FLAGS_model_dir, viz_point_cloud,
+                             record_params, std::nullopt);
   systems::Diagram<double>* diagram = stuff.diagram.get();
   multibody::MultibodyPlant<double>* rb_plant = stuff.controller_plant.get();
   ManipulationStation<double>* station = stuff.station;
@@ -105,11 +127,10 @@ int do_main(int argc, char* argv[]) {
   // Save initial configuration and tool pose.
   double t0 = simulator.get_context().get_time();
   Eigen::VectorXd q0 = station->GetIiwaPosition(station_context);
-  drake::log()->info("WTF: {}", q0.transpose());
 
   auto temp_context = rb_plant->CreateDefaultContext();
-  math::RigidTransform<double> X_WT0 = ComputeX_WT(
-      *rb_plant, q0, temp_context.get());
+  math::RigidTransform<double> X_WT0 =
+      ComputeX_WT(*rb_plant, q0, temp_context.get());
 
   // I am manually controlling the simulator stepping to mimic the anzu
   // workflow for programming behaviors, e.g.:
@@ -119,7 +140,7 @@ int do_main(int argc, char* argv[]) {
 
   // Initialize command sources.
   double settling_time = 1;
-  double t1 = settling_time;
+  double t1 = settling_time - FLAGS_record_period;
   const trajectories::PiecewisePolynomial<double> q_traj0 =
       trajectories::PiecewisePolynomial<double>::FirstOrderHold({t0, t1},
                                                                 {q0, q0});
@@ -148,8 +169,9 @@ int do_main(int argc, char* argv[]) {
   // Search DUY in manipulation_station.cc for more details.
   diagram->SetRandomContext(&simulator.get_mutable_context(), &generator);
 
+  // Note q0 is set in manipulation station, but you can override it here
+  // again.
   q0 = station->GetIiwaPosition(station_context);
-  drake::log()->info("WTF: {}", q0.transpose());
 
   // Initialize controller. Important, this needs to happen after
   // diagram->SetRandomContext, otherwise it will reset robot_comm's internal
@@ -166,32 +188,38 @@ int do_main(int argc, char* argv[]) {
   // Get object pose
   const auto& plant = stuff.station->get_multibody_plant();
   const auto& obj = plant.GetBodyByName(FLAGS_model_name);
-  const auto& plant_context = diagram->GetSubsystemContext(
-      plant, simulator.get_context());
-  auto X_WObj = plant.CalcRelativeTransform(
-      plant_context, plant.world_frame(), obj.body_frame());
+  const auto& plant_context =
+      diagram->GetSubsystemContext(plant, simulator.get_context());
+  auto X_WObj = plant.CalcRelativeTransform(plant_context, plant.world_frame(),
+                                            obj.body_frame());
 
   drake::log()->info("{}", X_WObj.matrix());
   auto target = ComputeX_WT_desired(X_WObj);
 
+  auto& v_cmd_context = diagram->GetMutableSubsystemContext(
+      *stuff.tool_vel_cmd, &simulator.get_mutable_context());
   while (true) {
     t0 = simulator.get_context().get_time();
     t1 = t0 + FLAGS_record_period;
 
     q0 = station->GetIiwaPosition(station_context);
-    X_WT0 = ComputeX_WT(
-      *rb_plant, q0, temp_context.get());
+    X_WT0 = ComputeX_WT(*rb_plant, q0, temp_context.get());
 
-    auto V = ComputeControl(X_WT0, target);
-    rb_context.FixInputPort(
-        robot_comm->GetInputPort("tool_velocity").get_index(), V);
+    Eigen::VectorXd V_cmd;
+    if (!FLAGS_test) {
+      V_cmd = ComputeControl(X_WT0, target);
+    } else {
+      V_cmd = WaitForRemoteControl(t0, X_WT0);
+    }
+    stuff.tool_vel_cmd->get_mutable_source_value(&v_cmd_context)
+        .set_value(V_cmd);
     rb_context.FixInputPort(
         robot_comm->GetInputPort("tool_velocity_active").get_index(),
         Eigen::VectorXd::Constant(1, 1));
 
     simulator.AdvanceTo(t1);
 
-    if (t1 > 1 && V.norm() < 1e-2) {
+    if (!FLAGS_test && t1 > 1 && V_cmd.norm() < 1e-2) {
       break;
     }
   }

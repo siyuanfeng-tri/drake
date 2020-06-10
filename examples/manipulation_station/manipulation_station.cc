@@ -501,7 +501,7 @@ void ManipulationStation<T>::SetRandomState(
         math::RotationMatrix<T>::MakeZRotation(-M_PI_2);
     pose.set_rotation(rot);
     /*
-    */
+     */
     pose.set_translation(pose.translation() + Vector3d{0, 0, z_offset});
     drake::log()->info("POS: {}", pose.translation().transpose());
     z_offset += 0.1;
@@ -608,7 +608,7 @@ void ManipulationStation<T>::Finalize(
       // Set the initial positions of the IIWA to a configuration right above
       // the picking bin.
       q0_iiwa << -0.5, 0, 0.5, 0, 0, 0, -1.57, 0, M_PI_2, 0;
-      //q0_iiwa << -0.483169, 0.565567, -2.5566, 1.10944, -0.382038, -1.7204,
+      // q0_iiwa << -0.483169, 0.565567, -2.5566, 1.10944, -0.382038, -1.7204,
       //    0.751417;
 
       // DUY: this sets up the distribution for the obj pose.
