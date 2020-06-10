@@ -89,6 +89,10 @@ void PidController<T>::DoCalcTimeDerivatives(
   const Eigen::VectorBlock<const VectorX<T>> state_d =
       get_input_port_desired_state().Eval(context);
 
+  drake::log()->info("t: {}", context.get_time());
+  drake::log()->info("x_d {}", state_d.transpose());
+  drake::log()->info("x {}", state.transpose());
+
   // The derivative of the continuous state is the instantaneous position error.
   VectorBase<T>& derivatives_vector = derivatives->get_mutable_vector();
   const VectorX<T> controlled_state_diff =

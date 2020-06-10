@@ -914,7 +914,10 @@ void MultibodyPlant<T>::CalcNormalAndTangentContactJacobians(
 
   // Quick no-op exit. Notice we did resize Jn, Jt and R_WC_set to be zero
   // sized.
-  if (num_contacts == 0) return;
+  if (num_contacts == 0) {
+    drake::log()->info("NO CONTACTS!!\n\n");
+    return;
+  }
 
   const Frame<T>& frame_W = world_frame();
   for (int icontact = 0; icontact < num_contacts; ++icontact) {
@@ -927,6 +930,7 @@ void MultibodyPlant<T>::CalcNormalAndTangentContactJacobians(
     const Body<T>& bodyA = get_body(bodyA_index);
     BodyIndex bodyB_index = geometry_id_to_body_index_.at(geometryB_id);
     const Body<T>& bodyB = get_body(bodyB_index);
+    drake::log()->info("CONTACT A: {}, B: {}", bodyA.name(), bodyB.name());
 
     // Penetration depth, > 0 if bodies interpenetrate.
     const Vector3<T>& nhat_BA_W = point_pair.nhat_BA_W;
