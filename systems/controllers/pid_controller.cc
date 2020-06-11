@@ -104,6 +104,11 @@ void PidController<T>::CalcControl(const Context<T>& context,
       get_input_port_estimated_state().Eval(context);
   const Eigen::VectorBlock<const VectorX<T>> state_d =
       get_input_port_desired_state().Eval(context);
+  if (state.size() == 4) {
+    drake::log()->info("proj:\n{}", state_projection_.cast<T>());
+    drake::log()->info("x_d: {}", state_d.transpose());
+    drake::log()->info("x: {}", (state_projection_.cast<T>() * state).transpose());
+  }
 
   // State error.
   const VectorX<T> controlled_state_diff =

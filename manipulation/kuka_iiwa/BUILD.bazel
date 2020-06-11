@@ -36,6 +36,7 @@ drake_cc_library(
     name = "iiwa_command_receiver",
     srcs = ["iiwa_command_receiver.cc"],
     hdrs = ["iiwa_command_receiver.h"],
+    copts = ["-g"],
     deps = [
         ":iiwa_constants",
         "//common:essential",

@@ -32,6 +32,7 @@ drake_cc_package_library(
 drake_cc_library(
     name = "schunk_wsg_constants",
     hdrs = ["schunk_wsg_constants.h"],
+    copts = ["-g"],
     deps = [
         "//common:essential",
         "//systems/primitives:matrix_gain",
@@ -42,6 +43,7 @@ drake_cc_library(
     name = "schunk_wsg_lcm",
     srcs = ["schunk_wsg_lcm.cc"],
     hdrs = ["schunk_wsg_lcm.h"],
+    copts = ["-g"],
     deps = [
         "//lcm:lcm_messages",
         "//lcmtypes:schunk",
@@ -60,6 +62,7 @@ drake_cc_library(
     name = "schunk_wsg_trajectory_generator",
     srcs = ["schunk_wsg_trajectory_generator.cc"],
     hdrs = ["schunk_wsg_trajectory_generator.h"],
+    copts = ["-g"],
     deps = [
         ":schunk_wsg_trajectory_generator_state_vector",
         "//common/trajectories:piecewise_polynomial",
@@ -72,6 +75,7 @@ drake_cc_library(
     name = "schunk_wsg_plain_controller",
     srcs = ["schunk_wsg_plain_controller.cc"],
     hdrs = ["schunk_wsg_plain_controller.h"],
+    copts = ["-g"],
     deps = [
         ":schunk_wsg_constants",
         ":schunk_wsg_lcm",
@@ -87,6 +91,7 @@ drake_cc_library(
     name = "schunk_wsg_position_controller",
     srcs = ["schunk_wsg_position_controller.cc"],
     hdrs = ["schunk_wsg_position_controller.h"],
+    copts = ["-g"],
     deps = [
         "//math:saturate",
         "//systems/framework:leaf_system",
@@ -98,6 +103,7 @@ drake_cc_library(
     name = "schunk_wsg_controller",
     srcs = ["schunk_wsg_controller.cc"],
     hdrs = ["schunk_wsg_controller.h"],
+    copts = ["-g"],
     deps = [
         ":schunk_wsg_constants",
         ":schunk_wsg_lcm",

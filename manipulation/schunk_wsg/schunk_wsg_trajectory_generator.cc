@@ -90,7 +90,8 @@ void SchunkWsgTrajectoryGenerator::DoCalcDiscreteVariableUpdates(
 
   if (std::abs(last_traj_state->last_target_position() - target_position) >
       kTargetEpsilon) {
-    UpdateTrajectory(cur_position, target_position);
+    drake::log()->info("CAO {} {}\n", last_traj_state->last_target_position(), target_position);
+    UpdateTrajectory(last_traj_state->last_target_position(), target_position);
     new_traj_state->set_last_target_position(target_position);
     new_traj_state->set_trajectory_start_time(context.get_time());
   } else {
