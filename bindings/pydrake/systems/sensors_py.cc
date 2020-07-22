@@ -18,6 +18,7 @@
 #include "drake/systems/sensors/camera_info.h"
 #include "drake/systems/sensors/image.h"
 #include "drake/systems/sensors/image_to_lcm_image_array_t.h"
+#include "drake/systems/sensors/image_writer.h"
 #include "drake/systems/sensors/pixel_types.h"
 #include "drake/systems/sensors/rgbd_sensor.h"
 
@@ -308,6 +309,29 @@ PYBIND11_MODULE(sensors, m) {
       AddTemplateMethod(cls, "DeclareImageInputPort",
           &Class::DeclareImageInputPort<kPixelType>, GetPyParam(param),
           py::arg("name"), py_rvp::reference_internal,
+          cls_doc.DeclareImageInputPort.doc);
+    };
+    type_visit(def_image_input_port, PixelTypeList{});
+  }
+
+  {
+    using Class = ImageWriter;
+    constexpr auto& cls_doc = doc.ImageWriter;
+    py::class_<Class, LeafSystem<T>> cls(m, "ImageWriter", cls_doc.doc);
+    cls  // BR
+        .def(py::init());
+    // Because the public interface requires templates and it's hard to
+    // reproduce the logic publicly (e.g. no overload that just takes
+    // `AbstractValue` and the pixel type), go ahead and bind the templated
+    // methods.
+    auto def_image_input_port = [&cls, cls_doc](auto param) {
+      constexpr PixelType kPixelType =
+          decltype(param)::template type_at<0>::value;
+      AddTemplateMethod(cls, "DeclareImageInputPort",
+          &Class::DeclareImageInputPort<kPixelType>, GetPyParam(param),
+          py::arg("port_name"), py::arg("file_name_format"),
+          py::arg("publish_period"), py::arg("start_time"),
+          py_rvp::reference_internal,
           cls_doc.DeclareImageInputPort.doc);
     };
     type_visit(def_image_input_port, PixelTypeList{});

@@ -232,6 +232,21 @@ class TestSensors(unittest.TestCase):
         # `lcm_py_bind_cpp_serializers.h` for more information.
         self.assertIsInstance(output.get_data(0), AbstractValue)
 
+    def test_image_writer(self):
+        dut = mut.ImageWriter()
+        for pixel_type in pixel_types:
+            name = str(pixel_type)
+            dut.DeclareImageInputPort[pixel_type](
+                port_name=name, file_name_format="test.png",
+                publish_period=0.1, start_time=0)
+        context = dut.CreateDefaultContext()
+        for pixel_type in pixel_types:
+            name = str(pixel_type)
+            port = dut.GetInputPort(name)
+            self._check_input(port)
+            image = mut.Image[pixel_type](width=1, height=1)
+            port.FixValue(context, image)
+
     def test_rgbd_sensor(self):
         def check_ports(system):
             self.assertIsInstance(system.query_object_input_port(), InputPort)
